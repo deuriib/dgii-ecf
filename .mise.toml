@@ -1,0 +1,6 @@
+[tools]
+node = "22.23.3"
+npm = "10.8.2"
+
+[env]
+NODE_ENV = "development"
