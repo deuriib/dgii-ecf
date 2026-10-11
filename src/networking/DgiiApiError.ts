@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Mensaje } from './types';
+import { classifyDgiiError, type DgiiError } from './errors';
 
 /**
  * Maximum number of characters kept from a response body that could not be
@@ -255,6 +256,12 @@ export class DgiiApiError extends Error {
   readonly data?: unknown;
   /** `mensajes` returned by DGII, when the body carried them. */
   readonly mensajes?: Mensaje[];
+  /**
+   * Typed error category derived from the structured vocabulary in
+   * `errors.ts`. Lets consumers discriminate failures without inspecting
+   * status codes or axios internals.
+   */
+  readonly _tag: DgiiError['_tag'];
 
   constructor(message: string, options: DgiiApiErrorOptions = {}) {
     super(message);
@@ -271,6 +278,11 @@ export class DgiiApiError extends Error {
     this.baseURL = options.baseURL;
     this.data = options.data;
     this.mensajes = options.mensajes;
+    this._tag = classifyDgiiError({
+      status: options.status,
+      code: options.code,
+      message,
+    })._tag;
 
     if (options.cause !== undefined) {
       // `cause` is not part of the ES2020 lib this package targets. It holds
@@ -295,6 +307,7 @@ export class DgiiApiError extends Error {
     return {
       name: this.name,
       message: this.message,
+      _tag: this._tag,
       status: this.status,
       statusText: this.statusText,
       code: this.code,

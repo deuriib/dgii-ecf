@@ -11,7 +11,7 @@
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "strict": true,
-    "types": ["node", "jest"],
+    "types": ["node", "vitest/globals"],
     "resolveJsonModule": true, 
     "noEmit": false,
     "emitDeclarationOnly": true,
