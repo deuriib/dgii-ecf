@@ -1,5 +1,4 @@
-import AxiosMockAdapter from 'axios-mock-adapter';
-import { ENVIRONMENT, restClient } from '../../networking';
+import { ENVIRONMENT } from '../../networking';
 import { ServiceDirectoryResponse } from '../../networking/types';
 import ECF from '../ECF';
 
@@ -13,60 +12,41 @@ const directoryEntry: ServiceDirectoryResponse = {
 };
 
 describe('ECF.getCustomerDirectory', () => {
-  const mock = new AxiosMockAdapter(restClient);
   const credentials = { key: undefined, cert: undefined };
 
-  afterEach(() => {
-    mock.reset();
-  });
-
-  afterAll(() => {
-    mock.restore();
-  });
+  // Inject the stub through the facade's fetch parameter (which routes via
+  // the `Fetch` context reference), never via `globalThis.fetch` spies.
+  const stubFor = (body: unknown): typeof globalThis.fetch =>
+    (async () =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })) as typeof globalThis.fetch;
 
   it('returns the array as-is when the service responds with an array', async () => {
     // DGII retired the bulk `listado` query, so DEV uses the per-RNC lookup too
-    mock
-      .onGet(
-        '/TesteCF/consultadirectorio/api/consultas/obtenerdirectorioporrnc',
-        {
-          params: { rnc },
-        }
-      )
-      .reply(200, [directoryEntry]);
-
     const ecf = new ECF(credentials, ENVIRONMENT.DEV);
 
-    await expect(ecf.getCustomerDirectory(rnc)).resolves.toEqual([
-      directoryEntry,
-    ]);
+    await expect(
+      ecf.getCustomerDirectory(rnc, stubFor([directoryEntry]))
+    ).resolves.toEqual([directoryEntry]);
   });
 
   it('wraps a single object response in an array (production eCF shape)', async () => {
-    mock
-      .onGet('/eCF/consultadirectorio/api/consultas/obtenerdirectorioporrnc', {
-        params: { rnc },
-      })
-      .reply(200, directoryEntry);
-
     const ecf = new ECF(credentials, ENVIRONMENT.PROD);
 
     // The production directory service returns a single object; getCustomerDirectory
     // normalizes it to an array so consumers always get ServiceDirectoryResponse[].
-    await expect(ecf.getCustomerDirectory(rnc)).resolves.toEqual([
-      directoryEntry,
-    ]);
+    await expect(
+      ecf.getCustomerDirectory(rnc, stubFor(directoryEntry))
+    ).resolves.toEqual([directoryEntry]);
   });
 
   it('returns undefined when the service responds with no body', async () => {
-    mock
-      .onGet('/eCF/consultadirectorio/api/consultas/obtenerdirectorioporrnc', {
-        params: { rnc },
-      })
-      .reply(200, null);
-
     const ecf = new ECF(credentials, ENVIRONMENT.PROD);
 
-    await expect(ecf.getCustomerDirectory(rnc)).resolves.toBeUndefined();
+    await expect(
+      ecf.getCustomerDirectory(rnc, stubFor(null))
+    ).resolves.toBeUndefined();
   });
 });

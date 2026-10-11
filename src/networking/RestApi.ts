@@ -1,11 +1,17 @@
 import { ENVIRONMENT } from '../networking';
-import { BaseUrl, restClient, setAuthToken } from './restClient';
-import FormData from 'form-data';
-import { AxiosError } from 'axios';
-import { toDgiiApiError } from './DgiiApiError';
-import string2fileStream from 'string-to-file-stream';
-
-import streamLength from 'stream-length';
+import { Effect } from 'effect';
+import { HttpClient } from 'effect/http';
+import type { HttpClientError } from 'effect/http';
+import {
+  getRequest,
+  readJsonBody,
+  requireOkStatus,
+  runDgiiRequest,
+  withBearerToken,
+  xmlUploadRequest,
+} from './transport';
+import type { DgiiError } from './errors';
+import { BaseUrl } from './restClient';
 import {
   TrackingStatusResponse,
   AuthToken,
@@ -36,37 +42,43 @@ export enum ENDPOINTS {
   DIRECTORY = 'consultadirectorio/api/consultas/obtenerdirectorioporrnc',
   VOID = 'anulacionrangos/api/operaciones/anularrango',
   SERVICE_STATUS = 'api/estatusservicios/obtenerestatus', //Require API KEY
-  SERVICE_MAINTENANCE = 'api/estatusservicios/obtenerventanasmantenimiento', //Require API KEY
-  SERVICE_VERIFICATION = 'api/estatusservicios/verificarestado', //Require API KEY
+  SERVICE_MAINTENANCE = 'api/estatusservicios/obtenerventanamantenimiento', //Require API KEY
+  SERVICE_VERIFICATION = 'api/estatusservicios/verificarconexion', //Require API KEY
 }
+
+export enum ENDPOINTS_SENDER_RECEIVER {
+  SEED = 'recepcion/api/semilla',
+  VALIDATE_SEED = 'recepcion/api/validarsemilla',
+  SEND_INVOICE = 'recepcion/api/facturaselectronicas',
+}
+
+type QueryParams = Record<string, string | number | undefined>;
 
 /**
- * Estándar de comunicación Emisor ‐ Receptor
- * Con el objetivo de garantizar el intercambio seguro de información entre
- * contribuyentes, en la presente sección se describe el estándar de comunicación que
- * estos deberán tener para Facturación Electrónica.
+ * Effect-native DGII transport.
+ *
+ * Every public member returns `Effect<unknown, DgiiError,
+ * HttpClient.HttpClient>` so the full error context (status, resource,
+ * typed `_tag`) survives into the error channel. The Promise-preserving
+ * `ECF` facade runs these through `runDgiiRequest`; in PR-6 the facade
+ * goes away and consumers consume the Effect directly.
+ *
+ * Auth is per-instance: the constructor holds the bearer token and every
+ * request attaches it via `withBearerToken`. Nothing writes to a shared
+ * axios singleton anymore (closes CRITICAL-1).
  */
-export enum ENDPOINTS_SENDER_RECEIVER {
-  SEED = `fe/autenticacion/api/semilla`,
-  VALIDATE_SEED = `fe/autenticacion/api/validacioncertificado`,
-  SEND_INVOICE = `fe/recepcion/api/ecf`,
-  SEND_COMMERCIAL_APPROVAL = `fe/aprobacioncomercial/api/ecf`,
-}
-
-export const isErrorResponse = <T>(
-  response: T | AxiosError
-): response is AxiosError => {
-  return (response as AxiosError).status !== 200;
-};
-
 class RestApi {
   private env: ENVIRONMENT = ENVIRONMENT.DEV;
+  private accessToken?: string;
 
   constructor(env: ENVIRONMENT, accessToken?: string) {
     this.env = env;
-    if (accessToken) {
-      setAuthToken(accessToken);
-    }
+    this.accessToken = accessToken;
+  }
+
+  /** Environment this instance talks to; the facade reuses it on re-auth. */
+  get environment(): ENVIRONMENT {
+    return this.env;
   }
 
   private get baseApi() {
@@ -81,25 +93,103 @@ class RestApi {
     return `/${endpoint}`;
   }
 
+  private withAuth(
+    url: string,
+    buyerToken?: string
+  ): {
+    url: string;
+    token?: string;
+  } {
+    return { url, token: buyerToken ?? this.accessToken };
+  }
+
+  /**
+   * Run a GET request against the Effect client and decode the JSON body.
+   */
+  private getJson<T>(
+    url: string,
+    params?: QueryParams,
+    token?: string,
+    baseURL: string = BaseUrl.ECF
+  ): Effect.Effect<
+    T,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > {
+    return Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const target = `${baseURL}${url}`;
+      let request = getRequest(target, params);
+      if (token !== undefined) {
+        request = withBearerToken(request, token);
+      }
+      const response = yield* client.execute(request);
+      yield* requireOkStatus(response, request);
+      return (yield* readJsonBody(response)) as T;
+    });
+  }
+
+  /**
+   * Run a multipart XML upload against the Effect client and decode the
+   * JSON body.
+   */
+  private postXml<T>(
+    url: string,
+    xml: string,
+    fileName: string,
+    token?: string,
+    baseURL: string = BaseUrl.ECF
+  ): Effect.Effect<
+    T,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > {
+    return Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const target = `${baseURL}${url}`;
+      let request = xmlUploadRequest(target, xml, fileName);
+      if (token !== undefined) {
+        request = withBearerToken(request, token);
+      }
+      const response = yield* client.execute(request);
+      yield* requireOkStatus(response, request);
+      return (yield* readJsonBody(response)) as T;
+    });
+  }
+
   /**
    * Get an initial XML payload called seed, should be signed using the certificate .p12
    * @param buyerHost optional - If buyerHost is defined the authentication will be againt the buyer HOST to stablish the communication Sender<->Receiver
    * @returns
    */
-  getSeedApi = async (buyerHost?: string): Promise<string | undefined> => {
-    try {
-      //If buyerHost is defined the authentication will be againt the buyer HOST to stablish the communication Sender<->Receiver
-      const resource = buyerHost
-        ? this.getBuyerResource(ENDPOINTS_SENDER_RECEIVER.SEED)
-        : this.getResource(ENDPOINTS.SEED);
-      const response = await restClient.get(resource, {
-        baseURL: buyerHost,
-      });
+  getSeedApi = (
+    buyerHost?: string
+  ): Effect.Effect<
+    string,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    //If buyerHost is defined the authentication will be againt the buyer HOST to stablish the communication Sender<->Receiver
+    const resource = buyerHost
+      ? this.getBuyerResource(ENDPOINTS_SENDER_RECEIVER.SEED)
+      : this.getResource(ENDPOINTS.SEED);
+    const baseURL = buyerHost ?? BaseUrl.ECF;
 
-      return response.data;
-    } catch (err) {
-      throw toDgiiApiError(err);
-    }
+    return Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const response = yield* client.execute(
+        getRequest(`${baseURL}${resource}`)
+      );
+      yield* requireOkStatus(response, getRequest(`${baseURL}${resource}`));
+      const text = yield* Effect.mapError(
+        response.text,
+        (): DgiiError => ({
+          _tag: 'SerializationError',
+          message: 'DGII seed response is not readable text',
+        })
+      );
+      return text;
+    });
   };
   /**
    * Return the token from a signed seed
@@ -108,35 +198,26 @@ class RestApi {
    * @returns promise with the access token
    */
 
-  getAuthTokenApi = async (
+  getAuthTokenApi = (
     signedSeed: string,
     buyerHost?: string
-  ): Promise<AuthToken | undefined> => {
-    try {
-      const resource = buyerHost
-        ? this.getBuyerResource(ENDPOINTS_SENDER_RECEIVER.VALIDATE_SEED)
-        : this.getResource(ENDPOINTS.VALIDATE_SEED);
+  ): Effect.Effect<
+    AuthToken,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    const resource = buyerHost
+      ? this.getBuyerResource(ENDPOINTS_SENDER_RECEIVER.VALIDATE_SEED)
+      : this.getResource(ENDPOINTS.VALIDATE_SEED);
+    const baseURL = buyerHost ?? BaseUrl.ECF;
 
-      //Stream Readable
-      const stream = string2fileStream(signedSeed, { path: 'signed.xml' });
-
-      const formData = new FormData();
-      formData.append('xml', stream);
-
-      const config = {
-        baseURL: buyerHost,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Accept: 'application/json',
-          ...formData.getHeaders(),
-        },
-      };
-      const response = await restClient.postForm(resource, formData, config);
-
-      return response.data as AuthToken;
-    } catch (err) {
-      throw toDgiiApiError(err);
-    }
+    return this.postXml<AuthToken>(
+      resource,
+      signedSeed,
+      'signed.xml',
+      undefined,
+      baseURL
+    );
   };
 
   /**
@@ -146,49 +227,24 @@ class RestApi {
    * @param buyerHost optional - If buyerHost is defined the authentication will be againt the buyer HOST to stablish the communication Sender<->Receiver
    * @returns
    */
-  sendElectronicDocumentApi = async <T = InvoiceResponse>(
+  sendElectronicDocumentApi = <T = InvoiceResponse>(
     signedInvoice: string,
     fileName: string,
     buyerHost?: string
-  ): Promise<T | undefined> => {
-    try {
-      const resource = buyerHost
+  ): Effect.Effect<
+    T,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    const { url, token } = this.withAuth(
+      buyerHost
         ? this.getBuyerResource(ENDPOINTS_SENDER_RECEIVER.SEND_INVOICE)
-        : this.getResource(ENDPOINTS.SEND_INVOICE);
+        : this.getResource(ENDPOINTS.SEND_INVOICE),
+      undefined
+    );
+    const baseURL = buyerHost ?? BaseUrl.ECF;
 
-      const stream = string2fileStream(signedInvoice, {
-        path: fileName,
-      });
-
-      const sLength = await streamLength(stream);
-
-      const options = {
-        knownLength: sLength, //Super important!! the DGII server need the Calculation of the content-length otherwise will reject the request saying "Multipart cannot be empty"
-      };
-
-      const formData = new FormData();
-      formData.append('xml', stream, options);
-
-      const response = await restClient.post(resource, formData, {
-        baseURL: buyerHost,
-        headers: {
-          ...formData.getHeaders(),
-          'Content-Length': formData.getLengthSync(), //Super important calculate dynamically! I spent so much time figuring this out! OHHHHHH I'm dead!
-        },
-      });
-
-      return response.data as T;
-    } catch (err) {
-      const apiError = toDgiiApiError(err);
-      console.error('Error sending sendElectronicDocument API:', {
-        message: apiError.message,
-        status: apiError.status,
-        code: apiError.code,
-        resource: apiError.resource,
-        data: apiError.data,
-      });
-      throw apiError;
-    }
+    return this.postXml<T>(url, signedInvoice, fileName, token, baseURL);
   };
 
   /**
@@ -199,48 +255,35 @@ class RestApi {
    * @returns
    */
 
-  sendSignedDocumentApi = async <T>(
+  sendSignedDocumentApi = <T>(
     signedDocument: string,
     fileName: string,
     opperation: Opperation
-  ): Promise<T | undefined> => {
-    try {
-      let resource = '';
-      switch (opperation) {
-        case Opperation.VOID_DOCUMENT:
-          resource = this.getResource(ENDPOINTS.VOID);
-          break;
-        case Opperation.COMMERCIAL_APPROVAL:
-          resource = this.getResource(ENDPOINTS.COMMERCIAL_APPROVAL);
-          break;
-        default:
-          throw new Error('Opperation not found');
-      }
-
-      const stream = string2fileStream(signedDocument, {
-        path: fileName,
-      });
-
-      const sLength = await streamLength(stream);
-
-      const options = {
-        knownLength: sLength, //Super important!! the DGII server need the Calculation of the content-length otherwise will reject the request saying "Multipart cannot be empty"
-      };
-
-      const formData = new FormData();
-      formData.append('xml', stream, options);
-
-      const response = await restClient.post(resource, formData, {
-        headers: {
-          ...formData.getHeaders(),
-          'Content-Length': formData.getLengthSync(), //Super important calculate dynamically! I spent so much time figuring this out! OHHHHHH I'm dead!
-        },
-      });
-
-      return response.data as T;
-    } catch (err) {
-      throw toDgiiApiError(err);
+  ): Effect.Effect<
+    T,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    let resource = '';
+    switch (opperation) {
+      case Opperation.VOID_DOCUMENT:
+        resource = this.getResource(ENDPOINTS.VOID);
+        break;
+      case Opperation.COMMERCIAL_APPROVAL:
+        resource = this.getResource(ENDPOINTS.COMMERCIAL_APPROVAL);
+        break;
+      default:
+        return Effect.fail({
+          _tag: 'ValidationError',
+          message: `Unknown opperation: ${String(opperation)}`,
+          field: 'opperation',
+          expected: 'VOID_DOCUMENT | COMMERCIAL_APPROVAL',
+          received: opperation,
+        } satisfies DgiiError);
     }
+    const { url, token } = this.withAuth(resource);
+
+    return this.postXml<T>(url, signedDocument, fileName, token);
   };
 
   /**
@@ -249,47 +292,25 @@ class RestApi {
    * @param fileName the composition of the file name should be RNC+e-NCF.xml example: “101672919E3100000001.xml”
    * @returns
    */
-  sendSummaryApi = async (
+  sendSummaryApi = (
     signedInvoice: string,
     fileName: string
-  ): Promise<InvoiceSummaryResponse | undefined> => {
-    try {
-      const resource = this.getResource(ENDPOINTS.SEND_SUMMARY);
+  ): Effect.Effect<
+    InvoiceSummaryResponse,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    const { url, token } = this.withAuth(
+      this.getResource(ENDPOINTS.SEND_SUMMARY)
+    );
 
-      const stream = string2fileStream(signedInvoice, {
-        path: fileName,
-      });
-
-      const sLength = await streamLength(stream);
-
-      const options = {
-        knownLength: sLength, //Super important!! the DGII server need the Calculation of the content-length otherwise will reject the request saying "Multipart cannot be empty"
-      };
-
-      const formData = new FormData();
-      formData.append('xml', stream, options);
-
-      console.log('Sending summary to:', { base: BaseUrl.CF, resource });
-      const response = await restClient.post(resource, formData, {
-        baseURL: BaseUrl.CF, //use FC endpoint
-        headers: {
-          ...formData.getHeaders(),
-          'Content-Length': formData.getLengthSync(), //Super important calculate dynamically! I spent so much time figuring this out! OHHHHHH I'm dead!
-        },
-      });
-
-      return response.data as InvoiceSummaryResponse;
-    } catch (err) {
-      const apiError = toDgiiApiError(err);
-      console.error('Error sending summary API:', {
-        message: apiError.message,
-        status: apiError.status,
-        code: apiError.code,
-        resource: apiError.resource,
-        data: apiError.data,
-      });
-      throw apiError;
-    }
+    return this.postXml<InvoiceSummaryResponse>(
+      url,
+      signedInvoice,
+      fileName,
+      token,
+      BaseUrl.CF
+    );
   };
 
   /**
@@ -298,22 +319,22 @@ class RestApi {
    * @returns promise with the tracking status
    */
 
-  statusTrackIdApi = async (
+  statusTrackIdApi = (
     trackId: string
-  ): Promise<TrackingStatusResponse | undefined> => {
-    try {
-      const resource = this.getResource(ENDPOINTS.TRACK_RESULT_STATUS);
+  ): Effect.Effect<
+    TrackingStatusResponse,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    const { url, token } = this.withAuth(
+      this.getResource(ENDPOINTS.TRACK_RESULT_STATUS)
+    );
 
-      const response = await restClient.get(resource, { params: { trackId } });
-
-      return response.data as TrackingStatusResponse;
-    } catch (err) {
-      throw toDgiiApiError(err);
-    }
+    return this.getJson<TrackingStatusResponse>(url, { trackId }, token);
   };
   /**
    * Consulta de estado e‐CF (CONSUMO Y CRÉDITO FISCAL)
-   *Servicio web responsable de responder la validez o estado de un e‐CF a un receptor o 
+   *Servicio web responsable de responder la validez o estado de un e‐CF a un receptor o
    incluso a un emisor, a través de la presentación del RNC emisor, e‐NCF y dos campos
    condicionales a la vigencia del comprobante, RNC Comprador y el código de seguridad.
 
@@ -324,23 +345,25 @@ class RestApi {
    * hash generado en el SignatureValue de la firma digital del e-CFrecibido. Factura de credito fiscal
    * @returns
    */
-  inquiryStatusApi = async (
+  inquiryStatusApi = (
     rncEmisor: string,
     ncfElectronico: string,
     rncComprador?: string,
     codigoSeguridad?: string
-  ): Promise<InquiryStatusResponse | undefined> => {
-    try {
-      const resource = this.getResource(ENDPOINTS.INQUIRY_STATUS);
+  ): Effect.Effect<
+    InquiryStatusResponse,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    const { url, token } = this.withAuth(
+      this.getResource(ENDPOINTS.INQUIRY_STATUS)
+    );
 
-      const response = await restClient.get(resource, {
-        params: { rncEmisor, ncfElectronico, rncComprador, codigoSeguridad },
-      });
-
-      return response.data as InquiryStatusResponse;
-    } catch (err) {
-      throw toDgiiApiError(err);
-    }
+    return this.getJson<InquiryStatusResponse>(
+      url,
+      { rncEmisor, ncfElectronico, rncComprador, codigoSeguridad },
+      token
+    );
   };
 
   /**
@@ -349,21 +372,23 @@ class RestApi {
    * @param encf electronic NCF
    * @returns
    */
-  getAllTrackingncfApi = async (
+  getAllTrackingncfApi = (
     rncEmisor: string,
     encf: string
-  ): Promise<SummaryTrackingStatusResponse[] | undefined> => {
-    try {
-      const resource = this.getResource(ENDPOINTS.ALL_TACKING_ECF);
+  ): Effect.Effect<
+    SummaryTrackingStatusResponse[],
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    const { url, token } = this.withAuth(
+      this.getResource(ENDPOINTS.ALL_TACKING_ECF)
+    );
 
-      const response = await restClient.get(resource, {
-        params: { rncEmisor, encf },
-      });
-
-      return response.data as SummaryTrackingStatusResponse[];
-    } catch (err) {
-      throw toDgiiApiError(err);
-    }
+    return this.getJson<SummaryTrackingStatusResponse[]>(
+      url,
+      { rncEmisor, encf },
+      token
+    );
   };
 
   /**
@@ -378,17 +403,27 @@ class RestApi {
    * @param rnc
    * @returns Promise ServiceDirectory array of URL
    */
-  getCustomerDirectoryApi = async (
+  getCustomerDirectoryApi = (
     rnc: string
-  ): Promise<ServiceDirectoryResponse[] | undefined> => {
-    try {
-      const resource = this.getResource(ENDPOINTS.DIRECTORY);
+  ): Effect.Effect<
+    ServiceDirectoryResponse[] | undefined,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    const { url, token } = this.withAuth(this.getResource(ENDPOINTS.DIRECTORY));
 
-      const response = await restClient.get(resource, {
-        params: { rnc },
-      });
-
-      const data = response.data as
+    return Effect.gen(function* () {
+      const data = (yield* Effect.gen(function* () {
+        const client = yield* HttpClient.HttpClient;
+        const target = `${BaseUrl.ECF}${url}`;
+        let request = getRequest(target, { rnc });
+        if (token !== undefined) {
+          request = withBearerToken(request, token);
+        }
+        const response = yield* client.execute(request);
+        yield* requireOkStatus(response, request);
+        return yield* readJsonBody(response);
+      })) as
         | ServiceDirectoryResponse[]
         | ServiceDirectoryResponse
         | undefined
@@ -401,9 +436,7 @@ class RestApi {
       // Normalize the inconsistent DGII response: wrap a single entry in an array so
       // callers always receive ServiceDirectoryResponse[].
       return Array.isArray(data) ? data : [data];
-    } catch (err) {
-      throw toDgiiApiError(err);
-    }
+    });
   };
 
   /**
@@ -416,23 +449,25 @@ class RestApi {
    * @param cod_seguridad_eCF CONSUMO: 6 digitos asignado en el resumen.
    * @returns
    */
-  getSummaryInvoiceInquiryApi = async (
+  getSummaryInvoiceInquiryApi = (
     rnc_emisor: string,
     encf: string,
     cod_seguridad_eCF: string
-  ): Promise<InquiryInvoiceSummary> => {
-    try {
-      const resource = this.getResource(ENDPOINTS.INQUIRY_INVOICE_SUMMARY); // >>>>>>>>>>>>>> ONLY AVAILABLE ON PRODUCTION ENVIRONEMNT <<<<<<<<<<<<<<<
+  ): Effect.Effect<
+    InquiryInvoiceSummary,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    const { url, token } = this.withAuth(
+      this.getResource(ENDPOINTS.INQUIRY_INVOICE_SUMMARY)
+    );
 
-      const response = await restClient.get(resource, {
-        params: { rnc_emisor, encf, cod_seguridad_eCF },
-        baseURL: BaseUrl.CF, //use FC endpoint
-      });
-
-      return response.data as InquiryInvoiceSummary;
-    } catch (err) {
-      throw toDgiiApiError(err);
-    }
+    return this.getJson<InquiryInvoiceSummary>(
+      url,
+      { rnc_emisor, encf, cod_seguridad_eCF },
+      token,
+      BaseUrl.CF
+    );
   };
 
   /**
@@ -442,50 +477,60 @@ class RestApi {
    * @param apiKey
    * @returns
    */
-  dgiiCloudServicesStatusApi = async <
+  dgiiCloudServicesStatusApi = <
     T = ServiceStatusResponse | MaintenanceResponse | VerificationResponse
   >(
     statusOperation: StatusOperation,
     apiKey: string
-  ): Promise<T | undefined> => {
-    try {
-      let resource = '';
-      let params = {};
-      switch (statusOperation) {
-        case StatusOperation.SERVICES_STATUS:
-          resource = this.getResource(ENDPOINTS.SERVICE_STATUS);
-          break;
-        case StatusOperation.SERVICE_MAINTENANCE_WINDOW:
-          resource = this.getResource(ENDPOINTS.SERVICE_MAINTENANCE);
-          break;
-        case StatusOperation.SERVICE_VERIFICATION:
-          resource = this.getResource(ENDPOINTS.SERVICE_VERIFICATION);
-          const currentEnv = {
-            [ENVIRONMENT.DEV]: 1,
-            [ENVIRONMENT.PROD]: 2,
-            [ENVIRONMENT.CERT]: 3,
-          };
+  ): Effect.Effect<
+    T | undefined,
+    DgiiError | HttpClientError.HttpClientError,
+    HttpClient.HttpClient
+  > => {
+    let resource = '';
+    let params: QueryParams = {};
+    switch (statusOperation) {
+      case StatusOperation.SERVICES_STATUS:
+        resource = this.getResource(ENDPOINTS.SERVICE_STATUS);
+        break;
+      case StatusOperation.SERVICE_MAINTENANCE_WINDOW:
+        resource = this.getResource(ENDPOINTS.SERVICE_MAINTENANCE);
+        break;
+      case StatusOperation.SERVICE_VERIFICATION:
+        resource = this.getResource(ENDPOINTS.SERVICE_VERIFICATION);
+        const currentEnv = {
+          [ENVIRONMENT.DEV]: 1,
+          [ENVIRONMENT.PROD]: 2,
+          [ENVIRONMENT.CERT]: 3,
+        };
 
-          params = { ambiente: currentEnv[this.env] };
+        params = { ambiente: currentEnv[this.env] };
 
-          break;
-        default:
-          throw new Error('Opperation not found');
-      }
-
-      const response = await restClient.get(resource, {
-        params,
-        headers: {
-          Authorization: apiKey,
-        },
-        baseURL: BaseUrl.STATUS,
-      });
-
-      return response.data as T;
-    } catch (err) {
-      throw toDgiiApiError(err);
+        break;
+      default:
+        return Effect.fail({
+          _tag: 'ValidationError',
+          message: `Unknown status operation: ${String(statusOperation)}`,
+          field: 'statusOperation',
+          expected:
+            'SERVICES_STATUS | SERVICE_MAINTENANCE_WINDOW | SERVICE_VERIFICATION',
+          received: statusOperation,
+        } satisfies DgiiError);
     }
+
+    const url = `${BaseUrl.STATUS}${resource}`;
+
+    return Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      let request = getRequest(url, params);
+      // Cloud status endpoints use the DGII API key, not the bearer token.
+      request = withBearerToken(request, apiKey);
+      const response = yield* client.execute(request);
+      yield* requireOkStatus(response, request);
+      return (yield* readJsonBody(response)) as T | undefined;
+    });
   };
 }
 
 export default RestApi;
+export { runDgiiRequest };

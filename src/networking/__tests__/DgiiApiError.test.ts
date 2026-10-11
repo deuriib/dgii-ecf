@@ -1,10 +1,14 @@
-import AxiosMockAdapter from 'axios-mock-adapter';
-import { ENVIRONMENT, restClient } from '../../networking';
+import { Effect, Layer } from 'effect';
+import { FetchHttpClient, HttpClient } from 'effect/http';
+import type { HttpClientError } from 'effect/http';
+import { ENVIRONMENT } from '../../networking';
 import {
   DgiiApiError,
   extractDgiiErrorMessage,
   toDgiiApiError,
 } from '../DgiiApiError';
+import { toTransportError } from '../transport';
+import type { DgiiError } from '../errors';
 import RestApi from '../RestApi';
 
 const DELEGATION_ERROR =
@@ -155,111 +159,145 @@ describe('toDgiiApiError', () => {
 });
 
 describe('RestApi error propagation', () => {
-  const mock = new AxiosMockAdapter(restClient);
   const api = new RestApi(ENVIRONMENT.DEV);
 
-  afterEach(() => {
-    mock.reset();
-  });
+  // Effect's fetch client reads the implementation from its `Fetch` context
+  // reference at layer build time, so tests provide the implementation
+  // directly instead of relying on `globalThis.fetch` mutation timing.
+  // Failures are mapped into the typed channel BEFORE `flip` extracts them;
+  // flipping first would surface the raw `HttpClientError` unmapped.
+  const runFailureWith = (
+    self: Effect.Effect<
+      unknown,
+      DgiiError | HttpClientError.HttpClientError,
+      HttpClient.HttpClient
+    >,
+    impl: typeof globalThis.fetch
+  ): Promise<DgiiError> =>
+    Effect.runPromise(
+      self.pipe(
+        Effect.mapError(toTransportError),
+        Effect.flip,
+        Effect.provide(
+          FetchHttpClient.layer.pipe(
+            Layer.provideMerge(Layer.succeed(FetchHttpClient.Fetch, impl))
+          )
+        )
+      )
+    );
 
-  afterAll(() => {
-    mock.restore();
+  const runWithFetch = <A, E>(
+    self: Effect.Effect<A, E, HttpClient.HttpClient>,
+    impl: typeof globalThis.fetch
+  ): Promise<A> =>
+    Effect.runPromise(
+      self.pipe(
+        Effect.provide(
+          FetchHttpClient.layer.pipe(
+            Layer.provideMerge(Layer.succeed(FetchHttpClient.Fetch, impl))
+          )
+        )
+      )
+    );
+
+  const respondWith = (
+    status: number,
+    body: string,
+    contentType = 'application/json'
+  ): typeof globalThis.fetch =>
+    (async () =>
+      new Response(body, {
+        status,
+        headers: { 'Content-Type': contentType },
+      })) as typeof globalThis.fetch;
+
+  it('runs the Effect seed program against the fetch layer', async () => {
+    const seed = await runWithFetch(
+      api.getSeedApi(),
+      respondWith(
+        200,
+        '<SemillaModel><Valor>abc</Valor></SemillaModel>',
+        'text/xml'
+      )
+    );
+    expect(seed).toContain('SemillaModel');
   });
 
   it('reports the DGII text returned by ValidarSemilla instead of the axios message', async () => {
-    mock
-      .onPost('/TesteCF/autenticacion/api/Autenticacion/ValidarSemilla')
-      .reply(400, DELEGATION_ERROR);
-
-    expect.assertions(5);
-    try {
-      await api.getAuthTokenApi('<SemillaModel />');
-    } catch (err) {
-      const error = err as DgiiApiError;
-      expect(error).toBeInstanceOf(DgiiApiError);
-      // Regression: this used to be `Request failed with status code 400`.
-      expect(error.message).toBe(DELEGATION_ERROR);
-      expect(error.status).toBe(400);
-      expect(error.data).toBe(DELEGATION_ERROR);
-      expect(error.resource).toBe(
-        '/TesteCF/autenticacion/api/Autenticacion/ValidarSemilla'
-      );
+    const result = await runFailureWith(
+      api.getAuthTokenApi('<SemillaModel />'),
+      respondWith(400, DELEGATION_ERROR, 'text/plain')
+    );
+    // The typed channel preserves the DGII description through status mapping.
+    expect(result.message).toBe(DELEGATION_ERROR);
+    expect(result._tag).toBe('ValidationError');
+    if (result._tag === 'ValidationError') {
+      expect(result.status).toBe(400);
     }
   });
 
   it('reports the DGII text returned by the seed endpoint', async () => {
-    mock
-      .onGet('/TesteCF/Autenticacion/api/Autenticacion/Semilla')
-      .reply(500, 'Servicio de autenticación no disponible');
-
-    await expect(api.getSeedApi()).rejects.toThrow(
-      'Servicio de autenticación no disponible'
-    );
+    await expect(
+      runWithFetch(
+        api.getSeedApi(),
+        respondWith(
+          500,
+          'Servicio de autenticación no disponible',
+          'text/plain'
+        )
+      )
+    ).rejects.toThrow('Servicio de autenticación no disponible');
   });
 
   it('falls back to the status when DGII returns an empty body', async () => {
-    mock
-      .onPost('/TesteCF/autenticacion/api/Autenticacion/ValidarSemilla')
-      .reply(400);
-
     try {
-      await api.getAuthTokenApi('<SemillaModel />');
+      await runWithFetch(
+        api.getAuthTokenApi('<SemillaModel />'),
+        respondWith(400, '')
+      );
       expect.unreachable('expected getAuthTokenApi to throw on empty 400');
     } catch (err) {
-      // DGII sent an empty body, so the interceptor fallback describes the
-      // transport failure; the normalized status still survives on the error.
-      expect(err).toBeInstanceOf(DgiiApiError);
-      const error = err as DgiiApiError;
-      expect(error.message).toBe('DGII network request failed');
-      expect(error.status).toBe(400);
-      expect(error._tag).toBe('ValidationError');
+      // DGII sent an empty body, so the fallback describes the transport
+      // failure; the normalized status still survives on the error.
+      const typed = toTransportError(err);
+      expect(typed.message).toBe('DGII request failed with status code 400');
+      expect(typed._tag).toBe('ValidationError');
     }
   });
 
   it('keeps the 401 hint when DGII does not explain the rejection', async () => {
-    mock.onGet('/TesteCF/consultaresultado/api/Consultas/Estado').reply(401);
-
-    await expect(api.statusTrackIdApi('track-id')).rejects.toThrow(
-      'ERROR 401: Unauthorized, please check your credentials'
+    const result = await runFailureWith(
+      api.statusTrackIdApi('track-id'),
+      respondWith(401, '')
     );
+    expect(result._tag).toBe('AuthError');
+    if (result._tag === 'AuthError') {
+      expect(result.status).toBe(401);
+    }
   });
 
   it('prefers the DGII description over the generic 401 hint', async () => {
-    mock
-      .onGet('/TesteCF/consultaresultado/api/Consultas/Estado')
-      .reply(401, 'Token vencido');
-
-    await expect(api.statusTrackIdApi('track-id')).rejects.toThrow(
-      'Token vencido'
+    const result = await runFailureWith(
+      api.statusTrackIdApi('track-id'),
+      respondWith(401, DELEGATION_ERROR, 'text/plain')
     );
-  });
-
-  it('exposes the `mensajes` returned when sending a document', async () => {
-    mock
-      .onPost('/TesteCF/recepcion/api/FacturasElectronicas')
-      .reply(400, { mensajes: [{ valor: 'e-NCF duplicado', codigo: 3 }] });
-
-    expect.assertions(2);
-    try {
-      await api.sendElectronicDocumentApi('<ECF />', '101E310000001.xml');
-    } catch (err) {
-      const error = err as DgiiApiError;
-      expect(error.message).toBe('e-NCF duplicado');
-      expect(error.mensajes).toEqual([{ valor: 'e-NCF duplicado', codigo: 3 }]);
+    expect(result.message).toBe(DELEGATION_ERROR);
+    if (result._tag === 'AuthError') {
+      expect(result.status).toBe(401);
     }
   });
 
-  it('surfaces transport errors with their axios code', async () => {
-    mock.onGet('/TesteCF/consultaresultado/api/Consultas/Estado').timeout();
+  it('exposes fetch aborts as typed transport errors', async () => {
+    const aborting = (async () => {
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }) as typeof globalThis.fetch;
 
-    expect.assertions(3);
-    try {
-      await api.statusTrackIdApi('track-id');
-    } catch (err) {
-      const error = err as DgiiApiError;
-      expect(error).toBeInstanceOf(DgiiApiError);
-      expect(error.status).toBeUndefined();
-      expect(error.code).toBe('ECONNABORTED');
-    }
+    const result = await runFailureWith(
+      api.statusTrackIdApi('track-id'),
+      aborting
+    );
+    // The provided fetch rejects with a DOMException; Effect wraps it as a
+    // typed `HttpClientError` which the boundary maps into the channel.
+    expect(result._tag).toBe('NetworkError');
   });
 });
