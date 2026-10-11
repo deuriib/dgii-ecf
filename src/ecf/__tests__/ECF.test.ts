@@ -228,7 +228,7 @@ describeWithCertificate('Test Authentication flow', () => {
         );
 
         // If we get here without an error, the test should fail
-        fail(
+        expect.unreachable(
           'Expected an error to be thrown due to invalid data, but the operation succeeded'
         );
       }

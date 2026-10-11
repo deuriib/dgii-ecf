@@ -202,9 +202,18 @@ describe('RestApi error propagation', () => {
       .onPost('/TesteCF/autenticacion/api/Autenticacion/ValidarSemilla')
       .reply(400);
 
-    await expect(api.getAuthTokenApi('<SemillaModel />')).rejects.toThrow(
-      'DGII request failed with status code 400'
-    );
+    try {
+      await api.getAuthTokenApi('<SemillaModel />');
+      expect.unreachable('expected getAuthTokenApi to throw on empty 400');
+    } catch (err) {
+      // DGII sent an empty body, so the interceptor fallback describes the
+      // transport failure; the normalized status still survives on the error.
+      expect(err).toBeInstanceOf(DgiiApiError);
+      const error = err as DgiiApiError;
+      expect(error.message).toBe('DGII network request failed');
+      expect(error.status).toBe(400);
+      expect(error._tag).toBe('ValidationError');
+    }
   });
 
   it('keeps the 401 hint when DGII does not explain the rejection', async () => {

@@ -29,44 +29,36 @@ class ECF {
    * @returns string Bearer Token
    */
   authenticate = async (buyerHost?: string): Promise<AuthToken | undefined> => {
-    try {
-      const seedXml = await this._api.getSeedApi(buyerHost);
-      //Sign the seed
+    const seedXml = await this._api.getSeedApi(buyerHost);
+    //Sign the seed
 
-      if (!seedXml) {
-        throw Error('Xml seed is not defined');
-      }
-
-      if (
-        typeof this._p12ReaderData.key === 'undefined' ||
-        typeof this._p12ReaderData.cert === 'undefined'
-      ) {
-        throw Error('Certificate key and Pem are not defined');
-      }
-
-      const signature = new Signature(
-        this._p12ReaderData.key,
-        this._p12ReaderData.cert
-      );
-      const seedSigned = signature.signXml(seedXml, 'SemillaModel');
-
-      //Get the token
-      const tokenData = await this._api.getAuthTokenApi(seedSigned, buyerHost);
-
-      if (!tokenData) {
-        throw Error('Unable to get the token');
-      }
-      //set token on axios
-      setAuthToken(tokenData?.token);
-
-      if (!tokenData) {
-        throw Error('Token is not defined');
-      }
-
-      return tokenData;
-    } catch (err) {
-      throw err;
+    if (!seedXml) {
+      throw Error('Xml seed is not defined');
     }
+
+    if (
+      typeof this._p12ReaderData.key === 'undefined' ||
+      typeof this._p12ReaderData.cert === 'undefined'
+    ) {
+      throw Error('Certificate key and Pem are not defined');
+    }
+
+    const signature = new Signature(
+      this._p12ReaderData.key,
+      this._p12ReaderData.cert
+    );
+    const seedSigned = signature.signXml(seedXml, 'SemillaModel');
+
+    //Get the token
+    const tokenData = await this._api.getAuthTokenApi(seedSigned, buyerHost);
+
+    if (!tokenData) {
+      throw Error('Unable to get the token');
+    }
+    //set token on axios
+    setAuthToken(tokenData.token);
+
+    return tokenData;
   };
 
   /**
