@@ -1,8 +1,8 @@
 import { ENVIRONMENT } from '../networking';
 import RestApi from '../networking/RestApi';
+import { runDgiiRequest, withFetch } from '../networking/transport';
 import { P12ReaderData } from '../P12Reader';
 import Signature from '../Signature/Signature';
-import { setAuthToken } from '../networking/restClient';
 import {
   AuthToken,
   CommercialApprovalResponse,
@@ -28,8 +28,12 @@ class ECF {
    * @param buyerHost optional - If buyerHost is defined the authentication will be againt the buyer HOST to stablish the communication Sender<->Receiver
    * @returns string Bearer Token
    */
-  authenticate = async (buyerHost?: string): Promise<AuthToken | undefined> => {
-    const seedXml = await this._api.getSeedApi(buyerHost);
+  authenticate = async (
+    buyerHost?: string,
+    fetchImpl?: typeof globalThis.fetch
+  ): Promise<AuthToken | undefined> => {
+    const run = withFetch(fetchImpl);
+    const seedXml = await run(this._api.getSeedApi(buyerHost));
     //Sign the seed
 
     if (!seedXml) {
@@ -50,13 +54,16 @@ class ECF {
     const seedSigned = signature.signXml(seedXml, 'SemillaModel');
 
     //Get the token
-    const tokenData = await this._api.getAuthTokenApi(seedSigned, buyerHost);
+    const tokenData = await run(
+      this._api.getAuthTokenApi(seedSigned, buyerHost)
+    );
 
     if (!tokenData) {
       throw Error('Unable to get the token');
     }
-    //set token on axios
-    setAuthToken(tokenData.token);
+    // Store the bearer token on this instance; every subsequent request
+    // attaches it per-request, never through a shared global.
+    this._api = new RestApi(this._api.environment, tokenData.token);
 
     return tokenData;
   };
@@ -71,19 +78,12 @@ class ECF {
   sendElectronicDocument = async <T = InvoiceResponse>(
     signedXml: string,
     fileName: string,
-    buyerHost?: string
-  ) => {
-    try {
-      const response = await this._api.sendElectronicDocumentApi<T>(
-        signedXml,
-        fileName,
-        buyerHost
-      );
-      return response;
-    } catch (err) {
-      throw err;
-    }
-  };
+    buyerHost?: string,
+    fetchImpl?: typeof globalThis.fetch
+  ) =>
+    withFetch(fetchImpl)(
+      this._api.sendElectronicDocumentApi<T>(signedXml, fileName, buyerHost)
+    );
 
   /**
    * Send summary for invoice < 250K pesos
@@ -91,14 +91,11 @@ class ECF {
    * @param fileName
    * @returns
    */
-  sendSummary = async (signedXml: string, fileName: string) => {
-    try {
-      const response = await this._api.sendSummaryApi(signedXml, fileName);
-      return response;
-    } catch (err) {
-      throw err;
-    }
-  };
+  sendSummary = async (
+    signedXml: string,
+    fileName: string,
+    fetchImpl?: typeof globalThis.fetch
+  ) => withFetch(fetchImpl)(this._api.sendSummaryApi(signedXml, fileName));
 
   /**
    * Get the status using the track id generated after send a new invoice or other document
@@ -106,14 +103,10 @@ class ECF {
    * @returns promise with the tracking status
    */
 
-  statusTrackId = async (trackId: string) => {
-    try {
-      const response = await this._api.statusTrackIdApi(trackId);
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  };
+  statusTrackId = async (
+    trackId: string,
+    fetchImpl?: typeof globalThis.fetch
+  ) => withFetch(fetchImpl)(this._api.statusTrackIdApi(trackId));
 
   /**
    * Servicio web responsable de responder la validez o estado de un e‐CF a un receptor o
@@ -131,20 +124,17 @@ class ECF {
     rncEmisor: string,
     ncfElectronico: string,
     rncComprador?: string,
-    codigoSeguridad?: string
-  ) => {
-    try {
-      const response = await this._api.inquiryStatusApi(
+    codigoSeguridad?: string,
+    fetchImpl?: typeof globalThis.fetch
+  ) =>
+    withFetch(fetchImpl)(
+      this._api.inquiryStatusApi(
         rncEmisor,
         ncfElectronico,
         rncComprador,
         codigoSeguridad
-      );
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  };
+      )
+    );
   /**
    * Get all tracking
    * @param rncEmisor
@@ -152,14 +142,11 @@ class ECF {
    * @returns
    */
 
-  trackStatuses = async (rncEmisor: string, encf: string) => {
-    try {
-      const response = await this._api.getAllTrackingncfApi(rncEmisor, encf);
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  };
+  trackStatuses = async (
+    rncEmisor: string,
+    encf: string,
+    fetchImpl?: typeof globalThis.fetch
+  ) => withFetch(fetchImpl)(this._api.getAllTrackingncfApi(rncEmisor, encf));
 
   /**
    * Gets the service directory entries for an RNC.
@@ -174,15 +161,10 @@ class ECF {
    * @returns The service directory entries, or `undefined` when the service returns no body
    */
   getCustomerDirectory = async (
-    rnc: string
-  ): Promise<ServiceDirectoryResponse[] | undefined> => {
-    try {
-      const response = await this._api.getCustomerDirectoryApi(rnc);
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  };
+    rnc: string,
+    fetchImpl?: typeof globalThis.fetch
+  ): Promise<ServiceDirectoryResponse[] | undefined> =>
+    withFetch(fetchImpl)(this._api.getCustomerDirectoryApi(rnc));
 
   /**
    * Consulta de Resumen de Factura (RFCE)
@@ -198,19 +180,12 @@ class ECF {
   getSummaryInvoiceInquiry = async (
     rnc_emisor: string,
     encf: string,
-    cod_seguridad_eCF: string
-  ) => {
-    try {
-      const response = await this._api.getSummaryInvoiceInquiryApi(
-        rnc_emisor,
-        encf,
-        cod_seguridad_eCF
-      );
-      return response;
-    } catch (error) {
-      throw error;
-    }
-  };
+    cod_seguridad_eCF: string,
+    fetchImpl?: typeof globalThis.fetch
+  ) =>
+    withFetch(fetchImpl)(
+      this._api.getSummaryInvoiceInquiryApi(rnc_emisor, encf, cod_seguridad_eCF)
+    );
 
   /**
    * Servicio web responsable de recibir aprobaciones comerciales emitidas por
@@ -221,19 +196,18 @@ class ECF {
    * @param fileName
    * @returns
    */
-  sendCommercialApproval = async (signedXml: string, fileName: string) => {
-    try {
-      const response =
-        await this._api.sendSignedDocumentApi<CommercialApprovalResponse>(
-          signedXml,
-          fileName,
-          Opperation.COMMERCIAL_APPROVAL
-        );
-      return response;
-    } catch (err) {
-      throw err;
-    }
-  };
+  sendCommercialApproval = async (
+    signedXml: string,
+    fileName: string,
+    fetchImpl?: typeof globalThis.fetch
+  ) =>
+    withFetch(fetchImpl)(
+      this._api.sendSignedDocumentApi<CommercialApprovalResponse>(
+        signedXml,
+        fileName,
+        Opperation.COMMERCIAL_APPROVAL
+      )
+    );
   /**
    * Servicio web responsable de recibir y anular los rangos de secuencias no utilizados
    * (e‐NCF) a través de un XML de solicitud que contiene el código de comprobante
@@ -243,18 +217,18 @@ class ECF {
    * @param fileName
    * @returns
    */
-  voidENCF = async (signedXml: string, fileName: string) => {
-    try {
-      const response = await this._api.sendSignedDocumentApi<VoidNCFResponse>(
+  voidENCF = async (
+    signedXml: string,
+    fileName: string,
+    fetchImpl?: typeof globalThis.fetch
+  ) =>
+    withFetch(fetchImpl)(
+      this._api.sendSignedDocumentApi<VoidNCFResponse>(
         signedXml,
         fileName,
         Opperation.VOID_DOCUMENT
-      );
-      return response;
-    } catch (err) {
-      throw err;
-    }
-  };
+      )
+    );
 }
 
 export default ECF;

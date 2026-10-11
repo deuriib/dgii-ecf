@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import { env } from '../env';
 import P12Reader, { P12ReaderData } from '../P12Reader';
 
 /**
@@ -17,7 +18,7 @@ import P12Reader, { P12ReaderData } from '../P12Reader';
  * @returns Absolute path to the certificate, or `null` when it is unavailable.
  */
 export const getTestCertificatePath = (): string | null => {
-  const certificateName = process.env.CERTIFICATE_NAME;
+  const certificateName = env.CERTIFICATE_NAME;
 
   if (!certificateName) {
     return null;
@@ -53,7 +54,7 @@ export const readTestCertificate = (): P12ReaderData => {
     return { key: undefined, cert: undefined, publicKey: undefined };
   }
 
-  const reader = new P12Reader(process.env.CERTIFICATE_TEST_PASSWORD || '');
+  const reader = new P12Reader(env.CERTIFICATE_TEST_PASSWORD || '');
 
   return reader.getKeyFromFile(certificatePath);
 };

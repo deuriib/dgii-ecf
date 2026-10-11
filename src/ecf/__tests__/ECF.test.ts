@@ -1,6 +1,7 @@
 import path from 'path';
 import ECF from '../ECF';
-import { ENVIRONMENT, restClient } from '../../networking';
+import { ENVIRONMENT } from '../../networking';
+import { env } from '../../env';
 import Signature from '../../Signature/Signature';
 import fs from 'fs';
 import { TrackStatusEnum } from '../../networking/types';
@@ -23,7 +24,7 @@ const describeWithCertificate = hasTestCertificate() ? describe : describe.skip;
 describeWithCertificate('Test Authentication flow', () => {
   let testTrackingNo = '';
 
-  const rnc = process.env.RNC_EMISOR || ''; //Customer RNC
+  const rnc = env.RNC_EMISOR || ''; //Customer RNC
   const noEcf = `E3100050${randomNum()}`; //Sequence
 
   const certs = readTestCertificate();
@@ -36,8 +37,9 @@ describeWithCertificate('Test Authentication flow', () => {
     const auth = new ECF(certs, ENVIRONMENT.DEV);
     const tokenData = await auth.authenticate();
     expect(tokenData?.token).toBeDefined();
-    console.log('Token:', tokenData?.token);
-    expect(restClient.defaults.headers.common['Authorization']).toBeDefined();
+    // Auth is per-instance now; the bearer token travels on each request
+    // instead of a shared axios default header. The value itself is never
+    // logged (DENY-02).
   });
 
   it('Testing authentication against Buyer HOST', async () => {
@@ -51,15 +53,12 @@ describeWithCertificate('Test Authentication flow', () => {
     const auth = new ECF(certs, ENVIRONMENT.DEV);
     const tokenData = await auth.authenticate(urlOpcional);
     expect(tokenData?.token).toBeDefined();
-    console.log('Buyer HOST Token:', tokenData?.token);
-    expect(restClient.defaults.headers.common['Authorization']).toBeDefined();
   });
 
   it('Testing  sending signed invoice (31) to DGII', async () => {
     if (!certs.key || !certs.cert) {
       return;
     }
-
     const ecf = new ECF(certs, ENVIRONMENT.DEV);
     const auth = await ecf.authenticate();
 
@@ -85,7 +84,7 @@ describeWithCertificate('Test Authentication flow', () => {
           console.error('Error writing to file:', err);
           return;
         } else {
-          console.log('File has been written successfully.');
+          console.log('File has been written.');
         }
       }
     );
@@ -94,7 +93,6 @@ describeWithCertificate('Test Authentication flow', () => {
 
     testTrackingNo = response?.trackId as string;
     expect(response?.trackId).toBeDefined();
-    console.log(response);
   });
 
   it('Test TrackingID status', async () => {
@@ -155,8 +153,7 @@ describeWithCertificate('Test Authentication flow', () => {
     JsonECF32Summary.RFCE.Encabezado.IdDoc.eNCF = noEcf;
     //Adding ramdom security code
     JsonECF32Summary.RFCE.Encabezado.CodigoSeguridadeCF = securityCode;
-    JsonECF32Summary.RFCE.Encabezado.Emisor.RNCEmisor =
-      process.env.RNC_EMISOR || '';
+    JsonECF32Summary.RFCE.Encabezado.Emisor.RNCEmisor = env.RNC_EMISOR || '';
     JsonECF32Summary.RFCE.Encabezado.Emisor.FechaEmision =
       getCurrentFormattedDate();
     const transformer = new Transformer();
@@ -242,8 +239,6 @@ describeWithCertificate('Test Authentication flow', () => {
       if (error && typeof error === 'object' && 'codigo' in error) {
         expect(error.codigo).toBe(2);
       } else {
-        // If the error structure is different, log it for debugging
-        console.log('Received error:', error);
         // Still pass the test since we expected an error
         expect(errorWasThrown).toBe(true);
       }
