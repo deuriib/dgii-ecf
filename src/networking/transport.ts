@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Schema, decodeUnknownEffect } from 'effect';
 import { env } from '../env';
 import {
   FetchHttpClient,
@@ -228,6 +228,28 @@ export const readJsonBody = (
     })
   );
 
+/**
+ * Decode an Effect response body as JSON validated by the given Schema.
+ * Non-JSON bodies and Schema mismatches fail as typed `SerializationError`.
+ */
+export const decodeJsonBody = <T>(schema: Schema.Schema<T>) =>
+  (response: HttpClientResponse.HttpClientResponse): Effect.Effect<
+    T,
+    DgiiError,
+    never
+  > =>
+    Effect.flatMap(
+      readJsonBody(response),
+      (body) =>
+        Effect.flatMap(
+          decodeUnknownEffect(schema)(body),
+          Effect.mapError((err): DgiiError => ({
+            _tag: 'SerializationError',
+            message: err.message,
+          }))
+        )
+      )
+    );
 /**
  * Build a GET request against the DGII client with optional query params.
  */
