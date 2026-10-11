@@ -1,0 +1,13 @@
+# Normalize line endings: LF everywhere in the repo.
+* text=auto eol=lf
+
+# Binary files — never touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.p12 binary
+*.pfx binary
+*.zip binary
+*.gz binary
