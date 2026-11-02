@@ -171,12 +171,18 @@ export interface XmlCertificateValidation {
   error?: string;
 }
 
+/**
+ * Matches `<X509Certificate>` with or without a namespace prefix (`ds:`).
+ */
+const X509_CERTIFICATE_RE =
+  /<(?:[\w]+:)?X509Certificate>([\s\S]*?)<\/(?:[\w]+:)?X509Certificate>/;
+
 /** Validate the embedded X509 certificate of a signed XML document. */
 export const validateXMLCertificate = (
   xml: string,
 ): XmlCertificateValidation => {
   try {
-    const match = xml.match(/<X509Certificate>([\s\S]*?)<\/X509Certificate>/);
+    const match = xml.match(X509_CERTIFICATE_RE);
     if (!match?.[1]) {
       return { isValid: false, error: 'X509Certificate not found' };
     }

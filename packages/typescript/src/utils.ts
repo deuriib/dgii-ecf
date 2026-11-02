@@ -3,11 +3,18 @@ import { err, ok, type Result } from './result.js';
 import { DgiiError } from './errors.js';
 import { Transformer } from './transformer.js';
 
+/**
+ * Matches `<SignatureValue>` with or without a namespace prefix (`ds:`), which
+ * is how .NET and other XMLDSig implementations emit the signature.
+ */
+const SIGNATURE_VALUE_RE =
+  /<(?:[\w]+:)?SignatureValue>([\s\S]*?)<\/(?:[\w]+:)?SignatureValue>/;
+
 /** First 6 chars of the `<SignatureValue>` (DGII security code). */
 export const getCodeSixDigitfromSignature = (
   signedXml: string,
 ): Result<string, DgiiError> => {
-  const match = signedXml.match(/<SignatureValue>([\s\S]*?)<\/SignatureValue>/);
+  const match = signedXml.match(SIGNATURE_VALUE_RE);
   const value = match?.[1]?.trim();
   if (!value) {
     return err(new DgiiError('SignatureValue not found', { code: 'SIGNING' }));

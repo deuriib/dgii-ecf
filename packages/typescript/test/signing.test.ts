@@ -88,6 +88,20 @@ describe('validateXMLCertificate', () => {
     expect(validation.subject).toContain('dgii-ecf-test');
   });
 
+  it('validates a certificate with a namespace prefix (ds:)', () => {
+    const { privateKey, certificate } = createSelfSigned();
+    const result = new Signature(privateKey, certificate).signXml(ECF_XML);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+
+    const prefixed = result.value
+      .replace('<X509Certificate>', '<ds:X509Certificate>')
+      .replace('</X509Certificate>', '</ds:X509Certificate>');
+    const validation = validateXMLCertificate(prefixed);
+    expect(validation.isValid).toBe(true);
+    expect(validation.subject).toContain('dgii-ecf-test');
+  });
+
   it('fails when no certificate is present', () => {
     const validation = validateXMLCertificate('<ECF></ECF>');
     expect(validation.isValid).toBe(false);
