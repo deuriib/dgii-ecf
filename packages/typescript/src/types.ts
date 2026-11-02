@@ -1,6 +1,10 @@
 export interface Mensaje {
   valor: string;
-  codigo: number;
+  /**
+   * DGII message code. Numeric on the status endpoints, a string on the RFCE
+   * response, so both shapes are preserved instead of coerced.
+   */
+  codigo: number | string;
 }
 
 export interface AuthToken {

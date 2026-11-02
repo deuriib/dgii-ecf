@@ -61,9 +61,11 @@ const readMensajes = (value: unknown): Mensaje[] | undefined => {
     if (typeof item === 'string' && item.trim()) {
       out.push({ valor: item.trim(), codigo: 0 });
     } else if (isObject(item) && typeof item.valor === 'string') {
+      const codigo = item.codigo;
       out.push({
         valor: item.valor,
-        codigo: typeof item.codigo === 'number' ? item.codigo : 0,
+        codigo:
+          typeof codigo === 'number' || typeof codigo === 'string' ? codigo : 0,
       });
     }
   }

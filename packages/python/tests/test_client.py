@@ -643,3 +643,65 @@ def test_send_document_rejects_a_buyer_host_for_an_rfce() -> None:
     assert result.is_err()
     assert result.unwrap_err().code.value == "VALIDATION"
     assert calls["n"] == 0
+
+
+RFCE_XML = (
+    "<RFCE><Encabezado><RNCEmisor>130862346</RNCEmisor>"
+    "<IdDoc><eNCF>E320000000001</eNCF></IdDoc></Encabezado></RFCE>"
+)
+
+
+def test_rfce_reception_accepts_a_string_message_code() -> None:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            200,
+            json={
+                "codigo": 2,
+                "estado": "Rechazado",
+                "encf": "E320000000001",
+                "secuenciaUtilizada": True,
+                "mensajes": [{"codigo": "A01", "valor": "Firma digital invalida"}],
+            },
+        )
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    result = ecf.send_summary(RFCE_XML, "f.xml")
+
+    assert result.is_ok()
+    assert result.unwrap().mensajes[0].codigo == "A01"
+
+
+def test_parse_failure_keeps_the_idempotency_key() -> None:
+    store = InMemoryIdempotencyStore()
+    key = (
+        "130862346:E320000000001:"
+        + hashlib.sha256(RFCE_XML.encode("utf-8")).hexdigest()
+    )
+    calls = {"n": 0}
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={"unexpected": True})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+    )
+
+    first = ecf.send_summary(RFCE_XML, "f.xml")
+    assert first.is_err()
+    assert store.get(key) is not None
+
+    # A retry must not re-submit a document DGII already accepted.
+    second = ecf.send_summary(RFCE_XML, "f.xml")
+    assert second.is_err()
+    assert calls["n"] == 1
