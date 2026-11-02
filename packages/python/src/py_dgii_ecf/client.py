@@ -217,22 +217,21 @@ class ECF:
     ) -> DgiiResult[_ModelT]:
         """Cache a submission response and return it as ``model``.
 
-        Malformed or non-object payloads clear the pending marker so the caller
-        can retry instead of getting a permanently stuck key.
+        DGII already accepted the document when we get here, so the key is
+        never dropped on a shape problem: re-submitting would risk a duplicate
+        fiscal document. A non-object payload keeps the pending marker, and a
+        dict that fails to parse is cached raw so the caller can reconcile.
         """
         if not isinstance(data, dict):
-            self._idempotency.delete(key)
             return Err(
                 DgiiError(
-                    "Unexpected DGII response payload",
+                    "Unexpected DGII response payload; reconcile via a status "
+                    "lookup before retrying",
                     code=DgiiErrorCode.VALIDATION,
                     data=data,
                 )
             )
         parsed = _parse_one(model, data)
-        if parsed.is_err():
-            self._idempotency.delete(key)
-            return Err(parsed.unwrap_err())
         self._idempotency.set(key, data)
         return parsed
 

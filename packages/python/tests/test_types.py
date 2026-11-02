@@ -250,3 +250,31 @@ def test_inquiry_invoice_summary_tolerates_a_partial_answer() -> None:
     assert response.rnc is None
     assert response.encf is None
     assert response.secuencia_utilizada is None
+
+
+def test_mensaje_preserves_an_alphanumeric_code() -> None:
+    response = InvoiceSummaryResponse.from_dict(
+        {
+            "codigo": 2,
+            "estado": "Rechazado",
+            "encf": "E320000000001",
+            "secuenciaUtilizada": True,
+            "mensajes": [{"codigo": "A01", "valor": "Firma digital invalida"}],
+        }
+    )
+
+    assert response.mensajes[0].codigo == "A01"
+
+
+def test_mensaje_coerces_a_numeric_string_code() -> None:
+    response = InvoiceSummaryResponse.from_dict(
+        {
+            "codigo": 1,
+            "estado": "Aceptado",
+            "encf": "E320000000001",
+            "secuenciaUtilizada": True,
+            "mensajes": [{"codigo": "7", "valor": "Observacion"}],
+        }
+    )
+
+    assert response.mensajes[0].codigo == 7

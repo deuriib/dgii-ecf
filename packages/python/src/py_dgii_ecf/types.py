@@ -24,10 +24,14 @@ COMMERCIAL_APPROVAL_REJECTED_STATE = "Aprobación comercial rechazada"
 
 @dataclass(frozen=True, slots=True)
 class Mensaje:
-    """A DGII message entry (``valor`` + ``codigo``)."""
+    """A DGII message entry (``valor`` + ``codigo``).
+
+    DGII sends a numeric code on the status endpoints and a string code on the
+    RFCE response, so the raw value is preserved instead of coerced.
+    """
 
     valor: str
-    codigo: int = 0
+    codigo: int | str = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,6 +102,30 @@ def _as_optional_bool(value: object, key: str) -> bool | None:
     return None if value is None else _as_bool(value, key)
 
 
+def _as_code(value: object) -> int | str:
+    """Normalize a DGII message code without ever failing the parse.
+
+    The code is the only machine-readable rejection discriminator, so it must
+    survive even when DGII types it differently than expected: numeric strings
+    become ``int``, everything else is kept verbatim.
+    """
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return 0
+        try:
+            return int(stripped)
+        except ValueError:
+            return stripped
+    return 0
+
+
 def _as_float(value: object, key: str) -> float:
     if isinstance(value, bool):
         raise _type_error(key, "a number", value)
@@ -145,7 +173,7 @@ def _parse_mensajes(value: object) -> tuple[Mensaje, ...]:
         mensajes.append(
             Mensaje(
                 valor=_as_str(item.get("valor"), f"mensajes[{index}].valor"),
-                codigo=_as_int(item.get("codigo", 0), f"mensajes[{index}].codigo"),
+                codigo=_as_code(item.get("codigo", 0)),
             )
         )
     return tuple(mensajes)
