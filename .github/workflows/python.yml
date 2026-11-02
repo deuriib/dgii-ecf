@@ -41,6 +41,10 @@ jobs:
       - name: Test
         run: uv run pytest
 
+      # Independent XMLDSig gate: sign a fixture and verify it with libxmlsec1.
+      - name: Verify signature with libxmlsec1
+        run: uv run --with xmlsec python scripts/verify_signing.py
+
       - name: Build
         run: uv build
 
