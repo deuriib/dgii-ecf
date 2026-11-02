@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Endpoint } from '../src/environment.js';
 import {
   CONSUMPTION_SUMMARY_THRESHOLD,
+  checkB2BApplicability,
   compareDecimal,
   isEcfTypeCode,
   resolveReceptionRoute,
@@ -139,5 +140,40 @@ describe('resolveReceptionRoute', () => {
     expect(route.isErr()).toBe(true);
     if (route.isOk()) return;
     expect(route.error.message).toContain('decimal');
+  });
+});
+
+describe('checkB2BApplicability', () => {
+  it.each(['41', '43', '45', '46', '47'])(
+    'rejects type %s for direct delivery',
+    (tipo) => {
+      const result = checkB2BApplicability(ecf(tipo, '1000.00'));
+      expect(result.isErr()).toBe(true);
+      if (result.isOk()) return;
+      expect(result.error.code).toBe('VALIDATION');
+      expect(result.error.message).toContain(tipo);
+    },
+  );
+
+  it.each(['31', '33', '34', '44'])('allows type %s', (tipo) => {
+    expect(checkB2BApplicability(ecf(tipo, '1000.00')).isOk()).toBe(true);
+  });
+
+  it('rejects an E32 below the threshold', () => {
+    const result = checkB2BApplicability(ecf('32', '249999.99'));
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.message).toContain('buyer host');
+  });
+
+  it('allows an E32 at the threshold', () => {
+    expect(checkB2BApplicability(ecf('32', '250000')).isOk()).toBe(true);
+  });
+
+  it('rejects an RFCE summary', () => {
+    const result = checkB2BApplicability(rfce());
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.message).toContain('RFCE');
   });
 });

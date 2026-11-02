@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import pytest
+
 from py_dgii_ecf._xml import extract_root_element_name
 from py_dgii_ecf.environment import Endpoint
 from py_dgii_ecf.reception import (
     CONSUMPTION_SUMMARY_THRESHOLD,
     ECF_TYPE_CODES,
+    check_b2b_applicability,
     compare_decimal,
     is_ecf_type_code,
     resolve_reception_route,
@@ -134,3 +137,33 @@ def test_rejects_non_decimal_total() -> None:
     route = resolve_reception_route(ecf("32", "250,000"))
     assert route.is_err()
     assert "decimal" in route.unwrap_err().message
+
+
+@pytest.mark.parametrize("tipo", ["41", "43", "45", "46", "47"])
+def test_b2b_rejects_excluded_types(tipo: str) -> None:
+    result = check_b2b_applicability(ecf(tipo, "1000.00"))
+    assert result.is_err()
+    error = result.unwrap_err()
+    assert error.code.value == "VALIDATION"
+    assert tipo in error.message
+
+
+@pytest.mark.parametrize("tipo", ["31", "33", "34", "44"])
+def test_b2b_allows_eligible_types(tipo: str) -> None:
+    assert check_b2b_applicability(ecf(tipo, "1000.00")).is_ok()
+
+
+def test_b2b_rejects_consumption_below_threshold() -> None:
+    result = check_b2b_applicability(ecf("32", "249999.99"))
+    assert result.is_err()
+    assert "buyer host" in result.unwrap_err().message
+
+
+def test_b2b_allows_consumption_at_threshold() -> None:
+    assert check_b2b_applicability(ecf("32", "250000")).is_ok()
+
+
+def test_b2b_rejects_an_rfce_summary() -> None:
+    result = check_b2b_applicability(rfce())
+    assert result.is_err()
+    assert "RFCE" in result.unwrap_err().message

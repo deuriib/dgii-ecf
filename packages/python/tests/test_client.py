@@ -758,3 +758,51 @@ def test_directory_listing_normalizes_a_single_object() -> None:
 
     assert result.is_ok()
     assert len(result.unwrap()) == 1
+
+
+E41_XML = (
+    "<ECF><Encabezado><IdDoc><TipoeCF>41</TipoeCF></IdDoc>"
+    "<Totales><MontoTotal>100.00</MontoTotal></Totales></Encabezado></ECF>"
+)
+
+
+def test_b2b_rejects_an_excluded_type_without_calling_http() -> None:
+    calls = {"n": 0}
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    result = ecf.send_electronic_document(E41_XML, "f.xml", "https://buyer.example")
+
+    assert result.is_err()
+    assert result.unwrap_err().code.value == "VALIDATION"
+    assert calls["n"] == 0
+
+
+def test_b2b_sends_when_enforcement_is_disabled() -> None:
+    calls = {"n": 0}
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        enforce_b2b_rules=False,
+    )
+
+    result = ecf.send_electronic_document(E41_XML, "f.xml", "https://buyer.example")
+
+    assert result.is_ok()
+    assert calls["n"] == 1

@@ -18,7 +18,7 @@ import {
   type IdempotencyStore,
 } from './http.js';
 import type { ResilienceOptions } from './resilience.js';
-import { resolveReceptionRoute } from './reception.js';
+import { checkB2BApplicability, resolveReceptionRoute } from './reception.js';
 import { Signature } from './signing.js';
 import { extractElementText } from './xml.js';
 import type { P12ReaderData } from './certificate.js';
@@ -56,6 +56,11 @@ export interface EcfOptions {
   now?: () => number;
   /** API key for the `statusecf` service (`Authorization: Apikey …`). */
   statusApiKey?: string;
+  /**
+   * Reject a direct buyer-host delivery for the e-CF types DGII excludes
+   * (E32 below RD$250,000, E41, E43, E45, E46, E47). Defaults to `true`.
+   */
+  enforceB2BRules?: boolean;
 }
 
 interface PendingSubmission {
@@ -96,6 +101,7 @@ export class ECF {
   private readonly tokenRefreshSkewMs: number;
   private readonly now: () => number;
   private readonly statusApiKey: string | undefined;
+  private readonly enforceB2BRules: boolean;
   private tokenExpiresAt: number | undefined;
   private refreshPromise: Promise<Result<AuthToken, DgiiError>> | undefined;
 
@@ -109,6 +115,7 @@ export class ECF {
     this.tokenRefreshSkewMs = options.tokenRefreshSkewMs ?? 5 * 60 * 1000;
     this.now = options.now ?? Date.now;
     this.statusApiKey = options.statusApiKey;
+    this.enforceB2BRules = options.enforceB2BRules ?? true;
     this.idempotency =
       options.idempotencyStore ?? new InMemoryIdempotencyStore();
     this.http = new HttpClient({
@@ -377,6 +384,12 @@ export class ECF {
     fileName: string,
     buyerHost?: string,
   ): Promise<Result<InvoiceResponse, DgiiError>> {
+    if (buyerHost !== undefined && this.enforceB2BRules) {
+      const applicable = checkB2BApplicability(signedXml);
+      if (applicable.isErr()) {
+        return err(applicable.error);
+      }
+    }
     const key = this.buildIdempotencyKey(signedXml);
     return this.submitIdempotent(key, () => {
       const url = buyerHost

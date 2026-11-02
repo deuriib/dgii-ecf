@@ -566,3 +566,54 @@ describe('directory listing', () => {
     expect(result.value).toHaveLength(1);
   });
 });
+
+describe('B2B applicability', () => {
+  const e41 =
+    '<ECF><Encabezado><IdDoc><TipoeCF>41</TipoeCF></IdDoc>' +
+    '<Totales><MontoTotal>100.00</MontoTotal></Totales></Encabezado></ECF>';
+
+  it('rejects an excluded type before any HTTP call', async () => {
+    let calls = 0;
+    const fetchImpl = mockFetch(async () => {
+      calls += 1;
+      return jsonResponse({ trackId: 't1' });
+    });
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+
+    const result = await ecf.sendElectronicDocument(
+      e41,
+      'f.xml',
+      'https://buyer.example',
+    );
+
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('VALIDATION');
+    expect(calls).toBe(0);
+  });
+
+  it('sends it when enforcement is disabled', async () => {
+    let calls = 0;
+    const fetchImpl = mockFetch(async () => {
+      calls += 1;
+      return jsonResponse({ trackId: 't1' });
+    });
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+      enforceB2BRules: false,
+    });
+
+    const result = await ecf.sendElectronicDocument(
+      e41,
+      'f.xml',
+      'https://buyer.example',
+    );
+
+    expect(result.isOk()).toBe(true);
+    expect(calls).toBe(1);
+  });
+});

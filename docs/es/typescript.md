@@ -76,6 +76,25 @@ if (result.isOk()) {
 | `sendCommercialApproval(xml, fileName)`             | `Result<CommercialApprovalResponse>`              |
 | `voidENCF(xml, fileName)`                           | `Result<VoidNCFResponse>`                         |
 
+### Aplicabilidad B2B
+
+El envío directo Emisor↔Receptor (`buyerHost` / `buyer_host`) no aplica a todos
+los tipos. La DGII excluye la **E32 menor a RD$250,000** (solo aplica el resumen
+RFCE) y los tipos **E41, E43, E45, E46 y E47**. La E31, E33, E34, E44 y una E32
+igual o mayor al umbral sí pueden entregarse entre pares.
+
+El cliente lo verifica antes de emitir la solicitud y falla con `VALIDATION` sin
+llamar al host del comprador. Desactiva la validación con
+`enforceB2BRules: false` (TypeScript) o `enforce_b2b_rules=False` (Python)
+cuando necesites reproducir un escenario de certificación:
+
+```ts
+const result = await ecf.sendElectronicDocument(xml, 'f.xml', buyerHost);
+if (result.isErr() && result.error.code === 'VALIDATION') {
+  // El tipo o el monto no son elegibles para envío directo.
+}
+```
+
 ### Endpoints exclusivos de producción
 
 `getSummaryInvoiceInquiry` (consulta de RFCE, `fc.dgii.gov.do/consultarfce`) solo
