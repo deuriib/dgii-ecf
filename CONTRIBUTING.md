@@ -45,6 +45,28 @@ mise run build
 mise run ci       # lint + test + build
 ```
 
+### Integration tests (opt-in)
+
+`packages/python/tests/integration/` and
+`packages/typescript/test/integration/` talk to a real DGII environment, so
+they are skipped unless credentials are present:
+
+| Variable            | Required            | Purpose                                             |
+| ------------------- | ------------------- | --------------------------------------------------- |
+| `DGII_P12_PATH`     | yes                 | certificate bundle                                  |
+| `DGII_P12_PASSWORD` | yes                 | bundle password                                     |
+| `DGII_RNC`          | yes                 | issuer RNC                                          |
+| `DGII_ENVIRONMENT`  | no                  | `TesteCF` or `CerteCF` (default). `eCF` is rejected |
+| `DGII_ENCF`         | to submit an e-CF   | a fresh, authorised sequence number                 |
+| `DGII_RFCE_ENCF`    | to submit a summary | a fresh, authorised RFCE sequence number            |
+
+`DGII_ENCF` and `DGII_RFCE_ENCF` must be **unused**: DGII rejects a repeated
+sequence number, so every submission run needs a new one.
+
+`.github/workflows/integration.yml` runs the suites on manual dispatch only,
+and only when the `DGII_P12_BASE64`, `DGII_P12_PASSWORD` and `DGII_RNC`
+secrets exist.
+
 ## Git hooks (pre-commit)
 
 Hooks are managed with [`pre-commit`](https://pre-commit.com/) and pinned in
