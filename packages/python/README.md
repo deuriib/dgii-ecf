@@ -68,9 +68,9 @@ ecf = ECF(credentials, Environment.PROD, idempotency_store=my_redis_store)
 ## CLI
 
 ```bash
-py-dgii-ecf sign invoice.xml --p12 identity.p12 --output signed.xml
-py-dgii-ecf authenticate --p12 identity.p12 --environment CertEcf
-py-dgii-ecf status <track-id> --p12 identity.p12
+py-dgii-ecf sign invoice.xml identity.p12 --output signed.xml
+py-dgii-ecf authenticate identity.p12 --environment CerteCF
+py-dgii-ecf status <track-id> identity.p12 --environment CerteCF
 ```
 
 ## Modules
