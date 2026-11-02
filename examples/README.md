@@ -6,7 +6,7 @@ Runnable examples for both SDKs, plus DGII sample fixtures.
 
 | Path                       | Description                                                                                                                                                                                       |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fixtures/test.xml`        | Full DGII e-CF sample document (from [victors1681/dgii-ecf](https://github.com/victors1681/dgii-ecf), MIT). **Reference only** — see [Expired fixture certificate](#expired-fixture-certificate). |
+| `fixtures/test.xml`        | Full DGII e-CF sample document (from [victors1681/dgii-ecf](https://github.com/victors1681/dgii-ecf), MIT). Ships with a synthetic certificate — see [Fixture certificate](#fixture-certificate). |
 | `fixtures/invoice-31.xml`  | Minimal unsigned ECF-31 invoice.                                                                                                                                                                  |
 | `fixtures/invoice-31.json` | The same invoice as compact JSON.                                                                                                                                                                 |
 | `fixtures/invoice-32.xml`  | Minimal ECF-32 (factura de consumo) for the summary flow.                                                                                                                                         |
@@ -62,23 +62,17 @@ See each folder's README for details. Outputs are written to `output/`
 > offline testing. They are **not** valid DGII certificates and will be rejected
 > by DGII.
 
-## Expired fixture certificate
+## Fixture certificate
 
-`fixtures/test.xml` is a historical reference sample only. It is **not** signing
-ground truth:
+`fixtures/test.xml` is a reference sample. Its certificate is **synthetic** and
+was generated for this repository: subject `CN=dgii-ecf-fixture`, valid
+**2024-01-01 → 2035-01-01**, and it carries no identity data.
 
-- The certificate embedded in it expired on **2024-12-04**.
-- Its `DigestValue` no longer matches the payload, because the document was
-  edited after it was signed.
+`utilities.py` and `utilities.ts` therefore report `certificate valid: true` for
+it, and the signature verifies with libxmlsec1.
 
-A consequence: `utilities.py` and `utilities.ts` report
-`certificate valid: false` for this file, and that is the expected result — it
-is a property of the fixture, not a bug in the SDK.
-
-The fixture also embeds a real certificate issued to a third party, so treat it
-as public historical data rather than as a template.
-
-To exercise signing end to end, use `fixtures/invoice-31.xml` (or
+It is still **not** a DGII certificate — DGII will reject it for a real
+submission. To exercise signing end to end, use `fixtures/invoice-31.xml` (or
 `fixtures/invoice-32.xml` for the RFCE flow) together with a generated
 `output/test.p12`:
 
