@@ -1,16 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Illustrative ACECF (commercial approval) document. Replace the fields with a
-  DGII-schema-compliant payload before submitting to a real environment.
+  Illustrative ACECF (commercial approval) document.
+
+  Structure follows the payload DGII returns for
+  `aprobacionComercial/api/AprobacionComercial`: every field lives inside
+  `DetalleAprobacionComercial`, including `FechaHoraAprobacionComercial`.
+
+  The document is unsigned on purpose — sign it with the SDK before sending.
 -->
 <ACECF>
   <DetalleAprobacionComercial>
     <Version>1.0</Version>
     <RNCEmisor>130862346</RNCEmisor>
-    <RNCComprador>40102368</RNCComprador>
     <eNCF>E310000000001</eNCF>
     <FechaEmision>01-01-2026</FechaEmision>
     <MontoTotal>1180.00</MontoTotal>
+    <RNCComprador>40102368</RNCComprador>
     <Estado>1</Estado>
+    <FechaHoraAprobacionComercial>01-01-2026 10:00:00</FechaHoraAprobacionComercial>
   </DetalleAprobacionComercial>
 </ACECF>
