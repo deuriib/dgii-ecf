@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/deuriib/dgii-ecf/compare/python-v0.5.0...python-v0.5.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **types:** align response contracts with the DGII vocabulary ([#96](https://github.com/deuriib/dgii-ecf/issues/96)) ([3a8ea2f](https://github.com/deuriib/dgii-ecf/commit/3a8ea2fbe0e9743b6455a058bba03e83b2b11a3f))
+
 ## [0.5.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.4.0...python-v0.5.0) (2026-11-02)
 
 
