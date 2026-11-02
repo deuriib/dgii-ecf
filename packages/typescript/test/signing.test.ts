@@ -49,6 +49,29 @@ describe('Signature', () => {
     expect(signed).toContain('<X509Certificate>');
   });
 
+  it('hashes the inclusive C14N form, not the raw serialization', () => {
+    const { privateKey, certificate } = createSelfSigned();
+    // Attributes are deliberately out of C14N order (`alpha` sorts before
+    // `zeta`), so a raw-serialization digest would produce a different value.
+    const xml =
+      '<ECF xmlns="urn:dgii:ecf" version="1.0">' +
+      '<IdDoc zeta="1" alpha="2"><TipoeCF>31</TipoeCF></IdDoc></ECF>';
+    const result = new Signature(privateKey, certificate).signXml(xml);
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+
+    // sha256(inclusive C14N) of that document, computed independently with
+    // lxml. Raw serialization would yield 5EtH+bWFmC/rkDhwtBkFD+ZE7jSbYlyKaiXKkMFox7A=
+    expect(result.value).toContain(
+      '3Nh+cOuHkKl+KUTNHpz9xJ5cE9WkdMIjc/DIVj5ediM=',
+    );
+    // The standard DigestMethod URI, which a .NET/DGII verifier understands.
+    expect(result.value).toContain(
+      'Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"',
+    );
+  });
+
   it('auto-detects the root element', () => {
     const { privateKey, certificate } = createSelfSigned();
     const seed =

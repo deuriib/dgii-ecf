@@ -16,9 +16,9 @@ enveloped** con:
 hacen canonicalización. Un byte de diferencia en namespaces o espacios en
 blanco cambia el digest y el documento es rechazado. Los SDKs usan C14N real:
 
-- **TypeScript** — `xml-crypto`, más un digest personalizado que ordena los
-  atributos `xmlns` del elemento raíz de la misma forma en que lo hace el stack
-  .NET de la DGII.
+- **TypeScript** — `xml-crypto`, que canonicaliza el node-set referenciado con
+  C14N 1.0 inclusiva antes de hashearlo, y luego firma con los URIs estándar
+  RSA-SHA256 y SHA-256.
 - **Python** — `lxml` con `method="c14n"` (inclusivo, comentarios eliminados).
 
 ## Firmar
