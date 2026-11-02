@@ -550,3 +550,96 @@ def test_separates_documents_sharing_rnc_and_encf() -> None:
     )
 
     assert calls["n"] == 2
+
+
+def test_send_document_dispatches_by_document_content() -> None:
+    urls: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        url = str(request.url)
+        urls.append(url)
+        if "recepcionfc" in url:
+            return httpx2.Response(
+                200,
+                json={
+                    "codigo": 1,
+                    "estado": "Aceptado",
+                    "mensajes": [],
+                    "encf": "E320000000001",
+                    "secuenciaUtilizada": True,
+                },
+            )
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    general = ecf.send_document(
+        "<ECF><Encabezado><IdDoc><TipoeCF>31</TipoeCF></IdDoc>"
+        "<Totales><MontoTotal>1000.00</MontoTotal></Totales></Encabezado></ECF>",
+        "f.xml",
+    )
+    assert general.is_ok()
+
+    summary = ecf.send_document(
+        "<RFCE><Encabezado><IdDoc><TipoeCF>32</TipoeCF></IdDoc></Encabezado></RFCE>",
+        "f.xml",
+    )
+    assert summary.is_ok()
+
+    assert "/TesteCF/recepcion/api/FacturasElectronicas" in urls[0]
+    assert "/TesteCF/recepcionfc/api/recepcion/ecf" in urls[1]
+
+
+def test_send_document_rejects_a_misrouted_e32_without_calling_http() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    result = ecf.send_document(
+        "<ECF><Encabezado><IdDoc><TipoeCF>32</TipoeCF></IdDoc>"
+        "<Totales><MontoTotal>100.00</MontoTotal></Totales></Encabezado></ECF>",
+        "f.xml",
+    )
+
+    assert result.is_err()
+    assert result.unwrap_err().code.value == "VALIDATION"
+    assert calls["n"] == 0
+
+
+def test_send_document_rejects_a_buyer_host_for_an_rfce() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    result = ecf.send_document(
+        "<RFCE><Encabezado><IdDoc><TipoeCF>32</TipoeCF></IdDoc></Encabezado></RFCE>",
+        "f.xml",
+        buyer_host="https://buyer.example",
+    )
+
+    assert result.is_err()
+    assert result.unwrap_err().code.value == "VALIDATION"
+    assert calls["n"] == 0

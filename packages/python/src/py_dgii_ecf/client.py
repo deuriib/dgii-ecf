@@ -25,6 +25,7 @@ from .http import (
     IdempotencyStore,
     InMemoryIdempotencyStore,
 )
+from .reception import resolve_reception_route
 from .resilience import ResilienceOptions
 from .result import DgiiResult, Err, Ok
 from .signing import Signature
@@ -318,6 +319,34 @@ class ECF:
             InvoiceSummaryResponse,
             lambda: self._http.post_multipart(url, file_name, signed_xml),
         )
+
+    def send_document(
+        self,
+        signed_xml: str,
+        file_name: str,
+        buyer_host: str | None = None,
+    ) -> DgiiResult[InvoiceResponse | InvoiceSummaryResponse]:
+        """Submit a signed document to the endpoint its own content belongs to.
+
+        Reads the root element, ``TipoeCF`` and ``MontoTotal`` from the signed
+        XML and dispatches to :meth:`send_summary` for an RFCE or to
+        :meth:`send_electronic_document` for an ECF. An E32 below RD$250,000 is
+        rejected because DGII only accepts the summary form for those.
+        """
+        route = resolve_reception_route(signed_xml)
+        if route.is_err():
+            return Err(route.unwrap_err())
+        resolved = route.unwrap()
+        if resolved.kind == "summary":
+            if buyer_host is not None:
+                return Err(
+                    DgiiError(
+                        "An RFCE summary cannot be delivered directly to a buyer host",
+                        code=DgiiErrorCode.VALIDATION,
+                    )
+                )
+            return self.send_summary(signed_xml, file_name)
+        return self.send_electronic_document(signed_xml, file_name, buyer_host)
 
     def status_track_id(self, track_id: str) -> DgiiResult[TrackingStatusResponse]:
         """Query the status of a submission by track id."""

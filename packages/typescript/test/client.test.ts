@@ -68,6 +68,57 @@ describe('ECF client', () => {
     expect(result.value.mensaje).toBe('Recibido');
   });
 
+  it('dispatches sendDocument to the endpoint the document belongs to', async () => {
+    const urls: string[] = [];
+    const fetchImpl = mockFetch(async (url) => {
+      urls.push(url);
+      return jsonResponse({ trackId: 't1' });
+    });
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+
+    const general = await ecf.sendDocument(
+      '<ECF><Encabezado><IdDoc><TipoeCF>31</TipoeCF></IdDoc>' +
+        '<Totales><MontoTotal>1000.00</MontoTotal></Totales></Encabezado></ECF>',
+      'f.xml',
+    );
+    expect(general.isOk()).toBe(true);
+
+    const summary = await ecf.sendDocument(
+      '<RFCE><Encabezado><IdDoc><TipoeCF>32</TipoeCF></IdDoc></Encabezado></RFCE>',
+      'f.xml',
+    );
+    expect(summary.isOk()).toBe(true);
+
+    expect(urls[0]).toContain('/TesteCF/recepcion/api/FacturasElectronicas');
+    expect(urls[1]).toContain('/TesteCF/recepcionfc/api/recepcion/ecf');
+  });
+
+  it('rejects a misrouted E32 before any HTTP call', async () => {
+    let calls = 0;
+    const fetchImpl = mockFetch(async () => {
+      calls += 1;
+      return jsonResponse({});
+    });
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+
+    const result = await ecf.sendDocument(
+      '<ECF><Encabezado><IdDoc><TipoeCF>32</TipoeCF></IdDoc>' +
+        '<Totales><MontoTotal>100.00</MontoTotal></Totales></Encabezado></ECF>',
+      'f.xml',
+    );
+
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('VALIDATION');
+    expect(calls).toBe(0);
+  });
+
   it('does not retry a 4xx rejection', async () => {
     let calls = 0;
     const fetchImpl = mockFetch(async () => {
