@@ -617,3 +617,79 @@ describe('B2B applicability', () => {
     expect(calls).toBe(1);
   });
 });
+
+describe('B2B commercial approval', () => {
+  const buyer = 'https://buyer.example';
+  const acecf =
+    '<ACECF><DetalleAprobacionComercial><RNCEmisor>130862346</RNCEmisor>' +
+    '<eNCF>E310000000001</eNCF></DetalleAprobacionComercial></ACECF>';
+
+  it('posts the ACECF to the buyer host and reports 200', async () => {
+    let capturedUrl = '';
+    const fetchImpl = mockFetch(async (url) => {
+      capturedUrl = url;
+      return jsonResponse({ received: true });
+    });
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+
+    const result = await ecf.sendCommercialApproval(acecf, 'a.xml', buyer);
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toEqual({ status: 200, accepted: true });
+    expect(capturedUrl).toBe(
+      'https://buyer.example/fe/aprobacioncomercial/api/ecf',
+    );
+  });
+
+  it('reports a 400 as an unsatisfactory outcome, not a failure', async () => {
+    const fetchImpl = mockFetch(
+      async () => new Response('unsatisfactory', { status: 400 }),
+    );
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+
+    const result = await ecf.sendCommercialApproval(acecf, 'a.xml', buyer);
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toEqual({ status: 400, accepted: false });
+  });
+
+  it('surfaces a 5xx as an error', async () => {
+    const fetchImpl = mockFetch(
+      async () => new Response('boom', { status: 503 }),
+    );
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+      resilience: { maxRetries: 1 },
+    });
+
+    const result = await ecf.sendCommercialApproval(acecf, 'a.xml', buyer);
+
+    expect(result.isErr()).toBe(true);
+  });
+
+  it('is idempotent for repeated B2B approvals', async () => {
+    let calls = 0;
+    const fetchImpl = mockFetch(async () => {
+      calls += 1;
+      return jsonResponse({ received: true });
+    });
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+
+    await ecf.sendCommercialApproval(acecf, 'a.xml', buyer);
+    await ecf.sendCommercialApproval(acecf, 'a.xml', buyer);
+
+    expect(calls).toBe(1);
+  });
+});

@@ -63,18 +63,18 @@ if (result.isOk()) {
 
 ## API
 
-| Método                                              | Devuelve                                          |
-| --------------------------------------------------- | ------------------------------------------------- |
-| `authenticate(buyerHost?)`                          | `Result<AuthToken>`                               |
-| `sendElectronicDocument(xml, fileName, buyerHost?)` | `Result<InvoiceResponse>`                         |
-| `sendSummary(xml, fileName)`                        | `Result<InvoiceSummaryResponse>`                  |
-| `statusTrackId(trackId)`                            | `Result<TrackingStatusResponse>`                  |
-| `inquiryStatus(rnc, ncf, comprador?, codigo?)`      | `Result<InquiryStatusResponse>`                   |
-| `trackStatuses(rnc, encf)`                          | `Result<SummaryTrackingStatusResponse[]>`         |
-| `getCustomerDirectory(rnc)`                         | `Result<ServiceDirectoryResponse[] \| undefined>` |
-| `getSummaryInvoiceInquiry(rnc, encf, codigo)`       | `Result<InquiryInvoiceSummary>`                   |
-| `sendCommercialApproval(xml, fileName)`             | `Result<CommercialApprovalResponse>`              |
-| `voidENCF(xml, fileName)`                           | `Result<VoidNCFResponse>`                         |
+| Método                                              | Devuelve                                                              |
+| --------------------------------------------------- | --------------------------------------------------------------------- |
+| `authenticate(buyerHost?)`                          | `Result<AuthToken>`                                                   |
+| `sendElectronicDocument(xml, fileName, buyerHost?)` | `Result<InvoiceResponse>`                                             |
+| `sendSummary(xml, fileName)`                        | `Result<InvoiceSummaryResponse>`                                      |
+| `statusTrackId(trackId)`                            | `Result<TrackingStatusResponse>`                                      |
+| `inquiryStatus(rnc, ncf, comprador?, codigo?)`      | `Result<InquiryStatusResponse>`                                       |
+| `trackStatuses(rnc, encf)`                          | `Result<SummaryTrackingStatusResponse[]>`                             |
+| `getCustomerDirectory(rnc)`                         | `Result<ServiceDirectoryResponse[] \| undefined>`                     |
+| `getSummaryInvoiceInquiry(rnc, encf, codigo)`       | `Result<InquiryInvoiceSummary>`                                       |
+| `sendCommercialApproval(xml, fileName, buyerHost?)` | `Result<CommercialApprovalResponse \| B2BCommercialApprovalResponse>` |
+| `voidENCF(xml, fileName)`                           | `Result<VoidNCFResponse>`                                             |
 
 ### Aplicabilidad B2B
 
@@ -105,6 +105,19 @@ lo expone la DGII en **producción** (`Environment.Prod` / `eCF`). En `Dev` o
 const inquiry = await ecf.getSummaryInvoiceInquiry(rnc, encf, codigoSeguridad);
 if (inquiry.isErr()) {
   console.error(inquiry.error.code); // 'VALIDATION' outside production
+}
+```
+
+El envío directo de un ACECF va al endpoint `fe/aprobacioncomercial/api/ecf`
+del comprador y devuelve `B2BCommercialApprovalResponse` en lugar del payload
+`{codigo, estado}` de la DGII. La DGII documenta **HTTP 200** como satisfactorio
+y **HTTP 400** como insatisfactorio, así que un 400 se reporta como
+`accepted: false` y no como un fallo de transporte:
+
+```ts
+const ack = await ecf.sendCommercialApproval(acecf, 'acecf.xml', buyerHost);
+if (ack.isOk() && !ack.value.accepted) {
+  // El receptor rechazó la aprobación; el emisor debe responder con una E34.
 }
 ```
 

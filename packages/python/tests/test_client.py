@@ -13,6 +13,7 @@ from py_dgii_ecf.errors import DgiiErrorCode
 from py_dgii_ecf.http import InMemoryIdempotencyStore
 from py_dgii_ecf.resilience import ResilienceOptions
 from py_dgii_ecf.types import (
+    B2BCommercialApprovalResponse,
     InquiryInvoiceSummary,
     InvoiceResponse,
     ServiceDirectoryResponse,
@@ -805,4 +806,76 @@ def test_b2b_sends_when_enforcement_is_disabled() -> None:
     result = ecf.send_electronic_document(E41_XML, "f.xml", "https://buyer.example")
 
     assert result.is_ok()
+    assert calls["n"] == 1
+
+
+def test_b2b_commercial_approval_reports_http_200() -> None:
+    captured: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured.append(str(request.url))
+        return httpx2.Response(200, json={"received": True})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    result = ecf.send_commercial_approval(
+        approval_xml("130862346", "E310000000001"),
+        "a.xml",
+        "https://buyer.example",
+    )
+
+    assert result.is_ok()
+    ack = result.unwrap()
+    assert isinstance(ack, B2BCommercialApprovalResponse)
+    assert ack.status == 200
+    assert ack.accepted is True
+    assert captured[0] == "https://buyer.example/fe/aprobacioncomercial/api/ecf"
+
+
+def test_b2b_commercial_approval_reports_http_400_as_unsatisfactory() -> None:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(400, text="unsatisfactory")
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    result = ecf.send_commercial_approval(
+        approval_xml("130862346", "E310000000002"),
+        "a.xml",
+        "https://buyer.example",
+    )
+
+    assert result.is_ok()
+    ack = result.unwrap()
+    assert ack.status == 400
+    assert ack.accepted is False
+
+
+def test_b2b_commercial_approval_is_idempotent() -> None:
+    calls = {"n": 0}
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={"received": True})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+    xml = approval_xml("130862346", "E310000000003")
+
+    ecf.send_commercial_approval(xml, "a.xml", "https://buyer.example")
+    ecf.send_commercial_approval(xml, "a.xml", "https://buyer.example")
+
     assert calls["n"] == 1

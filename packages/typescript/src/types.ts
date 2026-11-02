@@ -131,3 +131,11 @@ export interface MaintenanceWindow {
 export interface ServiceAvailabilityResponse {
   estado: ServiceAvailability;
 }
+
+/** Outcome of a direct ACECF delivery to a buyer host (Emisor↔Receptor). */
+export interface B2BCommercialApprovalResponse {
+  /** HTTP status returned by the buyer host: 200 satisfactory, 400 unsatisfactory. */
+  status: 200 | 400;
+  /** `true` for HTTP 200, `false` for HTTP 400. */
+  accepted: boolean;
+}

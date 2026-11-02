@@ -37,6 +37,7 @@ from .result import DgiiResult, Err, Ok
 from .signing import Signature
 from .types import (
     AuthToken,
+    B2BCommercialApprovalResponse,
     CommercialApprovalResponse,
     InquiryInvoiceSummary,
     InquiryStatusResponse,
@@ -555,12 +556,41 @@ class ECF:
         )
 
     def send_commercial_approval(
-        self, signed_xml: str, file_name: str
-    ) -> DgiiResult[CommercialApprovalResponse]:
-        """Submit a signed commercial approval (ACECF), idempotently."""
+        self,
+        signed_xml: str,
+        file_name: str,
+        buyer_host: str | None = None,
+    ) -> DgiiResult[CommercialApprovalResponse | B2BCommercialApprovalResponse]:
+        """Submit a signed commercial approval (ACECF), idempotently.
+
+        Without ``buyer_host`` the ACECF goes to DGII and returns the
+        ``{codigo, estado}`` payload. With ``buyer_host`` it goes straight to
+        the receiver's ``fe/aprobacioncomercial/api/ecf`` endpoint, where DGII
+        documents HTTP 200 as satisfactory and HTTP 400 as unsatisfactory — a
+        business outcome, not a transport failure.
+        """
+        key = self._build_idempotency_key(signed_xml)
+        if buyer_host is not None:
+
+            def _send_to_buyer() -> DgiiResult[JsonValue]:
+                url = build_sender_receiver_url(
+                    buyer_host, SenderReceiverEndpoint.COMMERCIAL_APPROVAL
+                )
+                result = self._http.post_multipart(url, file_name, signed_xml)
+                if result.is_err():
+                    error = result.unwrap_err()
+                    if error.status == 400:
+                        return Ok({"status": 400, "accepted": False})
+                    return Err(error)
+                return Ok({"status": 200, "accepted": True})
+
+            return self._submit_idempotent(
+                key, B2BCommercialApprovalResponse, _send_to_buyer
+            )
+
         url = build_url(self._environment, Endpoint.COMMERCIAL_APPROVAL)
         return self._submit_idempotent(
-            self._build_idempotency_key(signed_xml),
+            key,
             CommercialApprovalResponse,
             lambda: self._http.post_multipart(url, file_name, signed_xml),
         )

@@ -468,3 +468,20 @@ class ServiceAvailabilityResponse:
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> ServiceAvailabilityResponse:
         return cls(estado=_as_str(data.get("estado"), "estado"))
+
+
+@dataclass(frozen=True, slots=True)
+class B2BCommercialApprovalResponse:
+    """Outcome of a direct ACECF delivery to a buyer host (Emisor↔Receptor)."""
+
+    #: HTTP status returned by the buyer host: 200 satisfactory, 400 unsatisfactory.
+    status: int
+    #: ``True`` for HTTP 200, ``False`` for HTTP 400.
+    accepted: bool
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> B2BCommercialApprovalResponse:
+        return cls(
+            status=_as_int(data.get("status"), "status"),
+            accepted=_as_bool(data.get("accepted"), "accepted"),
+        )

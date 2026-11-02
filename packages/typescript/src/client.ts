@@ -24,6 +24,7 @@ import { extractElementText } from './xml.js';
 import type { P12ReaderData } from './certificate.js';
 import type {
   AuthToken,
+  B2BCommercialApprovalResponse,
   CommercialApprovalResponse,
   InquiryInvoiceSummary,
   InquiryStatusResponse,
@@ -560,8 +561,52 @@ export class ECF {
   sendCommercialApproval(
     signedXml: string,
     fileName: string,
-  ): Promise<Result<CommercialApprovalResponse, DgiiError>> {
+  ): Promise<Result<CommercialApprovalResponse, DgiiError>>;
+  sendCommercialApproval(
+    signedXml: string,
+    fileName: string,
+    buyerHost: string,
+  ): Promise<Result<B2BCommercialApprovalResponse, DgiiError>>;
+  sendCommercialApproval(
+    signedXml: string,
+    fileName: string,
+    buyerHost?: string,
+  ): Promise<
+    Result<
+      CommercialApprovalResponse | B2BCommercialApprovalResponse,
+      DgiiError
+    >
+  > {
     const key = this.buildIdempotencyKey(signedXml);
+    if (buyerHost !== undefined) {
+      return this.submitIdempotent<B2BCommercialApprovalResponse>(
+        key,
+        async () => {
+          const url = buildSenderReceiverUrl(
+            buyerHost,
+            SenderReceiverEndpoint.CommercialApproval,
+          );
+          const result = await this.http.postMultipart<unknown>(
+            url,
+            fileName,
+            signedXml,
+            {
+              absoluteUrl: true,
+              resource: SenderReceiverEndpoint.CommercialApproval,
+            },
+          );
+          if (result.isErr()) {
+            // DGII documents HTTP 400 as "unsatisfactory", i.e. the peer
+            // received the ACECF and rejected it — a business outcome, not a
+            // transport failure.
+            return result.error.status === 400
+              ? ok({ status: 400, accepted: false })
+              : err(result.error);
+          }
+          return ok({ status: 200, accepted: true });
+        },
+      );
+    }
     return this.submitIdempotent(key, () =>
       this.http.postMultipart<CommercialApprovalResponse>(
         buildUrl(this.environment, Endpoint.CommercialApproval),
