@@ -1,6 +1,8 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { ECF } from '../src/client.js';
 import { Environment } from '../src/environment.js';
+import { InMemoryIdempotencyStore } from '../src/http.js';
 
 const credentials = { key: 'unused-key', cert: 'unused-cert' };
 
@@ -135,5 +137,56 @@ describe('ECF client', () => {
     if (result.isErr()) return;
     expect(Array.isArray(result.value)).toBe(true);
     expect(result.value).toHaveLength(1);
+  });
+
+  it('refuses to resend a submission that is already pending', async () => {
+    const store = new InMemoryIdempotencyStore();
+    const xml = signedEcf('4', 'E4');
+    const key = `4:E4:${createHash('sha256').update(xml, 'utf8').digest('hex')}`;
+    await store.set(key, { pending: true });
+
+    let calls = 0;
+    const fetchImpl = mockFetch(async () => {
+      calls += 1;
+      return jsonResponse({ trackId: 'x' });
+    });
+
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+      idempotencyStore: store,
+    });
+    const result = await ecf.sendElectronicDocument(xml, 'f.xml');
+
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('IDEMPOTENCY');
+    expect(calls).toBe(0);
+  });
+
+  it('clears the pending marker when a submission fails', async () => {
+    const store = new InMemoryIdempotencyStore();
+    const xml = signedEcf('5', 'E5');
+    const key = `5:E5:${createHash('sha256').update(xml, 'utf8').digest('hex')}`;
+
+    let calls = 0;
+    const fetchImpl = mockFetch(async () => {
+      calls += 1;
+      return jsonResponse({ mensajes: [{ valor: 'bad', codigo: 1 }] }, 400);
+    });
+
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+      idempotencyStore: store,
+    });
+
+    const first = await ecf.sendElectronicDocument(xml, 'f.xml');
+    expect(first.isErr()).toBe(true);
+    expect(await store.get(key)).toBeUndefined();
+
+    // A retry after failure re-sends instead of returning a pending error.
+    await ecf.sendElectronicDocument(xml, 'f.xml');
+    expect(calls).toBe(2);
   });
 });
