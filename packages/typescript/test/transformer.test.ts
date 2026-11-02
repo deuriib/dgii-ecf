@@ -19,14 +19,34 @@ describe('Transformer', () => {
     expect(result.value).toContain('<Version>1.0</Version>');
   });
 
-  it('rounds monetary values to 2 decimals when requested', () => {
-    const transformer = new Transformer();
-    const result = transformer.json2xml(
+  it.each([
+    ['2.675', '2.68'],
+    // ROUND_HALF_EVEN would give 2.66 here; DGII expects half-up.
+    ['2.665', '2.67'],
+    ['1.005', '1.01'],
+    ['0.005', '0.01'],
+    ['1.004', '1.00'],
+    ['100.5', '100.50'],
+    ['9.999', '10.00'],
+    ['-2.675', '-2.68'],
+    ['1234.567', '1234.57'],
+  ])('rounds %s to %s with ROUND_HALF_UP', (raw, expected) => {
+    const result = new Transformer().json2xml(
+      { ECF: { Encabezado: { MontoTotal: { _text: raw } } } },
+      true,
+    );
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toContain(`<MontoTotal>${expected}</MontoTotal>`);
+  });
+
+  it('never rounds Version or non-monetary text', () => {
+    const result = new Transformer().json2xml(
       {
         ECF: {
           Encabezado: {
             Version: { _text: '1.0' },
-            MontoTotal: { _text: '100.5' },
+            RNCEmisor: { _text: '130862346' },
           },
         },
       },
@@ -35,7 +55,7 @@ describe('Transformer', () => {
     expect(result.isOk()).toBe(true);
     if (result.isErr()) return;
     expect(result.value).toContain('<Version>1.0</Version>');
-    expect(result.value).toContain('<MontoTotal>100.50</MontoTotal>');
+    expect(result.value).toContain('<RNCEmisor>130862346</RNCEmisor>');
   });
 
   it('round-trips XML back to compact JSON', () => {

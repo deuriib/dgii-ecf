@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from py_dgii_ecf.transformer import Transformer
 
 
@@ -12,13 +14,37 @@ def test_json_to_xml_with_declaration() -> None:
     assert "<Version>1.0</Version>" in xml.unwrap()
 
 
-def test_rounds_monetary_values() -> None:
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("2.675", "2.68"),
+        # ROUND_HALF_EVEN would give 2.66 here; DGII expects half-up.
+        ("2.665", "2.67"),
+        ("1.005", "1.01"),
+        ("0.005", "0.01"),
+        ("1.004", "1.00"),
+        ("100.5", "100.50"),
+        ("9.999", "10.00"),
+        ("-2.675", "-2.68"),
+        ("1234.567", "1234.57"),
+    ],
+)
+def test_rounds_monetary_values_half_up(raw: str, expected: str) -> None:
+    xml = Transformer().json_to_xml(
+        {"ECF": {"Encabezado": {"MontoTotal": {"_text": raw}}}},
+        round_monetary=True,
+    )
+    assert xml.is_ok()
+    assert f"<MontoTotal>{expected}</MontoTotal>" in xml.unwrap()
+
+
+def test_never_rounds_version_or_non_monetary_text() -> None:
     xml = Transformer().json_to_xml(
         {
             "ECF": {
                 "Encabezado": {
                     "Version": {"_text": "1.0"},
-                    "MontoTotal": {"_text": "100.5"},
+                    "RNCEmisor": {"_text": "130862346"},
                 }
             }
         },
@@ -26,7 +52,7 @@ def test_rounds_monetary_values() -> None:
     )
     assert xml.is_ok()
     assert "<Version>1.0</Version>" in xml.unwrap()
-    assert "<MontoTotal>100.50</MontoTotal>" in xml.unwrap()
+    assert "<RNCEmisor>130862346</RNCEmisor>" in xml.unwrap()
 
 
 def test_xml_to_json_round_trip() -> None:

@@ -27,7 +27,7 @@ directory contains runnable examples for both SDKs and DGII sample fixtures.
 | Status by track id | `status_track_id.py` | `status-track-id.ts` |
 | Inquiry status | `inquiry_status.py` | `inquiry-status.ts` |
 | Track statuses | `track_statuses.py` | `track-statuses.ts` |
-| Summary inquiry (RFCE) | `summary_inquiry.py` | `summary-inquiry.ts` |
+| Summary inquiry (RFCE) — production only | `summary_inquiry.py` | `summary-inquiry.ts` |
 | Customer directory | `customer_directory.py` | `customer-directory.ts` |
 | Commercial approval | `commercial_approval.py` | `commercial-approval.ts` |
 | Void a range | `void.py` | `void.ts` |

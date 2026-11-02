@@ -75,5 +75,26 @@ if (result.isOk()) {
 | `sendCommercialApproval(xml, fileName)` | `Result<CommercialApprovalResponse>` |
 | `voidENCF(xml, fileName)` | `Result<VoidNCFResponse>` |
 
+### Production-only endpoints
+
+`getSummaryInvoiceInquiry` (RFCE inquiry, `fc.dgii.gov.do/consultarfce`) is only
+exposed by DGII in **production** (`Environment.Prod` / `eCF`). In `Dev` or
+`Cert` it returns a `VALIDATION` error without issuing a request:
+
+```ts
+const inquiry = await ecf.getSummaryInvoiceInquiry(rnc, encf, codigoSeguridad);
+if (inquiry.isErr()) {
+  console.error(inquiry.error.code); // 'VALIDATION' outside production
+}
+```
+
+### Monetary rounding
+
+`Transformer.json2xml(data, true)` rounds decimal values to two places with
+**ROUND_HALF_UP** (`2.665` → `2.67`, `-2.675` → `-2.68`), computed on the
+decimal string rather than via `toFixed` (which loses precision:
+`(2.675).toFixed(2) === '2.67'`). `Version` and non-monetary text are never
+rounded.
+
 See [Signing](guides/signing.md), [Resilience](guides/resilience.md), and the
 [package README](https://github.com/deuriib/dgii-ecf/tree/main/packages/typescript).

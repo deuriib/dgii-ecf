@@ -37,7 +37,7 @@ if signed.is_err():
     raise SystemExit(signed.unwrap_err())
 
 response = ecf.send_electronic_document(signed.unwrap(), "101672919E3100000001.xml")
-response.map(lambda invoice: print(invoice.get("trackId"))).map_err(
+response.map(lambda invoice: print(invoice.track_id)).map_err(
     lambda error: print(error.code, error)
 )
 ```
@@ -47,7 +47,7 @@ response.map(lambda invoice: print(invoice.get("trackId"))).map_err(
 ```python
 result = ecf.status_track_id("some-track-id")
 if result.is_ok():
-    print(result.unwrap().get("estado"))
+    print(result.unwrap().estado)
 else:
     error = result.unwrap_err()
     print(error.code, error.message)
