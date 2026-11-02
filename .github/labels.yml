@@ -48,7 +48,7 @@
 
 - name: python
   color: 3776ab
-  description: Affects the dgii-ecf Python package
+  description: Affects the py-dgii-ecf Python package
 
 - name: breaking
   color: d93f0b

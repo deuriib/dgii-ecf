@@ -7,5 +7,5 @@
 # TypeScript (npm: @deuriib/dgii-ecf).
 /packages/typescript/ @deuriib
 
-# Python (PyPI: dgii-ecf).
+# Python (PyPI: py-dgii-ecf).
 /packages/python/ @deuriib

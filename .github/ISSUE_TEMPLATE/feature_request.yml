@@ -13,7 +13,7 @@ body:
       label: Which package?
       options:
         - '@deuriib/dgii-ecf (TypeScript)'
-        - 'dgii-ecf (Python)'
+        - 'py-dgii-ecf (Python)'
         - 'Both'
         - 'Monorepo / tooling'
     validations:

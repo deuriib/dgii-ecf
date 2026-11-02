@@ -3,7 +3,7 @@ dist/
 build/
 .venv/
 coverage/
-packages/python/src/dgii_ecf/__pycache__/
+packages/python/src/py_dgii_ecf/__pycache__/
 *.lock
 *.min.js
 CHANGELOG.md

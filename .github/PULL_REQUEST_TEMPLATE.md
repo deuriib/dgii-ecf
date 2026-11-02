@@ -19,7 +19,7 @@
 <!-- Which package(s) does this affect? -->
 
 - [ ] `packages/typescript` (`@deuriib/dgii-ecf`)
-- [ ] `packages/python` (`dgii-ecf`)
+- [ ] `packages/python` (`py-dgii-ecf`)
 - [ ] Monorepo / tooling / docs
 
 ## Checklist
