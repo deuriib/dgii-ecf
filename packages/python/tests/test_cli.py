@@ -9,7 +9,7 @@ from py_dgii_ecf import cli
 from py_dgii_ecf.certificate import P12ReaderData
 from py_dgii_ecf.errors import DgiiError, DgiiErrorCode
 from py_dgii_ecf.result import Err, Ok
-from py_dgii_ecf.types import AuthToken
+from py_dgii_ecf.types import AuthToken, TrackingStatusResponse
 
 CREDENTIALS = P12ReaderData(key="unused", cert="unused")
 
@@ -34,7 +34,7 @@ def test_status_surfaces_authentication_failure(
         def authenticate(self) -> Err[DgiiError]:
             return Err(DgiiError("bad certificate", code=DgiiErrorCode.CERTIFICATE))
 
-        def status_track_id(self, _track_id: str) -> Ok[dict[str, object]]:
+        def status_track_id(self, _track_id: str) -> Ok[TrackingStatusResponse]:
             raise AssertionError("status_track_id must not run when auth fails")
 
     monkeypatch.setattr(cli, "ECF", FakeEcf)
@@ -61,9 +61,19 @@ def test_status_queries_after_successful_auth(
         def authenticate(self) -> Ok[AuthToken]:
             return Ok(AuthToken(token="t", expira="", expedido=""))
 
-        def status_track_id(self, track_id: str) -> Ok[dict[str, object]]:
+        def status_track_id(self, track_id: str) -> Ok[TrackingStatusResponse]:
             requested["track_id"] = track_id
-            return Ok({"estado": "Aceptado"})
+            return Ok(
+                TrackingStatusResponse(
+                    track_id=track_id,
+                    codigo=1,
+                    estado="Aceptado",
+                    rnc="130862346",
+                    encf="E310000000001",
+                    secuencia_utilizada=True,
+                    fecha_recepcion="01-01-2026 10:00:00",
+                )
+            )
 
     monkeypatch.setattr(cli, "ECF", FakeEcf)
     runner = CliRunner()

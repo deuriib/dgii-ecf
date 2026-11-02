@@ -50,7 +50,7 @@ print(response.unwrap())
 ```python
 result = ecf.status_track_id("track-id")
 if result.is_ok():
-    print(result.unwrap().get("estado"))
+    print(result.unwrap().estado)
 else:
     error = result.unwrap_err()
     print(error.code, error.message)
@@ -58,18 +58,39 @@ else:
 
 ## API
 
+Every method returns a typed model, not a `dict`.
+
 | Method | Returns |
 | --- | --- |
 | `authenticate(buyer_host=None)` | `Result[AuthToken]` |
-| `send_electronic_document(xml, file_name, buyer_host=None)` | `Result[dict]` |
-| `send_summary(xml, file_name)` | `Result[dict]` |
-| `status_track_id(track_id)` | `Result[dict]` |
-| `inquiry_status(rnc, ncf, comprador=None, codigo=None)` | `Result[dict]` |
-| `track_statuses(rnc, encf)` | `Result[list[dict]]` |
-| `get_customer_directory(rnc)` | `Result[list[dict] \| None]` |
-| `get_summary_invoice_inquiry(rnc, encf, codigo)` | `Result[dict]` |
-| `send_commercial_approval(xml, file_name)` | `Result[dict]` |
-| `void_encf(xml, file_name)` | `Result[dict]` |
+| `send_electronic_document(xml, file_name, buyer_host=None)` | `Result[InvoiceResponse]` |
+| `send_summary(xml, file_name)` | `Result[InvoiceSummaryResponse]` |
+| `status_track_id(track_id)` | `Result[TrackingStatusResponse]` |
+| `inquiry_status(rnc, ncf, comprador=None, codigo=None)` | `Result[InquiryStatusResponse]` |
+| `track_statuses(rnc, encf)` | `Result[list[SummaryTrackingStatusResponse]]` |
+| `get_customer_directory(rnc)` | `Result[list[ServiceDirectoryResponse] \| None]` |
+| `get_summary_invoice_inquiry(rnc, encf, codigo)` | `Result[InquiryInvoiceSummary]` |
+| `send_commercial_approval(xml, file_name)` | `Result[CommercialApprovalResponse]` |
+| `void_encf(xml, file_name)` | `Result[VoidNCFResponse]` |
+
+### Production-only endpoints
+
+`get_summary_invoice_inquiry` (RFCE inquiry, `fc.dgii.gov.do/consultarfce`) is
+only exposed by DGII in **production** (`Environment.PROD` / `eCF`). In
+`TesteCF` or `CerteCF` it returns a `VALIDATION` error without issuing a
+request:
+
+```python
+inquiry = ecf.get_summary_invoice_inquiry(rnc, encf, codigo_seguridad)
+if inquiry.is_err():
+    print(inquiry.unwrap_err().code)   # VALIDATION outside production
+```
+
+### Monetary rounding
+
+`Transformer.json_to_xml(..., round_monetary=True)` rounds decimal values to two
+places with **ROUND_HALF_UP** (`2.665` → `2.67`, `-2.675` → `-2.68`), matching
+the TypeScript SDK. `Version` and non-monetary text are never rounded.
 
 ## CLI
 

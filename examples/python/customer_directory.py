@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from py_dgii_ecf import ECF, Environment, P12Reader
@@ -31,7 +32,9 @@ def main() -> int:
     if directory.is_err():
         print(f"error: {directory.unwrap_err()}", file=sys.stderr)
         return 1
-    print(json.dumps(directory.unwrap(), indent=2, ensure_ascii=False))
+    items = directory.unwrap()
+    payload = None if items is None else [asdict(item) for item in items]
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
     return 0
 
 
