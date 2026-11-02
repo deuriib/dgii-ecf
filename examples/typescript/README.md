@@ -1,5 +1,7 @@
 # TypeScript examples
 
+[English](README.md) · [Español](README.es.md)
+
 Runnable examples for [`@deuriib/dgii-ecf`](../../packages/typescript).
 
 ## Setup
