@@ -328,11 +328,19 @@ export class ECF {
   }
 
   /** RFCE inquiry — DGII production only. */
-  getSummaryInvoiceInquiry(
+  async getSummaryInvoiceInquiry(
     rnc: string,
     encf: string,
     codSeguridad: string,
   ): Promise<Result<InquiryInvoiceSummary, DgiiError>> {
+    if (this.environment !== Environment.Prod) {
+      return err(
+        new DgiiError(
+          `getSummaryInvoiceInquiry is only available in the production environment (eCF); current environment is ${this.environment}`,
+          { code: 'VALIDATION' },
+        ),
+      );
+    }
     const url = buildUrl(
       this.environment,
       Endpoint.InquiryInvoiceSummary,

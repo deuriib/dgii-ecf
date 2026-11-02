@@ -189,4 +189,63 @@ describe('ECF client', () => {
     await ecf.sendElectronicDocument(xml, 'f.xml');
     expect(calls).toBe(2);
   });
+
+  it('rejects the summary inquiry outside production', async () => {
+    let calls = 0;
+    const fetchImpl = mockFetch(async () => {
+      calls += 1;
+      return jsonResponse({
+        rnc: '130862346',
+        encf: 'E320000000001',
+        secuenciaUtilizada: true,
+        codigo: 1,
+        estado: 'Aceptado',
+      });
+    });
+
+    for (const environment of [Environment.Dev, Environment.Cert]) {
+      const ecf = new ECF(credentials, environment, {
+        token: 'tok',
+        fetchImpl,
+      });
+      const result = await ecf.getSummaryInvoiceInquiry(
+        '130862346',
+        'E320000000001',
+        'abc123',
+      );
+
+      expect(result.isErr()).toBe(true);
+      if (result.isOk()) continue;
+      expect(result.error.code).toBe('VALIDATION');
+      expect(result.error.message).toContain('production');
+    }
+
+    expect(calls).toBe(0);
+  });
+
+  it('allows the summary inquiry in production', async () => {
+    const fetchImpl = mockFetch(async () =>
+      jsonResponse({
+        rnc: '130862346',
+        encf: 'E320000000001',
+        secuenciaUtilizada: true,
+        codigo: 1,
+        estado: 'Aceptado',
+      }),
+    );
+
+    const ecf = new ECF(credentials, Environment.Prod, {
+      token: 'tok',
+      fetchImpl,
+    });
+    const result = await ecf.getSummaryInvoiceInquiry(
+      '130862346',
+      'E320000000001',
+      'abc123',
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value.encf).toBe('E320000000001');
+  });
 });
