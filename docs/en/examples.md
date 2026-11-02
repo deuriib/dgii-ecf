@@ -5,27 +5,25 @@ directory contains runnable examples for both SDKs and DGII sample fixtures.
 
 ## Fixtures
 
-| File                       | Description                                                                 |
-| -------------------------- | --------------------------------------------------------------------------- |
-| `fixtures/test.xml`        | Full DGII e-CF sample document. **Reference only** — see the warning below. |
-| `fixtures/invoice-31.xml`  | Minimal unsigned ECF-31.                                                    |
-| `fixtures/invoice-31.json` | The same invoice as compact JSON.                                           |
-| `fixtures/invoice-32.xml`  | Minimal ECF-32 for the summary (RFCE) flow.                                 |
-| `fixtures/acecf.xml`       | Illustrative ACECF (commercial approval).                                   |
-| `fixtures/anecf.xml`       | Illustrative ANECF (range voiding).                                         |
+| File                       | Description                                                              |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `fixtures/test.xml`        | Full DGII e-CF sample document with a synthetic certificate (see below). |
+| `fixtures/invoice-31.xml`  | Minimal unsigned ECF-31.                                                 |
+| `fixtures/invoice-31.json` | The same invoice as compact JSON.                                        |
+| `fixtures/invoice-32.xml`  | Minimal ECF-32 for the summary (RFCE) flow.                              |
+| `fixtures/acecf.xml`       | Illustrative ACECF (commercial approval).                                |
+| `fixtures/anecf.xml`       | Illustrative ANECF (range voiding).                                      |
 
-!!! warning "Expired fixture certificate"
-`fixtures/test.xml` is a historical reference only and **must not** be used as
-signing ground truth. The certificate embedded in it expired on **2024-12-04**,
-and its `DigestValue` no longer matches the payload because the document was
-edited after it was signed.
+### Fixture certificate
 
-    `utilities.py` / `utilities.ts` therefore report `certificate valid: false`
-    for it, and that is the expected result.
+`fixtures/test.xml` carries a **synthetic** certificate generated for this
+repository: subject `CN=dgii-ecf-fixture`, valid **2024-01-01 → 2035-01-01**.
+It holds no identity data and its signature verifies with libxmlsec1, so
+`utilities.py` / `utilities.ts` report `certificate valid: true`.
 
-    To sign end to end, use `fixtures/invoice-31.xml` (or
-    `fixtures/invoice-32.xml` for the RFCE flow) together with a generated
-    `output/test.p12`.
+It is still not a DGII certificate — DGII will reject it for a real submission.
+To sign end to end, use `fixtures/invoice-31.xml` (or `fixtures/invoice-32.xml`
+for the RFCE flow) with a generated `output/test.p12`.
 
 ## Flows
 
