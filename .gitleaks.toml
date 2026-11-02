@@ -1,0 +1,12 @@
+# gitleaks configuration for the dgii-ecf monorepo.
+# The default ruleset is kept intact; the allowlist below is deliberately narrow.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Signing artifacts written by the example scripts."
+# examples/output/ is gitignored (.gitignore:206) and holds the PKCS#12 bundles
+# and signed XML produced when running examples/. Those files never enter the
+# repository; the `certificate-material` pre-commit hook rejects any that do.
+paths = ['''^examples/output/''']
