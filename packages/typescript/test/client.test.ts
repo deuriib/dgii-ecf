@@ -49,6 +49,25 @@ describe('ECF client', () => {
     expect(captured?.init?.body).toBeInstanceOf(FormData);
   });
 
+  it('exposes the singular mensaje acknowledgement', async () => {
+    const fetchImpl = mockFetch(async () =>
+      jsonResponse({ trackId: 't1', error: '', mensaje: 'Recibido' }),
+    );
+
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+    const result = await ecf.sendElectronicDocument(
+      signedEcf('130862346', 'E310000000002'),
+      'f.xml',
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value.mensaje).toBe('Recibido');
+  });
+
   it('does not retry a 4xx rejection', async () => {
     let calls = 0;
     const fetchImpl = mockFetch(async () => {
@@ -285,8 +304,8 @@ describe('ECF client', () => {
       `<DetalleAnulacion><RangoNCF>${range}</RangoNCF></DetalleAnulacion></ANECF>`;
 
     const approvalPayload = {
-      codigo: '01',
-      estado: 'Aprobación Comercial Aprobada.',
+      codigo: '1',
+      estado: 'Aprobación comercial aprobada',
       mensaje: [],
     };
     const voidPayload = {
@@ -314,6 +333,30 @@ describe('ECF client', () => {
       expect(first.isOk()).toBe(true);
       expect(second.isOk()).toBe(true);
       expect(calls).toBe(1);
+    });
+
+    it('exposes the documented rejection vocabulary', async () => {
+      const fetchImpl = mockFetch(async () =>
+        jsonResponse({
+          codigo: '2',
+          estado: 'Aprobación comercial rechazada',
+          mensaje: ['No encontrada'],
+        }),
+      );
+      const ecf = new ECF(credentials, Environment.Dev, {
+        token: 'tok',
+        fetchImpl,
+      });
+
+      const result = await ecf.sendCommercialApproval(
+        approvalXml('130862346', 'E310000000009'),
+        'acecf.xml',
+      );
+
+      expect(result.isOk()).toBe(true);
+      if (result.isErr()) return;
+      expect(result.value.codigo).toBe('2');
+      expect(result.value.estado).toBe('Aprobación comercial rechazada');
     });
 
     it('is idempotent for repeated void requests', async () => {

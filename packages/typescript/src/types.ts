@@ -57,6 +57,12 @@ export interface SummaryTrackingStatusResponse {
 export interface InvoiceResponse {
   trackId?: string;
   error?: string;
+  /**
+   * Synchronous acknowledgement text. DGII sends this as a singular string on
+   * the general reception endpoint (`recepcion/api/FacturasElectronicas`).
+   */
+  mensaje?: string;
+  /** Tolerated array form used by the RFCE and status endpoints. */
   mensajes?: Mensaje[];
 }
 
@@ -86,8 +92,9 @@ export interface InquiryInvoiceSummary {
 }
 
 export interface CommercialApprovalResponse {
-  codigo: '01' | '02';
-  estado: 'Aprobación Comercial Aprobada.' | 'Aprobacion Comercial Rechazada.';
+  /** `1` = approved, `2` = not found / not processed. */
+  codigo: '1' | '2';
+  estado: 'Aprobación comercial aprobada' | 'Aprobación comercial rechazada';
   mensaje: string[];
 }
 

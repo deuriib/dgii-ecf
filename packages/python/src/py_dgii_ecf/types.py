@@ -14,6 +14,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol, Self, TypeVar
 
+# Commercial approval vocabulary, as documented by DGII. `codigo` is a string
+# with no leading zeros and `estado` uses sentence case without a trailing dot.
+COMMERCIAL_APPROVAL_ACCEPTED_CODE = "1"
+COMMERCIAL_APPROVAL_REJECTED_CODE = "2"
+COMMERCIAL_APPROVAL_ACCEPTED_STATE = "Aprobación comercial aprobada"
+COMMERCIAL_APPROVAL_REJECTED_STATE = "Aprobación comercial rechazada"
+
 
 @dataclass(frozen=True, slots=True)
 class Mensaje:
@@ -249,6 +256,10 @@ class InvoiceResponse:
 
     track_id: str | None = None
     error: str | None = None
+    #: Synchronous acknowledgement text. DGII sends this as a singular string
+    #: on the general reception endpoint.
+    mensaje: str | None = None
+    #: Tolerated array form used by the RFCE and status endpoints.
     mensajes: tuple[Mensaje, ...] = ()
 
     @classmethod
@@ -256,6 +267,7 @@ class InvoiceResponse:
         return cls(
             track_id=_as_optional_str(data.get("trackId"), "trackId"),
             error=_as_optional_str(data.get("error"), "error"),
+            mensaje=_as_optional_str(data.get("mensaje"), "mensaje"),
             mensajes=_parse_mensajes(data.get("mensajes")),
         )
 
@@ -332,7 +344,12 @@ class InquiryInvoiceSummary:
 
 @dataclass(frozen=True, slots=True)
 class CommercialApprovalResponse:
-    """Result of ``sendCommercialApproval`` (ACECF)."""
+    """Result of ``sendCommercialApproval`` (ACECF).
+
+    Compare against :data:`COMMERCIAL_APPROVAL_ACCEPTED_CODE` /
+    :data:`COMMERCIAL_APPROVAL_REJECTED_CODE` and the matching ``*_STATE``
+    constants instead of hand-typed strings.
+    """
 
     codigo: str
     estado: str

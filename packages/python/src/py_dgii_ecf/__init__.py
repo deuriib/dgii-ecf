@@ -36,6 +36,10 @@ from .result import DgiiResult, Err, Ok, Result
 from .signing import Signature, XmlCertificateValidation, validate_xml_certificate
 from .transformer import Transformer
 from .types import (
+    COMMERCIAL_APPROVAL_ACCEPTED_CODE,
+    COMMERCIAL_APPROVAL_ACCEPTED_STATE,
+    COMMERCIAL_APPROVAL_REJECTED_CODE,
+    COMMERCIAL_APPROVAL_REJECTED_STATE,
     AuthToken,
     CommercialApprovalResponse,
     InquiryInvoiceSummary,
@@ -64,6 +68,10 @@ from .utils import (
 __version__ = "0.5.0"
 
 __all__ = [
+    "COMMERCIAL_APPROVAL_ACCEPTED_CODE",
+    "COMMERCIAL_APPROVAL_ACCEPTED_STATE",
+    "COMMERCIAL_APPROVAL_REJECTED_CODE",
+    "COMMERCIAL_APPROVAL_REJECTED_STATE",
     "ECF",
     "AuthToken",
     "BaseUrl",
