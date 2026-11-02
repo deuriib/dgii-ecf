@@ -147,3 +147,58 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+.venv/
+venv/
+env/
+build/
+develop-eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# uv
+.uv/
+uv.lock.bak
+
+# ---------------------------------------------------------------------------
+# mise
+# ---------------------------------------------------------------------------
+.mise.local.toml
+.mise.tasks
+# Do NOT ignore mise.toml / uv.lock / bun.lock — they are committed.
+
+# ---------------------------------------------------------------------------
+# Secrets — DGII certificates & keys (NEVER commit)
+# ---------------------------------------------------------------------------
+*.p12
+*.pfx
+*.pem
+*.key
+*.crt
+*.cer
+!*.example
+test_cert/
+secrets/
+
+# ---------------------------------------------------------------------------
+# Misc
+# ---------------------------------------------------------------------------
+.DS_Store
+*.local
+

@@ -1,0 +1,67 @@
+name: Bug report
+description: Report a bug or unexpected behavior
+title: "bug: "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill this out carefully so we can reproduce it.
+
+        > ⚠️ **Never paste certificates, private keys, `.p12` files, tokens, or production RNC credentials.** Redact anything sensitive.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which package?
+      options:
+        - "@deuriib/dgii-ecf (TypeScript)"
+        - "dgii-ecf (Python)"
+        - "Monorepo / tooling"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      placeholder: "e.g. 0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Runtime & environment
+      description: "Node/Bun or Python version, OS, and DGII environment (TesteCF / CerteCF / eCF)."
+      placeholder: "Bun 1.4.4, Ubuntu 24.04, TesteCF"
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: What actually happens?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, runnable reproduction. Include a short code snippet (no secrets).
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error output
+      description: Any relevant output (redact sensitive data).
+      render: shell

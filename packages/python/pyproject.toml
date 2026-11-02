@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "py-dgii-ecf"
+version = "0.1.0"
+description = "DGII e-CF electronic invoicing SDK for the Dominican Republic — authenticate, sign (XMLDSig/C14N) and transmit electronic tax documents."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Deuri Vasquez" }]
+keywords = [
+  "dgii",
+  "ecf",
+  "facturacion",
+  "electronica",
+  "republica-dominicana",
+  "invoice",
+  "ncf",
+  "xml",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+  "Topic :: Office/Business :: Financial :: Accounting",
+]
+dependencies = [
+  "httpx2>=2.13,<3",
+  "tenacity>=9.0",
+  "pybreaker>=1.0",
+  "result>=0.17,<1",
+  "lxml>=5.0",
+  "cryptography>=43.0",
+  "typer>=0.15",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.9",
+  "mypy>=1.13",
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+]
+
+[project.scripts]
+py-dgii-ecf = "py_dgii_ecf.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/py_dgii_ecf"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF", "C4", "PTH", "PLC", "PLE"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["py_dgii_ecf"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+disallow_any_explicit = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["pybreaker.*", "lxml.*", "result.*", "tenacity.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["py_dgii_ecf"]

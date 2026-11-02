@@ -1,0 +1,13 @@
+# Normalize line endings to LF across the whole repo.
+* text=auto eol=lf
+
+# Binary-ish / generated artifacts.
+*.p12 binary
+*.pem binary
+*.pfx binary
+*.key binary
+*.lock binary
+
+# Linguist hints.
+packages/typescript/src/** linguist-language=TypeScript
+packages/python/src/** linguist-language=Python

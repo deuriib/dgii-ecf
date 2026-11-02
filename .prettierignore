@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+.venv/
+coverage/
+packages/python/src/dgii_ecf/__pycache__/
+*.lock
+*.min.js
+CHANGELOG.md

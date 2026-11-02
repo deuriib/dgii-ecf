@@ -1,0 +1,72 @@
+{
+  "name": "@deuriib/dgii-ecf",
+  "version": "0.1.0",
+  "description": "DGII e-CF electronic invoicing SDK for the Dominican Republic — authenticate, sign (XMLDSig/C14N) and transmit electronic tax documents. Bun-first, native fetch, result-pattern.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Deuri Vasquez",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deuriib/dgii-ecf.git",
+    "directory": "packages/typescript"
+  },
+  "homepage": "https://github.com/deuriib/dgii-ecf/tree/main/packages/typescript",
+  "keywords": [
+    "dgii",
+    "ecf",
+    "facturacion",
+    "electronica",
+    "republica-dominicana",
+    "invoice",
+    "ncf",
+    "xml",
+    "xmlsig",
+    "firma-digital"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "bun@1.4.4",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "cockatiel": "^3.2.1",
+    "neverthrow": "^7.1.0",
+    "node-forge": "^1.3.1",
+    "xml-crypto": "^6.1.2",
+    "xml-js": "^1.6.11"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/node-forge": "^1.3.11",
+    "prettier": "^3.5.3",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

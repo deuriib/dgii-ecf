@@ -1,0 +1,87 @@
+# mise.toml — tool versions + convenience tasks for the dgii-ecf monorepo.
+# Run `mise install` once, then `mise run <task>`.
+
+[tools]
+bun = "1.4.4"
+node = "26.13.0"
+python = "3.12"
+uv = "0.13.6"
+
+# ---------------------------------------------------------------------------
+# Bootstrap
+# ---------------------------------------------------------------------------
+[tasks.bootstrap]
+description = "Install all toolchains and dependencies"
+depends = ["bootstrap-tools", "bootstrap-typescript", "bootstrap-python"]
+
+[tasks.bootstrap-tools]
+description = "Install pinned toolchain versions"
+run = "mise install"
+
+[tasks.bootstrap-typescript]
+description = "Install TypeScript package dependencies"
+dir = "packages/typescript"
+run = "bun install"
+
+[tasks.bootstrap-python]
+description = "Install Python package dependencies"
+dir = "packages/python"
+run = "uv sync"
+
+# ---------------------------------------------------------------------------
+# Lint
+# ---------------------------------------------------------------------------
+[tasks.lint]
+description = "Run every linter/formatter across the monorepo"
+depends = ["lint-typescript", "lint-python"]
+
+[tasks.lint-typescript]
+description = "Typecheck + format-check the TypeScript package"
+dir = "packages/typescript"
+run = "bun run lint"
+
+[tasks.lint-python]
+description = "Ruff + mypy + format-check the Python package"
+dir = "packages/python"
+run = "uv run ruff check . && uv run ruff format --check . && uv run mypy src"
+
+# ---------------------------------------------------------------------------
+# Test
+# ---------------------------------------------------------------------------
+[tasks.test]
+description = "Run every test suite across the monorepo"
+depends = ["test-typescript", "test-python"]
+
+[tasks.test-typescript]
+description = "Run the TypeScript (vitest) test suite"
+dir = "packages/typescript"
+run = "bun run test"
+
+[tasks.test-python]
+description = "Run the Python (pytest) test suite"
+dir = "packages/python"
+run = "uv run pytest"
+
+# ---------------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------------
+[tasks.build]
+description = "Build every distributable across the monorepo"
+depends = ["build-typescript", "build-python"]
+
+[tasks.build-typescript]
+description = "Build the TypeScript package (dist/)"
+dir = "packages/typescript"
+run = "bun run build"
+
+[tasks.build-python]
+description = "Build the Python sdist + wheel (dist/)"
+dir = "packages/python"
+run = "uv build"
+
+# ---------------------------------------------------------------------------
+# Full CI
+# ---------------------------------------------------------------------------
+[tasks.ci]
+description = "Full CI pipeline locally (lint + test + build)"
+depends = ["lint", "test", "build"]

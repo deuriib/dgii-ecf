@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: DGII official documentation
+    url: https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Paginas/default.aspx
+    about: Official Dominican electronic invoicing (e-CF) documentation
+  - name: Questions & discussions
+    url: https://github.com/deuriib/dgii-ecf/discussions
+    about: Please ask questions here instead of opening an issue

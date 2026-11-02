@@ -1,0 +1,11 @@
+# Global code owners.
+* @deuriib
+
+# Governance and automation.
+/.github/ @deuriib
+
+# TypeScript (npm: @deuriib/dgii-ecf).
+/packages/typescript/ @deuriib
+
+# Python (PyPI: dgii-ecf).
+/packages/python/ @deuriib
