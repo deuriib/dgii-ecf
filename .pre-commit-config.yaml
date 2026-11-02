@@ -56,10 +56,9 @@ repos:
         files: ^packages/python/
 
       - id: prettier
-        name: prettier (packages/typescript)
+        name: prettier (repository)
         language: system
         entry: packages/typescript/node_modules/.bin/prettier --check
-        files: ^packages/typescript/
         types_or: [javascript, jsx, ts, tsx, json, yaml, markdown]
         exclude: ^packages/typescript/(dist|coverage)/
 
