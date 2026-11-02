@@ -90,6 +90,10 @@ class HttpClientOptions:
     token: str | None = None
     resilience: ResilienceOptions | None = None
     timeout_s: float = 15.0
+    #: Runs before every authenticated request; may refresh credentials.
+    before_request: Callable[[], None] | None = None
+    #: Runs on a 401; return ``True`` to replay the request once.
+    on_unauthorized: Callable[[], bool] | None = None
 
 
 def _clean_params(
@@ -115,15 +119,26 @@ class HttpClient:
         self._token = options.token
         self._policy = ResiliencePolicy(options.resilience)
         self._client = client or httpx2.Client(timeout=options.timeout_s)
+        self._before_request = options.before_request
+        self._on_unauthorized = options.on_unauthorized
 
     @property
     def timeout_s(self) -> float:
         """The configured per-request timeout in seconds."""
         return self._policy.options.timeout_s
 
+    @property
+    def token(self) -> str | None:
+        """The bearer token currently attached to requests."""
+        return self._token
+
     def set_token(self, token: str) -> None:
         """Set the bearer token used on subsequent requests."""
         self._token = token
+
+    def clear_token(self) -> None:
+        """Drop the bearer token used on subsequent requests."""
+        self._token = None
 
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/json"}
@@ -165,8 +180,31 @@ class HttpClient:
         *,
         params: Mapping[str, str | int | None] | None = None,
         files: Mapping[str, tuple[str, bytes, str]] | None = None,
+        skip_auth_hooks: bool = False,
     ) -> DgiiResult[JsonValue]:
         """Perform a request and normalize the outcome into a ``Result``."""
+        if not skip_auth_hooks and self._before_request is not None:
+            self._before_request()
+
+        first = self._execute(method, url, params=params, files=files)
+        if (
+            not skip_auth_hooks
+            and first.is_err()
+            and first.unwrap_err().status == 401
+            and self._on_unauthorized is not None
+            and self._on_unauthorized()
+        ):
+            return self._execute(method, url, params=params, files=files)
+        return first
+
+    def _execute(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: Mapping[str, str | int | None] | None = None,
+        files: Mapping[str, tuple[str, bytes, str]] | None = None,
+    ) -> DgiiResult[JsonValue]:
         clean_params = _clean_params(params)
 
         def _do() -> DgiiResult[JsonValue]:
@@ -204,16 +242,20 @@ class HttpClient:
         self,
         url: str,
         params: Mapping[str, str | int | None] | None = None,
+        *,
+        skip_auth_hooks: bool = False,
     ) -> DgiiResult[JsonValue]:
         """HTTP GET."""
-        return self.request("GET", url, params=params)
+        return self.request("GET", url, params=params, skip_auth_hooks=skip_auth_hooks)
 
     def post_multipart(
         self,
         url: str,
         file_name: str,
         xml: str,
+        *,
+        skip_auth_hooks: bool = False,
     ) -> DgiiResult[JsonValue]:
         """POST a signed XML as a multipart ``xml`` file part."""
         files = {"xml": (file_name, xml.encode("utf-8"), "application/xml")}
-        return self.request("POST", url, files=files)
+        return self.request("POST", url, files=files, skip_auth_hooks=skip_auth_hooks)

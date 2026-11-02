@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import threading
+import time
 from collections.abc import Callable
+from datetime import datetime
 
 import httpx2
 
@@ -52,6 +55,16 @@ def _is_pending(value: JsonObject) -> bool:
 
 def _sha256_hex(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _parse_expiry(value: str) -> float | None:
+    """Parse DGII's ISO-8601 ``expira`` into a POSIX timestamp."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
 
 
 def _parse_one(model: type[_ModelT], data: JsonValue) -> DgiiResult[_ModelT]:
@@ -130,21 +143,62 @@ class ECF:
         resilience: ResilienceOptions | None = None,
         timeout_s: float = 15.0,
         http_client: httpx2.Client | None = None,
+        token_refresh_skew_s: float = 5 * 60,
+        now: Callable[[], float] = time.time,
     ) -> None:
         self._credentials = credentials
         self._environment = environment
         self._idempotency: IdempotencyStore = (
             idempotency_store or InMemoryIdempotencyStore()
         )
+        self._token_refresh_skew_s = token_refresh_skew_s
+        self._now = now
+        self._token_expires_at: float | None = None
+        self._last_token: AuthToken | None = None
+        self._refresh_lock = threading.Lock()
         self._http = HttpClient(
             HttpClientOptions(
                 base_url=BaseUrl.ECF.value,
                 token=token,
                 resilience=resilience,
                 timeout_s=timeout_s,
+                before_request=self._ensure_token,
+                on_unauthorized=self._reauthenticate,
             ),
             client=http_client,
         )
+
+    def _ensure_token(self) -> None:
+        """Refresh the token when it is about to expire.
+
+        A pre-supplied ``token`` has no known expiry, so it is never refreshed
+        proactively — only a 401 triggers a re-authentication for it.
+        """
+        expires_at = self._token_expires_at
+        if expires_at is None:
+            return
+        if self._now() < expires_at - self._token_refresh_skew_s:
+            return
+        self._refresh_token()
+
+    def _refresh_token(self, *, force: bool = False) -> DgiiResult[AuthToken]:
+        """Authenticate, coalescing concurrent refreshes into one round-trip."""
+        with self._refresh_lock:
+            if not force and self._last_token is not None:
+                expires_at = self._token_expires_at
+                if (
+                    expires_at is not None
+                    and self._now() < expires_at - self._token_refresh_skew_s
+                ):
+                    return Ok(self._last_token)
+            return self.authenticate()
+
+    def _reauthenticate(self) -> bool:
+        """Drop the rejected token and authenticate once."""
+        self._http.clear_token()
+        self._token_expires_at = None
+        self._last_token = None
+        return self._refresh_token(force=True).is_ok()
 
     def _build_idempotency_key(self, signed_xml: str) -> str:
         rnc = extract_element_text(signed_xml, "RNCEmisor") or "unknown-rnc"
@@ -237,7 +291,10 @@ class ECF:
         if token.is_err():
             return Err(token.unwrap_err())
 
-        self._http.set_token(token.unwrap().token)
+        issued = token.unwrap()
+        self._http.set_token(issued.token)
+        self._last_token = issued
+        self._token_expires_at = _parse_expiry(issued.expira)
         return token
 
     def _get_seed(self, buyer_host: str | None) -> DgiiResult[str]:
@@ -246,7 +303,7 @@ class ECF:
             if buyer_host
             else build_url(self._environment, Endpoint.SEED)
         )
-        result = self._http.get(url)
+        result = self._http.get(url, skip_auth_hooks=True)
         if result.is_err():
             return Err(result.unwrap_err())
         data = result.unwrap()
@@ -268,7 +325,9 @@ class ECF:
             if buyer_host
             else build_url(self._environment, Endpoint.VALIDATE_SEED)
         )
-        result = self._http.post_multipart(url, "signed.xml", signed_seed)
+        result = self._http.post_multipart(
+            url, "signed.xml", signed_seed, skip_auth_hooks=True
+        )
         if result.is_err():
             return Err(result.unwrap_err())
         data = result.unwrap()

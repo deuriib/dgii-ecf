@@ -100,6 +100,10 @@ export interface HttpClientOptions {
   policies?: ResiliencePolicies;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /** Runs before every authenticated request; may refresh credentials. */
+  beforeRequest?: () => Promise<void>;
+  /** Runs on a 401; return `true` to replay the request once. */
+  onUnauthorized?: () => Promise<boolean>;
 }
 
 export interface RequestOptions {
@@ -111,6 +115,8 @@ export interface RequestOptions {
   body?: BodyInit;
   query?: Record<string, string | number | undefined>;
   resource?: string;
+  /** Skip the auth hooks (used by the authentication round-trip itself). */
+  skipAuthHooks?: boolean;
 }
 
 interface RequestContext {
@@ -125,10 +131,14 @@ export class HttpClient {
   private readonly policies: ResiliencePolicies;
   private readonly fetchImpl: typeof fetch;
   private readonly baseUrl: string;
+  private readonly beforeRequest: (() => Promise<void>) | undefined;
+  private readonly onUnauthorized: (() => Promise<boolean>) | undefined;
 
   constructor(options: HttpClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.token = options.token;
+    this.beforeRequest = options.beforeRequest;
+    this.onUnauthorized = options.onUnauthorized;
     this.policies =
       options.policies ??
       createResiliencePolicies({
@@ -142,6 +152,10 @@ export class HttpClient {
 
   setToken(token: string): void {
     this.token = token;
+  }
+
+  getToken(): string | undefined {
+    return this.token;
   }
 
   clearToken(): void {
@@ -225,6 +239,29 @@ export class HttpClient {
   }
 
   async request<T>(options: RequestOptions): Promise<Result<T, DgiiError>> {
+    if (!options.skipAuthHooks) {
+      await this.beforeRequest?.();
+    }
+
+    const first = await this.execute<T>(options);
+
+    if (
+      !options.skipAuthHooks &&
+      first.isErr() &&
+      first.error.status === 401 &&
+      this.onUnauthorized !== undefined
+    ) {
+      const replayed = await this.onUnauthorized();
+      if (replayed) {
+        return this.execute<T>(options);
+      }
+    }
+    return first;
+  }
+
+  private async execute<T>(
+    options: RequestOptions,
+  ): Promise<Result<T, DgiiError>> {
     const url = this.buildUrl(options.path, options.absoluteUrl, options.query);
     const method = options.method ?? 'GET';
     const headers = this.authHeaders(options.headers);
@@ -252,7 +289,11 @@ export class HttpClient {
   get<T>(
     path: string,
     query?: RequestOptions['query'],
-    opts?: { absoluteUrl?: boolean; resource?: string },
+    opts?: {
+      absoluteUrl?: boolean;
+      resource?: string;
+      skipAuthHooks?: boolean;
+    },
   ): Promise<Result<T, DgiiError>> {
     return this.request<T>({
       method: 'GET',
@@ -260,6 +301,7 @@ export class HttpClient {
       query,
       absoluteUrl: opts?.absoluteUrl,
       resource: opts?.resource,
+      skipAuthHooks: opts?.skipAuthHooks,
     });
   }
 
@@ -271,7 +313,11 @@ export class HttpClient {
     path: string,
     fileName: string,
     xml: string,
-    opts?: { absoluteUrl?: boolean; resource?: string },
+    opts?: {
+      absoluteUrl?: boolean;
+      resource?: string;
+      skipAuthHooks?: boolean;
+    },
   ): Promise<Result<T, DgiiError>> {
     const form = new FormData();
     form.append('xml', new Blob([xml], { type: 'application/xml' }), fileName);
@@ -282,6 +328,7 @@ export class HttpClient {
       headers: { Accept: 'application/json' },
       absoluteUrl: opts?.absoluteUrl,
       resource: opts?.resource,
+      skipAuthHooks: opts?.skipAuthHooks,
     });
   }
 }
