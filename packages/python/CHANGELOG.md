@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.2.3...python-v0.3.0) (2026-11-02)
+
+
+### Features
+
+* **python:** return typed response models ([102abb0](https://github.com/deuriib/dgii-ecf/commit/102abb07eda4a990ccf0a453959203254f914f9e))
+* **python:** typed response models, prod-only RFCE guard, half-up rounding ([c786718](https://github.com/deuriib/dgii-ecf/commit/c786718fd37626b23fa164fa76a919ebcf33568f))
+
+
+### Bug Fixes
+
+* **python:** round monetary values half-up ([508913b](https://github.com/deuriib/dgii-ecf/commit/508913ba9aad2a6353a05ff6474a05101cacd4cf))
+
 ## [0.2.3](https://github.com/deuriib/dgii-ecf/compare/python-v0.2.2...python-v0.2.3) (2026-11-02)
 
 
