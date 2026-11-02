@@ -1,6 +1,6 @@
 {
   "name": "@deuriib/dgii-ecf",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "DGII e-CF electronic invoicing SDK for the Dominican Republic — authenticate, sign (XMLDSig/C14N) and transmit electronic tax documents. Bun-first, native fetch, result-pattern.",
   "type": "module",
   "license": "MIT",

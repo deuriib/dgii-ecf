@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.3](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.2.2...typescript-v0.2.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* **typescript:** close the quick-win backlog ([#29](https://github.com/deuriib/dgii-ecf/issues/29), [#32](https://github.com/deuriib/dgii-ecf/issues/32), [#33](https://github.com/deuriib/dgii-ecf/issues/33)) ([215bdb4](https://github.com/deuriib/dgii-ecf/commit/215bdb4e9a3134d7874fc5420ecf3daf256943d2))
+* **typescript:** read plain key bags from PKCS[#12](https://github.com/deuriib/dgii-ecf/issues/12) bundles ([679a577](https://github.com/deuriib/dgii-ecf/commit/679a57729cdbe33f74d0556ee027ea50372509a4))
+* **typescript:** return INVALID_XML for malformed input ([b0f7805](https://github.com/deuriib/dgii-ecf/commit/b0f7805b3f6e11d8a201d630fad313cadd8c7b12))
+* **typescript:** tolerate namespace prefixes in signature helpers ([ff2f3c3](https://github.com/deuriib/dgii-ecf/commit/ff2f3c33c7d3cf61a2578c1c9306b24ff201aee8))
+
 ## [0.2.2](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.2.1...typescript-v0.2.2) (2026-11-02)
 
 
