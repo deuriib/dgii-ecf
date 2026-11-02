@@ -43,3 +43,21 @@ def extract_element_text(xml: str, tag: str) -> str | None:
     if match is None:
         return None
     return match.group(1).strip() or None
+
+
+_ROOT_PATTERN = re.compile(r"<\s*(?:[A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)[\s/>]")
+
+
+def extract_root_element_name(xml: str) -> str | None:
+    """Local name of the document's root element.
+
+    Ignores the XML declaration and any leading comments. Returns ``None``
+    when no element is present.
+
+    DGII routing depends on the root: ``<ECF>`` goes to the general reception
+    and ``<RFCE>`` to the consumption-summary reception.
+    """
+    stripped = re.sub(r"<\?[\s\S]*?\?>", "", xml)
+    stripped = re.sub(r"<!--[\s\S]*?-->", "", stripped).lstrip()
+    match = _ROOT_PATTERN.match(stripped)
+    return match.group(1) if match else None

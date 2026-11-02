@@ -31,6 +31,14 @@ from .http import (
     IdempotencyStore,
     InMemoryIdempotencyStore,
 )
+from .reception import (
+    CONSUMPTION_SUMMARY_THRESHOLD,
+    ECF_TYPE_CODES,
+    ReceptionRoute,
+    compare_decimal,
+    is_ecf_type_code,
+    resolve_reception_route,
+)
 from .resilience import ResilienceOptions, ResiliencePolicy, is_retryable_error
 from .result import DgiiResult, Err, Ok, Result
 from .signing import Signature, XmlCertificateValidation, validate_xml_certificate
@@ -72,7 +80,9 @@ __all__ = [
     "COMMERCIAL_APPROVAL_ACCEPTED_STATE",
     "COMMERCIAL_APPROVAL_REJECTED_CODE",
     "COMMERCIAL_APPROVAL_REJECTED_STATE",
+    "CONSUMPTION_SUMMARY_THRESHOLD",
     "ECF",
+    "ECF_TYPE_CODES",
     "AuthToken",
     "BaseUrl",
     "CertificateInfo",
@@ -98,6 +108,7 @@ __all__ = [
     "Ok",
     "P12Reader",
     "P12ReaderData",
+    "ReceptionRoute",
     "ResilienceOptions",
     "ResiliencePolicy",
     "ResponseModel",
@@ -115,6 +126,7 @@ __all__ = [
     "__version__",
     "build_sender_receiver_url",
     "build_url",
+    "compare_decimal",
     "convert_ecf32_to_rfce",
     "extract_dgii_error_message",
     "generate_ecf_qr_code_url",
@@ -123,8 +135,10 @@ __all__ = [
     "get_current_formatted_date",
     "get_current_formatted_datetime",
     "get_xml_from_body_response",
+    "is_ecf_type_code",
     "is_retryable_error",
     "is_retryable_status",
+    "resolve_reception_route",
     "to_dgii_error",
     "validate_xml_certificate",
 ]

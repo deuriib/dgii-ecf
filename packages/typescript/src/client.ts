@@ -15,6 +15,7 @@ import {
   type IdempotencyStore,
 } from './http.js';
 import type { ResilienceOptions } from './resilience.js';
+import { resolveReceptionRoute } from './reception.js';
 import { Signature } from './signing.js';
 import { extractElementText } from './xml.js';
 import type { P12ReaderData } from './certificate.js';
@@ -260,6 +261,37 @@ export class ECF {
         { absoluteUrl: true, resource: Endpoint.SendSummary },
       ),
     );
+  }
+
+  /**
+   * Submit a signed document to the endpoint its own content belongs to.
+   *
+   * Reads the root element, `TipoeCF` and `MontoTotal` from the signed XML and
+   * dispatches to {@link sendSummary} for an RFCE or to
+   * {@link sendElectronicDocument} for an ECF. An E32 below RD$250,000 is
+   * rejected because DGII only accepts the summary form for those.
+   */
+  async sendDocument(
+    signedXml: string,
+    fileName: string,
+    buyerHost?: string,
+  ): Promise<Result<InvoiceResponse | InvoiceSummaryResponse, DgiiError>> {
+    const route = resolveReceptionRoute(signedXml);
+    if (route.isErr()) {
+      return err(route.error);
+    }
+    if (route.value.kind === 'summary') {
+      if (buyerHost !== undefined) {
+        return err(
+          new DgiiError(
+            'An RFCE summary cannot be delivered directly to a buyer host',
+            { code: 'VALIDATION' },
+          ),
+        );
+      }
+      return this.sendSummary(signedXml, fileName);
+    }
+    return this.sendElectronicDocument(signedXml, fileName, buyerHost);
   }
 
   statusTrackId(
