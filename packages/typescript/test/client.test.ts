@@ -116,6 +116,32 @@ describe('ECF client', () => {
     expect(calls).toBe(1);
   });
 
+  it('derives the idempotency key from prefixed and attributed elements', async () => {
+    const store = new InMemoryIdempotencyStore();
+    const xml =
+      '<ECF xmlns:dgii="https://dgii.gov.do/eCF"><Encabezado>' +
+      '<RNCEmisor version="1.0">130862346</RNCEmisor>' +
+      '<IdDoc><dgii:eNCF tipo="31">E310000000001</dgii:eNCF></IdDoc>' +
+      '</Encabezado></ECF>';
+    const digest = createHash('sha256').update(xml, 'utf8').digest('hex');
+    const fetchImpl = mockFetch(async () => jsonResponse({ trackId: 't4' }));
+
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+      idempotencyStore: store,
+    });
+    const result = await ecf.sendElectronicDocument(xml, 'f.xml');
+
+    expect(result.isOk()).toBe(true);
+    expect(await store.get(`130862346:E310000000001:${digest}`)).toEqual({
+      trackId: 't4',
+    });
+    expect(
+      await store.get(`unknown-rnc:unknown-encf:${digest}`),
+    ).toBeUndefined();
+  });
+
   it('normalizes a single-object customer directory into an array', async () => {
     const fetchImpl = mockFetch(async () =>
       jsonResponse({
