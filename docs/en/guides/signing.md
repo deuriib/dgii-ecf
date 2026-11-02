@@ -16,8 +16,9 @@ enveloped** with:
 canonicalization. An off-by-one byte in namespaces or whitespace changes the
 digest and the document is rejected. The SDKs use real C14N:
 
-- **TypeScript** — `xml-crypto`, plus a custom digest that sorts the root
-  element's `xmlns` attributes the way DGII's .NET stack does.
+- **TypeScript** — `xml-crypto`, which canonicalizes the referenced node-set
+  with inclusive C14N 1.0 before hashing it, then signs with the standard
+  RSA-SHA256 and SHA-256 algorithm URIs.
 - **Python** — `lxml` with `method="c14n"` (inclusive, comments removed).
 
 ## Sign
