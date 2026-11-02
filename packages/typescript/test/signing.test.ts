@@ -85,3 +85,19 @@ describe('validateXMLCertificate', () => {
     expect(validation.isValid).toBe(false);
   });
 });
+
+const EXPECTED_DEFAULT_NS_EMPTY_DIGEST =
+  'my7OmiuMFAFblEY6xFR0560lqnZ95PGBPio6uWJoppU=';
+
+describe('DGII digest', () => {
+  it('uses inclusive C14N for default-namespace documents with empty elements', () => {
+    const { privateKey, certificate } = createSelfSigned();
+    const xml =
+      '<ECF xmlns="https://dgii.gov.do/eCF"><Encabezado><MontoExento/></Encabezado></ECF>';
+    const result = new Signature(privateKey, certificate).signXml(xml);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    const match = result.value.match(/<DigestValue>([^<]*)<\/DigestValue>/);
+    expect(match?.[1]).toBe(EXPECTED_DEFAULT_NS_EMPTY_DIGEST);
+  });
+});

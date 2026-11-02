@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { DOMParser } from '@xmldom/xmldom';
-import { SignedXml } from 'xml-crypto';
+import { C14nCanonicalization, SignedXml } from 'xml-crypto';
 import { err, ok, type Result } from './result.js';
 import { DgiiError } from './errors.js';
 
@@ -12,41 +12,32 @@ const RSA_SHA256 = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
 const SHA256 = 'http://www.w3.org/2001/04/xmlenc#sha256';
 const ENVELOPED = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature';
 /**
- * DGII's .NET stack hashes the document with the root element's `xmlns`
- * attributes sorted. xml-crypto's built-in SHA-256 does not, so we register
- * a custom digest under this private URI.
+ * Custom digest URI: DGII hashes the inclusive C14N 1.0 form of the referenced
+ * document. xml-crypto's built-in SHA-256 hashes its raw serialization, so we
+ * register a digest backed by xml-crypto's inclusive C14N implementation.
  */
-const CUSTOM_DIGEST_URI = 'http://dgii.gov.do/digest/sha256-sorted';
+const CUSTOM_DIGEST_URI = 'http://dgii.gov.do/digest/sha256-c14n';
 
 interface XmldomDocument extends Document {
   childNodes: NodeListOf<ChildNode>;
 }
 
 /**
- * DGII-compatible digest: sort the root element attributes (fixes
- * `xmlns:xsd`/`xmlns:xsi` ordering) before hashing with SHA-256.
+ * DGII-compatible digest: hash the inclusive C14N 1.0 form of the referenced
+ * document — the exact bytes a .NET/DGII verifier computes.
  */
 class DgiiDigest {
-  private static sortAttributes(attributes: NamedNodeMap): Attr[] {
-    return Array.from(attributes).sort((a, b) => {
-      const left = `${a.name}="${a.value}"`;
-      const right = `${b.name}="${b.value}"`;
-      return left < right ? -1 : left > right ? 1 : 0;
-    });
-  }
-
   getHash(xml: string): string {
     const doc = new DOMParser().parseFromString(
       xml,
     ) as unknown as XmldomDocument;
-    const root = doc.childNodes[0] as unknown as Element | undefined;
-    if (root?.attributes) {
-      const sorted = DgiiDigest.sortAttributes(root.attributes as NamedNodeMap);
-      Object.assign(root.attributes, sorted);
-    }
+    const canonical = new C14nCanonicalization().process(
+      doc as unknown as Node,
+      {},
+    );
     return crypto
       .createHash('sha256')
-      .update(doc.toString(), 'utf8')
+      .update(canonical, 'utf8')
       .digest('base64');
   }
 
