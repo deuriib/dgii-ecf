@@ -60,3 +60,26 @@ Usa un almacén persistente (Redis/Postgres) en producción:
 Guarda el XML firmado, su hash y la clave de idempotencia antes de la
 llamada de red, para que un envío interrumpido se pueda conciliar en lugar
 de reemitirse.
+
+## Vida útil del almacén en memoria
+
+El `InMemoryIdempotencyStore` por defecto expira las entradas a las 24 horas y
+las barre cuando el mapa pasa de 1.000 entradas, de modo que un proceso de
+larga duración no crece sin límite. Ambos valores son configurables:
+
+=== "TypeScript"
+
+    ```ts
+    const store = new InMemoryIdempotencyStore({ ttlMs: 60 * 60 * 1000 });
+    ```
+
+=== "Python"
+
+    ```python
+    from py_dgii_ecf import InMemoryIdempotencyStore
+
+    store = InMemoryIdempotencyStore(ttl_s=3600)
+    ```
+
+Sigue siendo local al proceso: usa Redis o Postgres cuando más de una
+instancia pueda enviar el mismo documento.

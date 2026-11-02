@@ -16,20 +16,80 @@ export interface IdempotencyStore {
   delete(key: string): Promise<void>;
 }
 
-/** Process-local default. Fine for single-instance usage and tests. */
+/** Default lifetime of a cached submission: 24 hours. */
+const DEFAULT_IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+/** Sweep expired entries once the map grows past this many live slots. */
+const IDEMPOTENCY_SWEEP_THRESHOLD = 1_000;
+
+export interface InMemoryIdempotencyStoreOptions {
+  /** How long a cached entry stays valid. Defaults to 24 hours. */
+  readonly ttlMs?: number;
+  /** Clock used for expiry, injectable for tests. Defaults to `Date.now`. */
+  readonly now?: () => number;
+}
+
+interface IdempotencyEntry {
+  readonly value: unknown;
+  readonly expiresAt: number;
+}
+
+/**
+ * Process-local default. Fine for single-instance usage and tests.
+ *
+ * Entries expire after `ttlMs` so a long-running process cannot grow without
+ * bound; reads drop expired entries and the map is swept once it passes
+ * `IDEMPOTENCY_SWEEP_THRESHOLD`. For more than one instance, back the store
+ * with Redis or Postgres.
+ */
 export class InMemoryIdempotencyStore implements IdempotencyStore {
-  private readonly store = new Map<string, unknown>();
+  private readonly entries = new Map<string, IdempotencyEntry>();
+  private readonly ttlMs: number;
+  private readonly now: () => number;
+
+  constructor(options: InMemoryIdempotencyStoreOptions = {}) {
+    this.ttlMs = options.ttlMs ?? DEFAULT_IDEMPOTENCY_TTL_MS;
+    if (!Number.isFinite(this.ttlMs) || this.ttlMs <= 0) {
+      throw new RangeError('ttlMs must be a positive finite number');
+    }
+    this.now = options.now ?? Date.now;
+  }
+
+  /** Number of live entries; expired ones are swept first. */
+  get size(): number {
+    this.sweepExpired();
+    return this.entries.size;
+  }
 
   async get<T>(key: string): Promise<T | undefined> {
-    return this.store.get(key) as T | undefined;
+    const entry = this.entries.get(key);
+    if (entry === undefined) {
+      return undefined;
+    }
+    if (entry.expiresAt <= this.now()) {
+      this.entries.delete(key);
+      return undefined;
+    }
+    return entry.value as T;
   }
 
   async set<T>(key: string, value: T): Promise<void> {
-    this.store.set(key, value);
+    this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
+    if (this.entries.size > IDEMPOTENCY_SWEEP_THRESHOLD) {
+      this.sweepExpired();
+    }
   }
 
   async delete(key: string): Promise<void> {
-    this.store.delete(key);
+    this.entries.delete(key);
+  }
+
+  private sweepExpired(): void {
+    const now = this.now();
+    for (const [key, entry] of this.entries) {
+      if (entry.expiresAt <= now) {
+        this.entries.delete(key);
+      }
+    }
   }
 }
 

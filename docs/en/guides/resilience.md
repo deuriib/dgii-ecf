@@ -58,3 +58,26 @@ Provide a persistent store (Redis/Postgres) in production:
 !!! info "Persist before transmit"
 Store the signed XML, its hash and the idempotency key before the network
 call, so an interrupted send can be reconciled instead of re-issued.
+
+## In-memory store lifetime
+
+The default `InMemoryIdempotencyStore` expires entries after 24 hours and
+sweeps them once the map passes 1,000 entries, so a long-running process cannot
+grow without bound. Both are configurable:
+
+=== "TypeScript"
+
+    ```ts
+    const store = new InMemoryIdempotencyStore({ ttlMs: 60 * 60 * 1000 });
+    ```
+
+=== "Python"
+
+    ```python
+    from py_dgii_ecf import InMemoryIdempotencyStore
+
+    store = InMemoryIdempotencyStore(ttl_s=3600)
+    ```
+
+It is still process-local: use Redis or Postgres when more than one instance
+can submit the same document.

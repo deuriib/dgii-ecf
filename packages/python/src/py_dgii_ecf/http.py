@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -12,6 +13,9 @@ from ._json import JsonObject, JsonValue
 from .errors import DgiiError, DgiiErrorCode, extract_dgii_error_message
 from .resilience import ResilienceOptions, ResiliencePolicy
 from .result import DgiiResult, Err, Ok
+
+DEFAULT_IDEMPOTENCY_TTL_S = 24 * 60 * 60
+_IDEMPOTENCY_SWEEP_THRESHOLD = 1_000
 
 
 @runtime_checkable
@@ -26,19 +30,56 @@ class IdempotencyStore(Protocol):
 
 
 class InMemoryIdempotencyStore:
-    """Process-local default store. Fine for single-instance usage and tests."""
+    """Process-local default store. Fine for single-instance usage and tests.
 
-    def __init__(self) -> None:
-        self._store: dict[str, JsonObject] = {}
+    Entries expire after ``ttl_s`` so a long-running process cannot grow
+    without bound. For multi-instance deployments, back the store with Redis
+    or Postgres.
+    """
+
+    def __init__(
+        self,
+        ttl_s: float = DEFAULT_IDEMPOTENCY_TTL_S,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        if ttl_s <= 0:
+            raise ValueError("ttl_s must be positive")
+        self._ttl_s = ttl_s
+        self._clock = clock
+        self._store: dict[str, tuple[float, JsonObject]] = {}
+
+    @property
+    def size(self) -> int:
+        """Number of live entries; expired ones are swept first."""
+        self._sweep_expired()
+        return len(self._store)
 
     def get(self, key: str) -> JsonObject | None:
-        return self._store.get(key)
+        entry = self._store.get(key)
+        if entry is None:
+            return None
+        expires_at, value = entry
+        if expires_at <= self._clock():
+            del self._store[key]
+            return None
+        return value
 
     def set(self, key: str, value: JsonObject) -> None:
-        self._store[key] = value
+        self._store[key] = (self._clock() + self._ttl_s, value)
+        if len(self._store) > _IDEMPOTENCY_SWEEP_THRESHOLD:
+            self._sweep_expired()
 
     def delete(self, key: str) -> None:
         self._store.pop(key, None)
+
+    def _sweep_expired(self) -> None:
+        now = self._clock()
+        expired = [
+            key for key, (expires_at, _) in self._store.items() if expires_at <= now
+        ]
+        for key in expired:
+            del self._store[key]
 
 
 @dataclass(frozen=True, slots=True)
