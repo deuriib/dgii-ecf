@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from py_dgii_ecf.types import (
+    COMMERCIAL_APPROVAL_ACCEPTED_CODE,
+    COMMERCIAL_APPROVAL_ACCEPTED_STATE,
     CommercialApprovalResponse,
     InquiryInvoiceSummary,
     InquiryStatusResponse,
@@ -62,6 +64,15 @@ def test_invoice_response_defaults_empty_fields() -> None:
     response = InvoiceResponse.from_dict({})
     assert response.track_id is None
     assert response.error is None
+    assert response.mensaje is None
+    assert response.mensajes == ()
+
+
+def test_invoice_response_reads_singular_mensaje() -> None:
+    response = InvoiceResponse.from_dict(
+        {"trackId": "t1", "error": "", "mensaje": "Recibido"}
+    )
+    assert response.mensaje == "Recibido"
     assert response.mensajes == ()
 
 
@@ -134,11 +145,13 @@ def test_summary_tracking_status() -> None:
 def test_commercial_approval_accepts_single_message_string() -> None:
     response = CommercialApprovalResponse.from_dict(
         {
-            "codigo": "01",
-            "estado": "Aprobación Comercial Aprobada.",
+            "codigo": "1",
+            "estado": "Aprobación comercial aprobada",
             "mensaje": "Aprobada",
         }
     )
+    assert response.codigo == COMMERCIAL_APPROVAL_ACCEPTED_CODE
+    assert response.estado == COMMERCIAL_APPROVAL_ACCEPTED_STATE
     assert response.mensaje == ("Aprobada",)
 
 

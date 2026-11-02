@@ -387,8 +387,8 @@ def test_summary_inquiry_works_in_production() -> None:
 
 
 APPROVAL_PAYLOAD = {
-    "codigo": "01",
-    "estado": "Aprobación Comercial Aprobada.",
+    "codigo": "1",
+    "estado": "Aprobación comercial aprobada",
     "mensaje": [],
 }
 
