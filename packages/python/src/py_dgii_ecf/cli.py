@@ -106,7 +106,10 @@ def status(
     """Query the status of a submission by track id."""
     credentials = _load_credentials(p12, password)
     ecf = ECF(credentials, _parse_environment(environment))
-    ecf.authenticate()
+    auth = ecf.authenticate()
+    if auth.is_err():
+        typer.echo(f"error: {auth.unwrap_err()}", err=True)
+        raise typer.Exit(code=1)
     result = ecf.status_track_id(track_id)
     if result.is_err():
         typer.echo(f"error: {result.unwrap_err()}", err=True)
