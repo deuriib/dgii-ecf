@@ -213,11 +213,18 @@ class ECF:
         return self._refresh_token(force=True).is_ok()
 
     def _build_idempotency_key(self, signed_xml: str) -> str:
-        rnc = extract_element_text(signed_xml, "RNCEmisor") or "unknown-rnc"
-        # ACECF carries ``eNCF``; ANECF uses ``RangoNCF``. Fall back to the hash
-        # when neither is present, so the key stays unique per document.
+        # ECF/ACECF use ``RNCEmisor``; the ANECF schema spells it ``RncEmisor``.
+        rnc = (
+            extract_element_text(signed_xml, "RNCEmisor")
+            or extract_element_text(signed_xml, "RncEmisor")
+            or "unknown-rnc"
+        )
+        # ECF/ACECF carry ``eNCF``; ANECF carries the first
+        # ``SecuenciaeNCFDesde``. ``RangoNCF`` stays as a fallback for
+        # hand-built documents.
         ncf = (
             extract_element_text(signed_xml, "eNCF")
+            or extract_element_text(signed_xml, "SecuenciaeNCFDesde")
             or extract_element_text(signed_xml, "RangoNCF")
             or "unknown-ncf"
         )

@@ -879,3 +879,37 @@ def test_b2b_commercial_approval_is_idempotent() -> None:
     ecf.send_commercial_approval(xml, "a.xml", "https://buyer.example")
 
     assert calls["n"] == 1
+
+
+def test_void_key_uses_the_anecf_schema_elements() -> None:
+    store = InMemoryIdempotencyStore()
+    xml = (
+        "<ANECF><Encabezado><Version>1.0</Version>"
+        "<RncEmisor>130862346</RncEmisor>"
+        "<CantidadeNCFAnulados>10</CantidadeNCFAnulados>"
+        "<FechaHoraAnulacioneNCF>01-01-2026 10:00:00</FechaHoraAnulacioneNCF>"
+        "</Encabezado><DetalleAnulacion><Anulacion><NoLinea>1</NoLinea>"
+        "<TipoeCF>31</TipoeCF><TablaRangoSecuenciasAnuladaseNCF>"
+        "<Secuencias><SecuenciaeNCFDesde>E310000000010</SecuenciaeNCFDesde>"
+        "<SecuenciaeNCFHasta>E310000000019</SecuenciaeNCFHasta>"
+        "</Secuencias></TablaRangoSecuenciasAnuladaseNCF>"
+        "</Anulacion></DetalleAnulacion></ANECF>"
+    )
+    digest = hashlib.sha256(xml.encode("utf-8")).hexdigest()
+    key = f"130862346:E310000000010:{digest}"
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json=VOID_PAYLOAD)
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+    )
+
+    result = ecf.void_encf(xml, "anecf.xml")
+
+    assert result.is_ok()
+    assert store.get(key) is not None
