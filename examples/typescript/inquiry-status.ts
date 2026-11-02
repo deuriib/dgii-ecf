@@ -1,4 +1,8 @@
-import { ECF, Environment, P12Reader } from '../../packages/typescript/src/index.ts';
+import {
+  ECF,
+  Environment,
+  P12Reader,
+} from '../../packages/typescript/src/index.ts';
 
 const p12Path = process.env.DGII_P12_PATH;
 const password = process.env.DGII_P12_PASSWORD;
@@ -26,12 +30,7 @@ if (auth.isErr()) {
   process.exit(1);
 }
 
-const result = await ecf.inquiryStatus(
-  rnc,
-  ncf,
-  rncComprador,
-  codigoSeguridad,
-);
+const result = await ecf.inquiryStatus(rnc, ncf, rncComprador, codigoSeguridad);
 if (result.isErr()) {
   console.error('error:', result.error);
   process.exit(1);

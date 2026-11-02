@@ -65,15 +65,15 @@ instead of once per file.
 
 What is enforced:
 
-| Hook | Scope |
-| --- | --- |
-| `ruff`, `ruff-format` | `packages/python` |
-| `mypy --strict` | `packages/python/src` |
-| `tsc --noEmit` | `packages/typescript` |
-| `prettier --check` | `packages/typescript` |
-| `gitleaks` | every file |
+| Hook                   | Scope                                                       |
+| ---------------------- | ----------------------------------------------------------- |
+| `ruff`, `ruff-format`  | `packages/python`                                           |
+| `mypy --strict`        | `packages/python/src`                                       |
+| `tsc --noEmit`         | `packages/typescript`                                       |
+| `prettier --check`     | every tracked `.md`, `.json`, `.yaml` and JS/TS file        |
+| `gitleaks`             | every file                                                  |
 | `certificate-material` | rejects `*.p12`, `*.pfx`, `*.pem`, `*.jks`, `*.der`, `*.p8` |
-| `conventional-commit` | the commit subject |
+| `conventional-commit`  | the commit subject                                          |
 
 The hooks are not a substitute for CI: the `pre-commit` workflow runs
 `mise run hooks` on every pull request, so a commit made with `--no-verify`
@@ -114,13 +114,13 @@ BREAKING CHANGE: signXml now returns a Result
 
 `main` is protected. The settings that matter, and why:
 
-| Setting | Value | Why |
-| --- | --- | --- |
-| Required checks | `CI (@deuriib/dgii-ecf)`, `CI (py-dgii-ecf)`, `pre-commit (all files)` | Every gate runs on the PR, not only locally |
-| `enforce_admins` | `true` | Applies to the maintainer too — a required check that the owner can bypass is not a gate |
-| `strict` (branch up to date) | `true` | A PR that was green against an older `main` can still break `main` |
-| `required_approving_review_count` | `0` | See below |
-| `require_code_owner_reviews` | `false` | See below |
+| Setting                           | Value                                                                  | Why                                                                                      |
+| --------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Required checks                   | `CI (@deuriib/dgii-ecf)`, `CI (py-dgii-ecf)`, `pre-commit (all files)` | Every gate runs on the PR, not only locally                                              |
+| `enforce_admins`                  | `true`                                                                 | Applies to the maintainer too — a required check that the owner can bypass is not a gate |
+| `strict` (branch up to date)      | `true`                                                                 | A PR that was green against an older `main` can still break `main`                       |
+| `required_approving_review_count` | `0`                                                                    | See below                                                                                |
+| `require_code_owner_reviews`      | `false`                                                                | See below                                                                                |
 
 ### Why zero approvals
 
@@ -177,7 +177,7 @@ the release PR — the drift is never silent.
 - Do not hand-edit that line — if you changed dependencies, run `uv lock` and
   commit the result.
 - CI runs `uv lock --check`, which fails when the lock does not match
-  `pyproject.toml`. `uv sync --frozen` installs from the lock *without* that
+  `pyproject.toml`. `uv sync --frozen` installs from the lock _without_ that
   validation, so the explicit check is what keeps the two honest.
 
 ## Security

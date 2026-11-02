@@ -60,18 +60,18 @@ else:
 
 Cada método devuelve un modelo tipado, no un `dict`.
 
-| Método | Devuelve |
-| --- | --- |
-| `authenticate(buyer_host=None)` | `Result[AuthToken]` |
-| `send_electronic_document(xml, file_name, buyer_host=None)` | `Result[InvoiceResponse]` |
-| `send_summary(xml, file_name)` | `Result[InvoiceSummaryResponse]` |
-| `status_track_id(track_id)` | `Result[TrackingStatusResponse]` |
-| `inquiry_status(rnc, ncf, comprador=None, codigo=None)` | `Result[InquiryStatusResponse]` |
-| `track_statuses(rnc, encf)` | `Result[list[SummaryTrackingStatusResponse]]` |
-| `get_customer_directory(rnc)` | `Result[list[ServiceDirectoryResponse] \| None]` |
-| `get_summary_invoice_inquiry(rnc, encf, codigo)` | `Result[InquiryInvoiceSummary]` |
-| `send_commercial_approval(xml, file_name)` | `Result[CommercialApprovalResponse]` |
-| `void_encf(xml, file_name)` | `Result[VoidNCFResponse]` |
+| Método                                                      | Devuelve                                         |
+| ----------------------------------------------------------- | ------------------------------------------------ |
+| `authenticate(buyer_host=None)`                             | `Result[AuthToken]`                              |
+| `send_electronic_document(xml, file_name, buyer_host=None)` | `Result[InvoiceResponse]`                        |
+| `send_summary(xml, file_name)`                              | `Result[InvoiceSummaryResponse]`                 |
+| `status_track_id(track_id)`                                 | `Result[TrackingStatusResponse]`                 |
+| `inquiry_status(rnc, ncf, comprador=None, codigo=None)`     | `Result[InquiryStatusResponse]`                  |
+| `track_statuses(rnc, encf)`                                 | `Result[list[SummaryTrackingStatusResponse]]`    |
+| `get_customer_directory(rnc)`                               | `Result[list[ServiceDirectoryResponse] \| None]` |
+| `get_summary_invoice_inquiry(rnc, encf, codigo)`            | `Result[InquiryInvoiceSummary]`                  |
+| `send_commercial_approval(xml, file_name)`                  | `Result[CommercialApprovalResponse]`             |
+| `void_encf(xml, file_name)`                                 | `Result[VoidNCFResponse]`                        |
 
 ### Endpoints exclusivos de producción
 

@@ -3,10 +3,10 @@
 Two production-oriented, publishable SDKs for the Dominican Republic's **DGII**
 electronic invoicing system (e-CF):
 
-| Language | Package | Registry |
-| --- | --- | --- |
+| Language   | Package             | Registry                                               |
+| ---------- | ------------------- | ------------------------------------------------------ |
 | TypeScript | `@deuriib/dgii-ecf` | [npm](https://www.npmjs.com/package/@deuriib/dgii-ecf) |
-| Python | `py-dgii-ecf` | [PyPI](https://pypi.org/project/py-dgii-ecf/) |
+| Python     | `py-dgii-ecf`       | [PyPI](https://pypi.org/project/py-dgii-ecf/)          |
 
 Both SDKs share the same design:
 
@@ -21,8 +21,8 @@ Both SDKs share the same design:
   e-NCF voiding.
 
 !!! warning "Server-side only"
-    These SDKs handle private keys and credentials. Never ship them to a browser
-    or a client-side bundle.
+These SDKs handle private keys and credentials. Never ship them to a browser
+or a client-side bundle.
 
 ## Quick start
 

@@ -2,7 +2,7 @@
 # Install with `mise run hooks-install`; run everything with `mise run hooks`.
 # See CONTRIBUTING.md §Git hooks.
 
-minimum_pre_commit_version: "4.0.0"
+minimum_pre_commit_version: '4.0.0'
 
 default_language_version:
   python: python3.12
@@ -56,10 +56,9 @@ repos:
         files: ^packages/python/
 
       - id: prettier
-        name: prettier (packages/typescript)
+        name: prettier (repository)
         language: system
         entry: packages/typescript/node_modules/.bin/prettier --check
-        files: ^packages/typescript/
         types_or: [javascript, jsx, ts, tsx, json, yaml, markdown]
         exclude: ^packages/typescript/(dist|coverage)/
 

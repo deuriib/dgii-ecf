@@ -8,10 +8,10 @@
 Build a professional, polyglot monorepo that ships two publishable SDKs for the
 Dominican Republic's **DGII e-CF** (electronic invoicing) system:
 
-| Package | Language | Registry | Distribution name |
-| --- | --- | --- | --- |
-| TypeScript | TypeScript (Bun-first) | npm | `@deuriib/dgii-ecf` |
-| Python | Python (uv) | PyPI | `py-dgii-ecf` (import `py_dgii_ecf`) |
+| Package    | Language               | Registry | Distribution name                    |
+| ---------- | ---------------------- | -------- | ------------------------------------ |
+| TypeScript | TypeScript (Bun-first) | npm      | `@deuriib/dgii-ecf`                  |
+| Python     | Python (uv)            | PyPI     | `py-dgii-ecf` (import `py_dgii_ecf`) |
 
 Both SDKs authenticate against DGII web services, sign electronic tax documents
 with **XMLDSig (inclusive C14N + RSA-SHA256)**, and transmit them reliably.
@@ -54,8 +54,8 @@ dgii-ecf/
 3. **Retry + circuit breaker + timeout** for every external HTTP call:
    - TypeScript → `cockatiel` (retry, `ConsecutiveBreaker`, timeout, bulkhead).
    - Python → `tenacity` (retry) + `pybreaker` (circuit breaker).
-   Retry only transient failures (network error, 408, 429, 5xx). Never retry 4xx
-   (except 408/429) — a rejected e-CF must not be blindly re-sent.
+     Retry only transient failures (network error, 408, 429, 5xx). Never retry 4xx
+     (except 408/429) — a rejected e-CF must not be blindly re-sent.
 4. **Money is `Decimal`** (Python) / **string or big-int-safe numeric** (TypeScript:
    keep monetary values as strings in the document model; round only when formatting
    to 2 decimals). Floating-point money is forbidden.
@@ -169,12 +169,16 @@ resilience, http, certificate, signing, transformer, utils, client, cli).
 ## A.1 Environment + base URLs
 
 ```ts
-enum Environment { Dev = 'TesteCF', Cert = 'CerteCF', Prod = 'eCF' }
-const BaseUrl = {
-  ECF: 'https://ecf.dgii.gov.do',      // crédito fiscal
-  CF:  'https://fc.dgii.gov.do',       // factura de consumo (< 250K)
-  STATUS: 'https://statusecf.dgii.gov.do',
+enum Environment {
+  Dev = 'TesteCF',
+  Cert = 'CerteCF',
+  Prod = 'eCF',
 }
+const BaseUrl = {
+  ECF: 'https://ecf.dgii.gov.do', // crédito fiscal
+  CF: 'https://fc.dgii.gov.do', // factura de consumo (< 250K)
+  STATUS: 'https://statusecf.dgii.gov.do',
+};
 ```
 
 Request path = `/{environment}/{endpoint}` (e.g. `/TesteCF/autenticacion/api/Autenticacion/ValidarSemilla`).
@@ -182,17 +186,17 @@ Request path = `/{environment}/{endpoint}` (e.g. `/TesteCF/autenticacion/api/Aut
 ## A.2 Endpoints
 
 ```ts
-SEED          = 'Autenticacion/api/Autenticacion/Semilla'
-VALIDATE_SEED = 'autenticacion/api/Autenticacion/ValidarSemilla'
-SEND_INVOICE  = 'recepcion/api/FacturasElectronicas'
-SEND_SUMMARY  = 'recepcionfc/api/recepcion/ecf'            // baseUrl = BaseUrl.CF
-INQUIRY_SUMMARY = 'consultarfce/api/Consultas/Consulta'    // baseUrl = BaseUrl.CF, PROD only
-COMMERCIAL_APPROVAL = 'aprobacionComercial/api/AprobacionComercial'
-TRACK_RESULT_STATUS = 'consultaresultado/api/Consultas/Estado'
-INQUIRY_STATUS      = 'consultaestado/api/Consultas/Estado'
-ALL_TRACKING_ECF    = 'ConsultaTrackIds/api/TrackIds/Consulta'
-DIRECTORY           = 'consultadirectorio/api/consultas/obtenerdirectorioporrnc'
-VOID                = 'anulacionrangos/api/operaciones/anularrango'
+SEED = 'Autenticacion/api/Autenticacion/Semilla';
+VALIDATE_SEED = 'autenticacion/api/Autenticacion/ValidarSemilla';
+SEND_INVOICE = 'recepcion/api/FacturasElectronicas';
+SEND_SUMMARY = 'recepcionfc/api/recepcion/ecf'; // baseUrl = BaseUrl.CF
+INQUIRY_SUMMARY = 'consultarfce/api/Consultas/Consulta'; // baseUrl = BaseUrl.CF, PROD only
+COMMERCIAL_APPROVAL = 'aprobacionComercial/api/AprobacionComercial';
+TRACK_RESULT_STATUS = 'consultaresultado/api/Consultas/Estado';
+INQUIRY_STATUS = 'consultaestado/api/Consultas/Estado';
+ALL_TRACKING_ECF = 'ConsultaTrackIds/api/TrackIds/Consulta';
+DIRECTORY = 'consultadirectorio/api/consultas/obtenerdirectorioporrnc';
+VOID = 'anulacionrangos/api/operaciones/anularrango';
 ```
 
 Sender↔Receiver (buyer host) endpoints are prefixed `fe/...` and hit `buyerHost`
@@ -245,7 +249,7 @@ Before signing, strip whitespace-only text nodes + comments from the DOM.
 
 **Python (lxml + cryptography)** — no custom digest needed: use
 `etree.tostring(node, method="c14n", exclusive=False, with_comments=False)` for
-inclusive C14N. Digest the canonicalized root *before* appending `<Signature>`,
+inclusive C14N. Digest the canonicalized root _before_ appending `<Signature>`,
 build `SignedInfo` (ds namespace), canonicalize + RSA-PKCS1v15-SHA256 sign it, append.
 X509Certificate = base64(DER of the cert).
 
@@ -278,4 +282,4 @@ X509Certificate = base64(DER of the cert).
 
 - `getSummaryInvoiceInquiry` / `INQUIRY_SUMMARY`: **PROD only**.
 - `SEND_SUMMARY` / summary invoice: `BaseUrl.CF` (factura de consumo < 250K).
-- 401 response: keep DGII's body message (it explains *why* credentials were rejected).
+- 401 response: keep DGII's body message (it explains _why_ credentials were rejected).

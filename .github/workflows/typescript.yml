@@ -3,7 +3,7 @@ name: typescript
 on:
   push:
     branches: [main]
-    tags: ["typescript-v*"]
+    tags: ['typescript-v*']
   pull_request:
   workflow_dispatch:
 
@@ -23,7 +23,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: '1.4.4'
 
       - uses: actions/setup-node@v7
         with:
@@ -37,6 +37,14 @@ jobs:
 
       - name: Lint
         run: bun run lint
+
+      # `bun run lint` runs `prettier --check .` from inside packages/typescript,
+      # so docs, examples and workflow files would otherwise go unchecked. Run
+      # the same pinned binary from the repository root so the root
+      # `.prettierrc.json` and `.prettierignore` apply.
+      - name: Format check (repository)
+        working-directory: ${{ github.workspace }}
+        run: packages/typescript/node_modules/.bin/prettier --check .
 
       - name: Test
         run: bun run test
@@ -62,7 +70,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.4"
+          bun-version: '1.4.4'
 
       - uses: actions/setup-node@v7
         with:

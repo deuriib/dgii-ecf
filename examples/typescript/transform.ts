@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { Transformer } from '../../packages/typescript/src/index.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const source = process.argv[2] ?? resolve(here, '..', 'fixtures', 'invoice-31.json');
+const source =
+  process.argv[2] ?? resolve(here, '..', 'fixtures', 'invoice-31.json');
 const payload = JSON.parse(readFileSync(source, 'utf8')) as object;
 
 const result = new Transformer().json2xml(payload, true);

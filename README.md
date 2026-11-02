@@ -16,10 +16,10 @@ Professional, polyglot monorepo with two publishable, production-oriented SDKs
 for authenticating against DGII web services, signing electronic tax documents
 with **XMLDSig** (inclusive C14N + RSA-SHA256), and transmitting them reliably.
 
-| Package | Language | Registry | Status |
-| --- | --- | --- | --- |
-| [`@deuriib/dgii-ecf`](packages/typescript) | TypeScript (Bun-first) | [npm](https://www.npmjs.com/package/@deuriib/dgii-ecf) | 🚧 |
-| [`py-dgii-ecf`](packages/python) | Python (uv) | [PyPI](https://pypi.org/project/py-dgii-ecf/) | 🚧 |
+| Package                                    | Language               | Registry                                               | Status |
+| ------------------------------------------ | ---------------------- | ------------------------------------------------------ | ------ |
+| [`@deuriib/dgii-ecf`](packages/typescript) | TypeScript (Bun-first) | [npm](https://www.npmjs.com/package/@deuriib/dgii-ecf) | 🚧     |
+| [`py-dgii-ecf`](packages/python)           | Python (uv)            | [PyPI](https://pypi.org/project/py-dgii-ecf/)          | 🚧     |
 
 ## ✨ Features
 

@@ -12,12 +12,12 @@ Solo se reintentan las fallas **transitorias**:
 
 Un e-CF rechazado (por ejemplo `400`, `401`) **nunca** se reenvía a ciegas.
 
-| Opción | Valor por defecto |
-| --- | --- |
-| Intentos máximos | 3 |
-| Umbral del breaker | 5 fallas consecutivas |
-| Semiabierto después de | 30 s |
-| Timeout por intento | 15 s |
+| Opción                 | Valor por defecto     |
+| ---------------------- | --------------------- |
+| Intentos máximos       | 3                     |
+| Umbral del breaker     | 5 fallas consecutivas |
+| Semiabierto después de | 30 s                  |
+| Timeout por intento    | 15 s                  |
 
 === "TypeScript"
 
@@ -57,6 +57,6 @@ Usa un almacén persistente (Redis/Postgres) en producción:
     ```
 
 !!! info "Persiste antes de transmitir"
-    Guarda el XML firmado, su hash y la clave de idempotencia antes de la
-    llamada de red, para que un envío interrumpido se pueda conciliar en lugar
-    de reemitirse.
+Guarda el XML firmado, su hash y la clave de idempotencia antes de la
+llamada de red, para que un envío interrumpido se pueda conciliar en lugar
+de reemitirse.

@@ -46,7 +46,7 @@ run = "pre-commit run --all-files"
 # ---------------------------------------------------------------------------
 [tasks.lint]
 description = "Run every linter/formatter across the monorepo"
-depends = ["lint-typescript", "lint-python"]
+depends = ["lint-typescript", "lint-python", "lint-format"]
 
 [tasks.lint-typescript]
 description = "Typecheck + format-check the TypeScript package"
@@ -57,6 +57,12 @@ run = "bun run lint"
 description = "Ruff + mypy + format-check the Python package"
 dir = "packages/python"
 run = "uv run ruff check . && uv run ruff format --check . && uv run mypy src"
+
+[tasks.lint-format]
+description = "Prettier format-check over the whole repository"
+# Runs from the repository root so the root `.prettierrc.json` and
+# `.prettierignore` both apply — `bun run lint` only sees packages/typescript.
+run = "packages/typescript/node_modules/.bin/prettier --check ."
 
 # ---------------------------------------------------------------------------
 # Test

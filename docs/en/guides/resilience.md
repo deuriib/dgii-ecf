@@ -11,12 +11,12 @@ Only **transient** failures are retried:
 
 A rejected e-CF (e.g. `400`, `401`) is **never** blindly re-sent.
 
-| Option | Default |
-| --- | --- |
-| Max attempts | 3 |
-| Breaker threshold | 5 consecutive failures |
-| Half-open after | 30 s |
-| Per-attempt timeout | 15 s |
+| Option              | Default                |
+| ------------------- | ---------------------- |
+| Max attempts        | 3                      |
+| Breaker threshold   | 5 consecutive failures |
+| Half-open after     | 30 s                   |
+| Per-attempt timeout | 15 s                   |
 
 === "TypeScript"
 
@@ -56,5 +56,5 @@ Provide a persistent store (Redis/Postgres) in production:
     ```
 
 !!! info "Persist before transmit"
-    Store the signed XML, its hash and the idempotency key before the network
-    call, so an interrupted send can be reconciled instead of re-issued.
+Store the signed XML, its hash and the idempotency key before the network
+call, so an interrupted send can be reconciled instead of re-issued.

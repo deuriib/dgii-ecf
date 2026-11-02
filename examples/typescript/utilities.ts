@@ -27,7 +27,13 @@ console.log('certificate subject:', validation.subject);
 
 console.log(
   'FC QR:',
-  generateFcQRCodeURL('130862346', 'E310000000001', 1180, 'abc123', Environment.Dev),
+  generateFcQRCodeURL(
+    '130862346',
+    'E310000000001',
+    1180,
+    'abc123',
+    Environment.Dev,
+  ),
 );
 console.log(
   'e-CF QR:',
