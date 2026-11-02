@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.2.3...typescript-v0.3.0) (2026-11-02)
+
+
+### Features
+
+* **python:** typed response models, prod-only RFCE guard, half-up rounding ([c786718](https://github.com/deuriib/dgii-ecf/commit/c786718fd37626b23fa164fa76a919ebcf33568f))
+
+
+### Bug Fixes
+
+* **typescript:** guard the RFCE inquiry to production ([b996a79](https://github.com/deuriib/dgii-ecf/commit/b996a79bb9cc4ae9971daf413f75790181e0ff34))
+* **typescript:** round monetary values half-up ([b7065f1](https://github.com/deuriib/dgii-ecf/commit/b7065f17e6e7899706e010d3578feba965e83404))
+
 ## [0.2.3](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.2.2...typescript-v0.2.3) (2026-11-02)
 
 

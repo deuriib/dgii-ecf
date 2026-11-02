@@ -61,7 +61,7 @@ from .utils import (
     get_xml_from_body_response,
 )
 
-__version__ = "0.2.3"
+__version__ = "0.3.0"
 
 __all__ = [
     "ECF",
