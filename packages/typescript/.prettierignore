@@ -4,3 +4,4 @@ coverage/
 *.lock
 *.map
 *.tgz
+CHANGELOG.md
