@@ -21,6 +21,17 @@ def test_security_code() -> None:
     assert result.unwrap() == "abcdef"
 
 
+def test_security_code_tolerates_prefix_and_attributes() -> None:
+    xml = (
+        '<ECF><ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">'
+        '<ds:SignatureValue Id="sig-1">abcdef123456</ds:SignatureValue>'
+        "</ds:Signature></ECF>"
+    )
+    result = get_code_six_digit_from_signature(xml)
+    assert result.is_ok()
+    assert result.unwrap() == "abcdef"
+
+
 def test_security_code_missing() -> None:
     assert get_code_six_digit_from_signature("<ECF></ECF>").is_err()
 

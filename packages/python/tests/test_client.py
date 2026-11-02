@@ -135,6 +135,33 @@ def test_idempotent_submission() -> None:
     assert calls["n"] == 1
 
 
+def test_idempotency_key_tolerates_prefix_and_attributes() -> None:
+    store = InMemoryIdempotencyStore()
+    xml = (
+        '<ECF xmlns:dgii="https://dgii.gov.do/eCF"><Encabezado>'
+        '<RNCEmisor version="1.0">130862346</RNCEmisor>'
+        '<IdDoc><dgii:eNCF tipo="31">E310000000001</dgii:eNCF></IdDoc>'
+        "</Encabezado></ECF>"
+    )
+    digest = hashlib.sha256(xml.encode()).hexdigest()
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"trackId": "t4"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        idempotency_store=store,
+        http_client=make_client(handler),
+    )
+    result = ecf.send_electronic_document(xml, "f.xml")
+
+    assert result.is_ok()
+    assert store.get(f"130862346:E310000000001:{digest}") == {"trackId": "t4"}
+    assert store.get(f"unknown-rnc:unknown-encf:{digest}") is None
+
+
 def test_normalizes_single_object_directory() -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(
