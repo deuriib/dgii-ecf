@@ -2,6 +2,49 @@ import convert from 'xml-js';
 import { err, ok, type Result } from './result.js';
 import { DgiiError } from './errors.js';
 
+const MONETARY_RE = /^(-?)(\d+)\.(\d+)$/;
+
+/** Increment a string of decimal digits ("267" -> "268", "999" -> "1000"). */
+const incrementDigits = (digits: string): string => {
+  const chars = digits.split('');
+  let index = chars.length - 1;
+  while (index >= 0) {
+    const current = chars[index];
+    if (current === '9') {
+      chars[index] = '0';
+      index -= 1;
+      continue;
+    }
+    chars[index] = String(Number(current) + 1);
+    return chars.join('');
+  }
+  return `1${chars.join('')}`;
+};
+
+/**
+ * Round a decimal string to 2 places with ROUND_HALF_UP semantics.
+ *
+ * `Number.prototype.toFixed` cannot be used: `(2.675).toFixed(2)` is `'2.67'`
+ * because the literal is not representable in binary floating point. DGII
+ * expects the decimal, half-up result (`'2.68'`) — the same contract as the
+ * Python SDK's `Decimal.quantize(..., rounding=ROUND_HALF_UP)`.
+ *
+ * Values that are not plain decimals (e.g. `1.0e3`) are returned unchanged.
+ */
+export const roundHalfUpToCents = (value: string): string => {
+  const match = MONETARY_RE.exec(value);
+  if (!match) {
+    return value;
+  }
+  const sign = match[1] === '-' ? '-' : '';
+  const integerPart = (match[2] ?? '0').replace(/^0+(?=\d)/, '');
+  const fractionPart = `${match[3] ?? ''}000`;
+  const cents = `${integerPart}${fractionPart.slice(0, 2)}`;
+  const rounded = fractionPart[2] >= '5' ? incrementDigits(cents) : cents;
+  const padded = rounded.padStart(3, '0');
+  return `${sign}${padded.slice(0, -2)}.${padded.slice(-2)}`;
+};
+
 /**
  * Converts between the DGII XML documents and the "compact" JSON shape used by
  * `xml-js` (a dict key is an element, an array is a repeated element, and
@@ -21,13 +64,8 @@ export class Transformer {
         spaces: 2,
         fullTagEmptyElement: true,
         textFn: (value: string, label: string) => {
-          const omits = ['version'];
-          if (
-            /^\d+\.\d+$/.test(value) &&
-            round &&
-            !omits.includes(label.toLowerCase())
-          ) {
-            return parseFloat(value).toFixed(2);
+          if (round && label.toLowerCase() !== 'version') {
+            return roundHalfUpToCents(value);
           }
           return value;
         },
