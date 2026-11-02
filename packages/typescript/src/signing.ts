@@ -107,8 +107,24 @@ export class Signature {
     xml: string,
     rootElName?: DgiiDocumentType,
   ): Result<string, DgiiError> {
+    let parsed: StrictParseResult;
     try {
-      const { doc, rootName } = parseStrict(xml);
+      parsed = parseStrict(xml);
+    } catch (error) {
+      // Malformed input is an INVALID_XML error, not a signing failure —
+      // aligning with the Python SDK.
+      return err(
+        new DgiiError(
+          error instanceof Error
+            ? error.message
+            : `Invalid XML: ${String(error)}`,
+          { code: 'INVALID_XML', cause: error },
+        ),
+      );
+    }
+
+    try {
+      const { doc, rootName } = parsed;
       const elementName = rootElName ?? rootName;
 
       const sig = new SignedXml({
