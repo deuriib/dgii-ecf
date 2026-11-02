@@ -40,6 +40,26 @@ export enum SenderReceiverEndpoint {
   CommercialApproval = 'fe/aprobacioncomercial/api/ecf',
 }
 
+/** Service-status endpoints. They carry no environment segment. */
+export enum StatusEndpoint {
+  Services = 'api/estatusservicios/obtenerestatus',
+  MaintenanceWindows = 'api/estatusservicios/obtenerventanasmantenimiento',
+  Check = 'api/estatusservicios/verificarestado',
+}
+
+/** Numeric `ambiente` codes accepted by the status service. */
+export enum StatusEnvironment {
+  PreCertification = 1,
+  Production = 2,
+  Certification = 3,
+}
+
+/** Build an absolute status-service URL (no environment segment). */
+export const buildStatusUrl = (
+  endpoint: StatusEndpoint,
+  baseUrl: string = BaseUrl.STATUS,
+): string => `${baseUrl.replace(/\/+$/, '')}/${endpoint}`;
+
 /** Build an absolute DGII URL: `${baseUrl}/${environment}/${endpoint}`. */
 export const buildUrl = (
   environment: Environment,

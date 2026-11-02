@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import datetime
 
 import httpx2
@@ -18,7 +18,10 @@ from .environment import (
     Endpoint,
     Environment,
     SenderReceiverEndpoint,
+    StatusEndpoint,
+    StatusEnvironment,
     build_sender_receiver_url,
+    build_status_url,
     build_url,
 )
 from .errors import DgiiError, DgiiErrorCode
@@ -39,8 +42,11 @@ from .types import (
     InquiryStatusResponse,
     InvoiceResponse,
     InvoiceSummaryResponse,
+    MaintenanceWindow,
     ResponseShapeError,
+    ServiceAvailabilityResponse,
     ServiceDirectoryResponse,
+    ServiceStatusEntry,
     SummaryTrackingStatusResponse,
     TrackingStatusResponse,
     VoidNCFResponse,
@@ -146,12 +152,14 @@ class ECF:
         http_client: httpx2.Client | None = None,
         token_refresh_skew_s: float = 5 * 60,
         now: Callable[[], float] = time.time,
+        status_api_key: str | None = None,
     ) -> None:
         self._credentials = credentials
         self._environment = environment
         self._idempotency: IdempotencyStore = (
             idempotency_store or InMemoryIdempotencyStore()
         )
+        self._status_api_key = status_api_key
         self._token_refresh_skew_s = token_refresh_skew_s
         self._now = now
         self._token_expires_at: float | None = None
@@ -480,6 +488,56 @@ class ECF:
                     "cod_seguridad_eCF": cod_seguridad,
                 },
             ),
+        )
+
+    def get_service_status(self) -> DgiiResult[list[ServiceStatusEntry]]:
+        """Operational status of every DGII service.
+
+        The status host takes an API key instead of a bearer token, so this
+        call neither needs :meth:`authenticate` nor triggers a refresh.
+        """
+        result = self._status_request(StatusEndpoint.SERVICES)
+        if result.is_err():
+            return Err(result.unwrap_err())
+        return _parse_list(ServiceStatusEntry, result.unwrap())
+
+    def get_maintenance_windows(self) -> DgiiResult[list[MaintenanceWindow]]:
+        """Scheduled maintenance windows, one entry per environment."""
+        result = self._status_request(StatusEndpoint.MAINTENANCE_WINDOWS)
+        if result.is_err():
+            return Err(result.unwrap_err())
+        data = result.unwrap()
+        if isinstance(data, list):
+            return _parse_list(MaintenanceWindow, data)
+        if isinstance(data, dict):
+            return _parse_list(MaintenanceWindow, data.get("ventanaMantenimientos"))
+        return Ok([])
+
+    def check_service_availability(
+        self, ambiente: StatusEnvironment
+    ) -> DgiiResult[ServiceAvailabilityResponse]:
+        """Whether an environment is currently inside a maintenance window."""
+        return _parse_response(
+            ServiceAvailabilityResponse,
+            self._status_request(StatusEndpoint.CHECK, {"ambiente": int(ambiente)}),
+        )
+
+    def _status_request(
+        self,
+        endpoint: StatusEndpoint,
+        params: Mapping[str, str | int | None] | None = None,
+    ) -> DgiiResult[JsonValue]:
+        headers = (
+            {"Authorization": f"Apikey {self._status_api_key}"}
+            if self._status_api_key
+            else None
+        )
+        return self._http.get(
+            build_status_url(endpoint),
+            params,
+            headers=headers,
+            skip_auth_hooks=True,
+            omit_auth=True,
         )
 
     def send_commercial_approval(
