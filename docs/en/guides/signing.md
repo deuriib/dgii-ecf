@@ -62,5 +62,5 @@ Then submit to the DGII **certification** environment — DGII remains the
 authority on acceptance.
 
 !!! tip "Fixture tests"
-    The test suites verify the digest and the RSA signature cryptographically
-    (Python) and check the emitted algorithm URIs and structure (TypeScript).
+The test suites verify the digest and the RSA signature cryptographically
+(Python) and check the emitted algorithm URIs and structure (TypeScript).

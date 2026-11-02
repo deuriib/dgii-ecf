@@ -1,4 +1,8 @@
-import { ECF, Environment, P12Reader } from '../../packages/typescript/src/index.ts';
+import {
+  ECF,
+  Environment,
+  P12Reader,
+} from '../../packages/typescript/src/index.ts';
 
 const p12Path = process.env.DGII_P12_PATH;
 const password = process.env.DGII_P12_PASSWORD;

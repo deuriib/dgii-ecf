@@ -2,13 +2,13 @@
 
 ## Requirements
 
-| | Minimum |
-| --- | --- |
+|            | Minimum                   |
+| ---------- | ------------------------- |
 | TypeScript | Node.js 20+ (or Bun 1.0+) |
-| Python | Python 3.11+ |
+| Python     | Python 3.11+              |
 
 !!! warning "Server-side only"
-    Both SDKs load private keys and certificates. Run them only on the server.
+Both SDKs load private keys and certificates. Run them only on the server.
 
 ## TypeScript
 

@@ -11,8 +11,9 @@ con [`cockatiel`](https://github.com/connor4312/cockatiel).
 ```ts
 import { ECF, Environment, P12Reader } from '@deuriib/dgii-ecf';
 
-const credentials = new P12Reader(process.env.CERT_PASSWORD ?? '')
-  .getKeyFromFile('/secure/identity.p12');
+const credentials = new P12Reader(
+  process.env.CERT_PASSWORD ?? '',
+).getKeyFromFile('/secure/identity.p12');
 if (credentials.isErr()) throw credentials.error;
 
 const ecf = new ECF(credentials.value, Environment.Cert);
@@ -62,18 +63,18 @@ if (result.isOk()) {
 
 ## API
 
-| Método | Devuelve |
-| --- | --- |
-| `authenticate(buyerHost?)` | `Result<AuthToken>` |
-| `sendElectronicDocument(xml, fileName, buyerHost?)` | `Result<InvoiceResponse>` |
-| `sendSummary(xml, fileName)` | `Result<InvoiceSummaryResponse>` |
-| `statusTrackId(trackId)` | `Result<TrackingStatusResponse>` |
-| `inquiryStatus(rnc, ncf, comprador?, codigo?)` | `Result<InquiryStatusResponse>` |
-| `trackStatuses(rnc, encf)` | `Result<SummaryTrackingStatusResponse[]>` |
-| `getCustomerDirectory(rnc)` | `Result<ServiceDirectoryResponse[] \| undefined>` |
-| `getSummaryInvoiceInquiry(rnc, encf, codigo)` | `Result<InquiryInvoiceSummary>` |
-| `sendCommercialApproval(xml, fileName)` | `Result<CommercialApprovalResponse>` |
-| `voidENCF(xml, fileName)` | `Result<VoidNCFResponse>` |
+| Método                                              | Devuelve                                          |
+| --------------------------------------------------- | ------------------------------------------------- |
+| `authenticate(buyerHost?)`                          | `Result<AuthToken>`                               |
+| `sendElectronicDocument(xml, fileName, buyerHost?)` | `Result<InvoiceResponse>`                         |
+| `sendSummary(xml, fileName)`                        | `Result<InvoiceSummaryResponse>`                  |
+| `statusTrackId(trackId)`                            | `Result<TrackingStatusResponse>`                  |
+| `inquiryStatus(rnc, ncf, comprador?, codigo?)`      | `Result<InquiryStatusResponse>`                   |
+| `trackStatuses(rnc, encf)`                          | `Result<SummaryTrackingStatusResponse[]>`         |
+| `getCustomerDirectory(rnc)`                         | `Result<ServiceDirectoryResponse[] \| undefined>` |
+| `getSummaryInvoiceInquiry(rnc, encf, codigo)`       | `Result<InquiryInvoiceSummary>`                   |
+| `sendCommercialApproval(xml, fileName)`             | `Result<CommercialApprovalResponse>`              |
+| `voidENCF(xml, fileName)`                           | `Result<VoidNCFResponse>`                         |
 
 ### Endpoints exclusivos de producción
 

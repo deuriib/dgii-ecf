@@ -1,6 +1,6 @@
 name: Feature request
 description: Suggest a new feature or enhancement
-title: "feat: "
+title: 'feat: '
 labels: [feature, triage]
 body:
   - type: markdown
@@ -12,10 +12,10 @@ body:
     attributes:
       label: Which package?
       options:
-        - "@deuriib/dgii-ecf (TypeScript)"
-        - "dgii-ecf (Python)"
-        - "Both"
-        - "Monorepo / tooling"
+        - '@deuriib/dgii-ecf (TypeScript)'
+        - 'dgii-ecf (Python)'
+        - 'Both'
+        - 'Monorepo / tooling'
     validations:
       required: true
   - type: textarea

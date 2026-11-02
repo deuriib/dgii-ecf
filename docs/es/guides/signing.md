@@ -64,6 +64,6 @@ Luego envía el documento al ambiente de **certificación** de la DGII — la DG
 sigue siendo la autoridad sobre la aceptación.
 
 !!! tip "Pruebas con fixtures"
-    Las suites de pruebas verifican el digest y la firma RSA criptográficamente
-    (Python), y comprueban los URIs de algoritmo emitidos y la estructura
-    (TypeScript).
+Las suites de pruebas verifican el digest y la firma RSA criptográficamente
+(Python), y comprueban los URIs de algoritmo emitidos y la estructura
+(TypeScript).

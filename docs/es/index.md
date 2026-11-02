@@ -3,10 +3,10 @@
 Dos SDKs publicables y orientados a producción para el sistema de facturación
 electrónica (e-CF) de la **DGII** de República Dominicana:
 
-| Lenguaje | Paquete | Registro |
-| --- | --- | --- |
+| Lenguaje   | Paquete             | Registro                                               |
+| ---------- | ------------------- | ------------------------------------------------------ |
 | TypeScript | `@deuriib/dgii-ecf` | [npm](https://www.npmjs.com/package/@deuriib/dgii-ecf) |
-| Python | `py-dgii-ecf` | [PyPI](https://pypi.org/project/py-dgii-ecf/) |
+| Python     | `py-dgii-ecf`       | [PyPI](https://pypi.org/project/py-dgii-ecf/)          |
 
 Ambos SDKs comparten el mismo diseño:
 
@@ -22,8 +22,8 @@ Ambos SDKs comparten el mismo diseño:
   aprobación comercial y anulación de e-NCF.
 
 !!! warning "Solo del lado del servidor"
-    Estos SDKs manejan claves privadas y credenciales. Nunca los ejecutes en un
-    navegador ni los empaquetes en un bundle del lado del cliente.
+Estos SDKs manejan claves privadas y credenciales. Nunca los ejecutes en un
+navegador ni los empaquetes en un bundle del lado del cliente.
 
 ## Inicio rápido
 

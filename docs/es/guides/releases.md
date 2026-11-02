@@ -24,9 +24,9 @@ No se usa `RELEASE_PLEASE_TOKEN`, `NPM_TOKEN` ni `PYPI_TOKEN`.
 ## Configuración de trusted publishing
 
 !!! note "Primera publicación en npm"
-    npm requiere que el paquete exista antes de poder configurar un trusted
-    publisher. El primer lanzamiento se publica localmente; los siguientes se
-    publican desde GitHub Actions mediante OIDC.
+npm requiere que el paquete exista antes de poder configurar un trusted
+publisher. El primer lanzamiento se publica localmente; los siguientes se
+publican desde GitHub Actions mediante OIDC.
 
 ### npm
 
@@ -53,8 +53,8 @@ Configura un trusted publisher pendiente para `py-dgii-ecf`:
 
 ## Versionado
 
-| Cambio | Incremento |
-| --- | --- |
-| `feat:` | MINOR |
-| `fix:` | PATCH |
-| `BREAKING CHANGE:` | MAJOR |
+| Cambio             | Incremento |
+| ------------------ | ---------- |
+| `feat:`            | MINOR      |
+| `fix:`             | PATCH      |
+| `BREAKING CHANGE:` | MAJOR      |

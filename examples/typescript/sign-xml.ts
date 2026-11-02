@@ -8,7 +8,8 @@ import {
 } from '../../packages/typescript/src/index.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const xmlPath = process.argv[2] ?? resolve(here, '..', 'fixtures', 'invoice-31.xml');
+const xmlPath =
+  process.argv[2] ?? resolve(here, '..', 'fixtures', 'invoice-31.xml');
 const p12Path = process.argv[3] ?? resolve(here, '..', 'output', 'test.p12');
 const password = process.argv[4] ?? 'test';
 

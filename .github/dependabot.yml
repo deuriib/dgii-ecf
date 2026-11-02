@@ -10,11 +10,11 @@ updates:
       - dependencies
       - typescript
     commit-message:
-      prefix: "build(deps)"
+      prefix: 'build(deps)'
     groups:
       typescript-deps:
         patterns:
-          - "*"
+          - '*'
 
   - package-ecosystem: pip
     directory: /packages/python
@@ -26,11 +26,11 @@ updates:
       - dependencies
       - python
     commit-message:
-      prefix: "build(deps)"
+      prefix: 'build(deps)'
     groups:
       python-deps:
         patterns:
-          - "*"
+          - '*'
 
   - package-ecosystem: github-actions
     directory: /

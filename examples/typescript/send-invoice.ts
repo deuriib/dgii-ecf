@@ -19,7 +19,8 @@ if (!p12Path || !password || !rnc) {
 }
 
 const environment = (process.env.DGII_ENVIRONMENT ?? 'TesteCF') as Environment;
-const xmlPath = process.argv[2] ?? resolve(here, '..', 'fixtures', 'invoice-31.xml');
+const xmlPath =
+  process.argv[2] ?? resolve(here, '..', 'fixtures', 'invoice-31.xml');
 
 const credentials = new P12Reader(password).getKeyFromFile(p12Path);
 if (credentials.isErr()) {

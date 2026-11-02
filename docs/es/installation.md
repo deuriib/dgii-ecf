@@ -2,14 +2,14 @@
 
 ## Requisitos
 
-| | Mínimo |
-| --- | --- |
+|            | Mínimo                   |
+| ---------- | ------------------------ |
 | TypeScript | Node.js 20+ (o Bun 1.0+) |
-| Python | Python 3.11+ |
+| Python     | Python 3.11+             |
 
 !!! warning "Solo del lado del servidor"
-    Ambos SDKs cargan claves privadas y certificados. Ejecútalos únicamente en el
-    servidor.
+Ambos SDKs cargan claves privadas y certificados. Ejecútalos únicamente en el
+servidor.
 
 ## TypeScript
 

@@ -4,10 +4,10 @@
 
 We release security fixes for the **latest** version of each package only.
 
-| Package | Registry | Status |
-| --- | --- | --- |
-| `@deuriib/dgii-ecf` | npm | Actively supported |
-| `dgii-ecf` | PyPI | Actively supported |
+| Package             | Registry | Status             |
+| ------------------- | -------- | ------------------ |
+| `@deuriib/dgii-ecf` | npm      | Actively supported |
+| `dgii-ecf`          | PyPI     | Actively supported |
 
 ## Reporting a vulnerability
 

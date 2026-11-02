@@ -17,10 +17,10 @@ producción para autenticarse contra los servicios web de la DGII, firmar
 documentos fiscales electrónicos con **XMLDSig** (C14N inclusivo + RSA-SHA256)
 y transmitirlos de forma confiable.
 
-| Paquete | Lenguaje | Registro | Estado |
-| --- | --- | --- | --- |
-| [`@deuriib/dgii-ecf`](packages/typescript) | TypeScript (pensado para Bun) | [npm](https://www.npmjs.com/package/@deuriib/dgii-ecf) | 🚧 |
-| [`py-dgii-ecf`](packages/python) | Python (uv) | [PyPI](https://pypi.org/project/py-dgii-ecf/) | 🚧 |
+| Paquete                                    | Lenguaje                      | Registro                                               | Estado |
+| ------------------------------------------ | ----------------------------- | ------------------------------------------------------ | ------ |
+| [`@deuriib/dgii-ecf`](packages/typescript) | TypeScript (pensado para Bun) | [npm](https://www.npmjs.com/package/@deuriib/dgii-ecf) | 🚧     |
+| [`py-dgii-ecf`](packages/python)           | Python (uv)                   | [PyPI](https://pypi.org/project/py-dgii-ecf/)          | 🚧     |
 
 ## ✨ Características
 

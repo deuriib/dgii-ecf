@@ -46,6 +46,7 @@ and both packages under `packages/`.
 ## Phase 0 — Monorepo scaffolding + governance
 
 ### [ ] Task 0.1 — Full root `README.md`
+
 **Files**: `README.md`
 **Spec**: §2 "monorepo is grouped by language"; §1 table of packages; §6 release/governance.
 **Work**: Replace the one-line placeholder with: project mission, the two-package table, monorepo
@@ -55,6 +56,7 @@ SECURITY.md / CODE_OF_CONDUCT.md / CONTRIBUTING.md.
 **Acceptance**: README documents both packages, setup, and release flow; no placeholder text remains.
 
 ### [ ] Task 0.2 — `mise.toml` tool pinning + tasks
+
 **Files**: `mise.toml`
 **Spec**: §6 "**mise.toml** (tool pinning + tasks)"; §4.1 `bun@1.4.4`; §5.1 `uv`.
 **Work**: Pin `bun`, `node`, `python`, `uv`; provide `bootstrap`, `lint`, `test`, `build`, `ci` tasks
@@ -62,13 +64,16 @@ that aggregate the TS (`packages/typescript`) and Python (`packages/python`) pac
 **Acceptance**: `mise install && mise run ci` is the single local entrypoint; versions match spec.
 
 ### [ ] Task 0.3 — `.pre-commit-config.yaml`
+
 **Files**: `.pre-commit-config.yaml`
 **Spec**: §6 "**pre-commit** (ruff + prettier + general hooks)".
 **Work**: General hooks (trailing whitespace, end-of-file, check-yaml, large-file) + `ruff` (Python)
-+ `prettier` (TS/JSON/YAML/MD) scoped to the correct paths.
-**Acceptance**: `pre-commit run --all-files` passes clean on a fresh checkout.
+
+- `prettier` (TS/JSON/YAML/MD) scoped to the correct paths.
+  **Acceptance**: `pre-commit run --all-files` passes clean on a fresh checkout.
 
 ### [ ] Task 0.4 — `.editorconfig` + `.gitattributes`
+
 **Files**: `.editorconfig`, `.gitattributes`
 **Spec**: professional monorepo baseline (implicit in §2 layout / §6 governance).
 **Work**: consistent charset/indent/eol per language; `.gitattributes` for LF eol normalization and
@@ -76,6 +81,7 @@ linguist overrides if needed.
 **Acceptance**: Editor/format settings are deterministic across machines.
 
 ### [ ] Task 0.5 — `.gitignore` (secrets-safe)
+
 **Files**: `.gitignore`
 **Spec**: §3.5 "**No secrets in source**: `.p12`, `.pem`, private keys, tokens, and production URLs
 come from config/secret manager. `.gitignore` must cover them."
@@ -84,6 +90,7 @@ lockfile artifacts not intended for VCS, and local secret-manager output.
 **Acceptance**: A sample `.p12`/`.pem`/`.env` dropped anywhere in the tree is not tracked by git.
 
 ### [ ] Task 0.6 — `SECURITY.md`
+
 **Files**: `SECURITY.md`
 **Spec**: §6 "**SECURITY.md**, CODE_OF_CONDUCT.md, CONTRIBUTING.md".
 **Work**: Supported versions, report-a-vulnerability channel, and note that `.p12`/private keys must
@@ -91,12 +98,14 @@ never be committed (cross-ref §3.5).
 **Acceptance**: File present with a clear private disclosure process.
 
 ### [ ] Task 0.7 — `CODE_OF_CONDUCT.md`
+
 **Files**: `CODE_OF_CONDUCT.md`
 **Spec**: §6 "SECURITY.md, **CODE_OF_CONDUCT.md**, CONTRIBUTING.md".
 **Work**: Adopt a standard CoC (e.g. Contributor Covenant 2.1) with an enforcement email.
 **Acceptance**: File present and linked from README.
 
 ### [ ] Task 0.8 — `CONTRIBUTING.md`
+
 **Files**: `CONTRIBUTING.md`
 **Spec**: §6 "SECURITY.md, CODE_OF_CONDUCT.md, **CONTRIBUTING.md**"; §6 "Conventional Commits
 (required for release-please semver + changelog)."
@@ -109,6 +118,7 @@ never be committed (cross-ref §3.5).
 ## Phase 1 — Release automation + CI/CD
 
 ### [ ] Task 1.1 — Release-please manifest config + manifest
+
 **Files**: `release-please-config.json`, `.release-please-manifest.json`
 **Spec**: §6 "**Automatic releases**: release-please in **manifest mode** (independent versions per
 package). Tags `typescript-v*`, `python-v*`. npm publish → `@deuriib/dgii-ecf`; PyPI publish →
@@ -119,6 +129,7 @@ package). Tags `typescript-v*`, `python-v*`. npm publish → `@deuriib/dgii-ecf`
 **Acceptance**: `release-please-config.json` + manifest are valid JSON; two independent components.
 
 ### [ ] Task 1.2 — Release-please workflow
+
 **Files**: `.github/workflows/release-please.yml`
 **Spec**: §6 automatic releases via release-please (manifest mode).
 **Work**: Standard `googleapis/release-please-action` in manifest mode; on a new release, dispatch to
@@ -126,6 +137,7 @@ the per-package publish workflows (or write release artifacts).
 **Acceptance**: A conventional `feat`/`fix` commit opens a release PR that bumps only the touched package.
 
 ### [ ] Task 1.3 — TypeScript CI + publish workflow
+
 **Files**: `.github/workflows/typescript.yml`
 **Spec**: §4.1 toolchain (`bun`, `tsup`, `vitest`); §6 npm publish → `@deuriib/dgii-ecf`.
 **Work**: Job runs `bun install --frozen-lockfile`, `bun run lint`, `bun run test`, `bun run build`;
@@ -133,6 +145,7 @@ publish job (tag-gated on `typescript-v*`) runs `npm publish` with `NODE_AUTH_TO
 **Acceptance**: Push to `main` runs CI; a `typescript-v*` tag publishes to npm.
 
 ### [ ] Task 1.4 — Python CI + publish workflow
+
 **Files**: `.github/workflows/python.yml`
 **Spec**: §5.1 toolchain (`uv`, `ruff`, `mypy`, `pytest`); §6 PyPI publish → `dgii-ecf`.
 **Work**: Job runs `uv sync --frozen`, `ruff check`, `ruff format --check`, `mypy src`, `pytest`;
@@ -141,12 +154,14 @@ publishing.
 **Acceptance**: Push to `main` runs CI; a `python-v*` tag publishes to PyPI.
 
 ### [ ] Task 1.5 — Labels sync workflow
+
 **Files**: `.github/workflows/labels.yml`
 **Spec**: §6 "**Labels**, issue templates, PR template, CODEOWNERS, FUNDING.yml, dependabot.yml".
 **Work**: Workflow running `crazy-max/ghaction-github-labeler` against `.github/labels.yml`.
 **Acceptance**: Labels in `.github/labels.yml` are mirrored to the repo on merge.
 
 ### [ ] Task 1.6 — Dependabot config
+
 **Files**: `.github/dependabot.yml`
 **Spec**: §6 "**dependabot.yml**".
 **Work**: `npm` ecosystem (dir `packages/typescript`) + `pip`/`uv` ecosystem (dir `packages/python`),
@@ -154,6 +169,7 @@ weekly schedule, grouped updates, `dependencies` label.
 **Acceptance**: Dependabot opens PRs for both ecosystems.
 
 ### [ ] Task 1.7 — CODEOWNERS
+
 **Files**: `.github/CODEOWNERS`
 **Spec**: §6 "**CODEOWNERS**".
 **Work**: Ownership rules: `packages/typescript/**` → TS owners, `packages/python/**` → Python owners,
@@ -161,12 +177,14 @@ weekly schedule, grouped updates, `dependencies` label.
 **Acceptance**: PR review requests are auto-assigned by path.
 
 ### [ ] Task 1.8 — FUNDING
+
 **Files**: `.github/FUNDING.yml`
 **Spec**: §6 "**FUNDING.yml**".
 **Work**: Declare GitHub Sponsors (or equivalent) account.
 **Acceptance**: Sponsor button renders from the configured account.
 
 ### [ ] Task 1.9 — Issue + PR templates
+
 **Files**: `.github/ISSUE_TEMPLATE/bug_report.yml`, `.github/ISSUE_TEMPLATE/feature_request.yml`,
 `.github/ISSUE_TEMPLATE/config.yml`, `.github/PULL_REQUEST_TEMPLATE.md`
 **Spec**: §6 "issue templates, **PR template**".
@@ -175,6 +193,7 @@ and the linked package scope.
 **Acceptance**: New issue/PR forms render correctly; PR template is applied automatically.
 
 ### [ ] Task 1.10 — `labels.yml`
+
 **Files**: `.github/labels.yml`
 **Spec**: §6 "**Labels**".
 **Work**: Define labels incl. `bug`, `feature`, `typescript`, `python`, `dependencies`, `breaking`, etc.
@@ -185,6 +204,7 @@ and the linked package scope.
 ## Phase 2 — TypeScript package `@deuriib/dgii-ecf`
 
 ### [ ] Task 2.1 — TS package scaffolding + config
+
 **Files**: `packages/typescript/package.json`, `packages/typescript/tsconfig.json`,
 `packages/typescript/tsup.config.ts`, `packages/typescript/vitest.config.ts`
 **Spec**: §4.1 "Package manager / runtime: **bun** (`packageManager: bun@1.4.4`, `bun.lock`). Build:
@@ -197,6 +217,7 @@ and the linked package scope.
 **Acceptance**: `bun install` succeeds, `bun run build` emits `.js`+`.cjs`+`.d.ts`, `bun run test` runs.
 
 ### [ ] Task 2.2 — `environment.ts`
+
 **Files**: `packages/typescript/src/environment.ts`
 **Spec**: §4.3 `environment.ts`; Appendix A.1 "enum Environment { Dev='TesteCF', Cert='CerteCF',
 Prod='eCF' }"; "BaseUrl { ECF:'https://ecf.dgii.gov.do', CF:'https://fc.dgii.gov.do',
@@ -207,6 +228,7 @@ STATUS:'https://statusecf.dgii.gov.do' }"; A.2 endpoint path constants; "Request
 **Acceptance**: Constants match A.1/A.2 byte-for-byte; unit test asserts path composition.
 
 ### [ ] Task 2.3 — `types.ts`
+
 **Files**: `packages/typescript/src/types.ts`
 **Spec**: §4.3 `types.ts` "AuthToken, InvoiceResponse, TrackingStatusResponse, ..."; §3.4 "Money is …
 string or big-int-safe numeric … keep monetary values as strings in the document model".
@@ -215,6 +237,7 @@ methods. Monetary fields typed as `string`.
 **Acceptance**: Types compile strict; monetary fields are `string`, not `number`.
 
 ### [ ] Task 2.4 — `errors.ts`
+
 **Files**: `packages/typescript/src/errors.ts`
 **Spec**: §4.3 `errors.ts` "DgiiError (+ DgiiErrorCode) + toDgiiError() normalizer"; A.8 "Error
 extraction: DGII returns inconsistent error shapes … Normalize to a single message; keep `status`,
@@ -225,6 +248,7 @@ ProblemDetails, and HTML.
 **Acceptance**: Normalizer reduces every A.8 shape to a single `DgiiError`; no domain error throws.
 
 ### [ ] Task 2.5 — `result.ts`
+
 **Files**: `packages/typescript/src/result.ts`
 **Spec**: §3.1 "TypeScript → neverthrow (`Result<T, E>`, `Ok`, `Err`; `Promise<Result<T, E>>` for
 async)"; §4.3 `result.ts` "neverthrow re-exports + DgiiResult<T> alias".
@@ -232,15 +256,18 @@ async)"; §4.3 `result.ts` "neverthrow re-exports + DgiiResult<T> alias".
 **Acceptance**: Alias usable everywhere; no thrown domain/IO exceptions (cross-cutting §3.1).
 
 ### [ ] Task 2.6 — `resilience.ts`
+
 **Files**: `packages/typescript/src/resilience.ts`
 **Spec**: §3.3 "TypeScript → cockatiel (retry, ConsecutiveBreaker, timeout, bulkhead). Retry only
 transient failures (network error, 408, 429, 5xx). Never retry 4xx (except 408/429)"; §4.3
 `resilience.ts`.
 **Work**: A policy factory returning retry (transient-only predicate) + `ConsecutiveBreaker` + timeout
-+ bulkhead, composed for HTTP calls.
-**Acceptance**: Unit tests prove 5xx/429/408/network are retried and other 4xx are not.
+
+- bulkhead, composed for HTTP calls.
+  **Acceptance**: Unit tests prove 5xx/429/408/network are retried and other 4xx are not.
 
 ### [ ] Task 2.7 — `http.ts` (HttpClient + IdempotencyStore + InMemory)
+
 **Files**: `packages/typescript/src/http.ts`
 **Spec**: §3.2 "Provide an injectable `IdempotencyStore` interface + an in-memory default …
 Persist-before-transmit is a hard rule." §3.2 key "`RNC + eNCF + SHA-256(signed XML)`"; §4.3
@@ -253,6 +280,7 @@ and resilience policy application. Enforce persist-before-transmit.
 uses `FormData`+`Blob`.
 
 ### [ ] Task 2.8 — `certificate.ts` (P12Reader)
+
 **Files**: `packages/typescript/src/certificate.ts`
 **Spec**: §4.3 `certificate.ts` "P12Reader (node-forge)"; A.6 "TS: node-forge —
 `forge.pkcs12.pkcs12FromAsn1(asn1, false, passphrase)`; pull `certBag` (cert → PEM) and
@@ -261,6 +289,7 @@ uses `FormData`+`Blob`.
 **Acceptance**: Unit test with a generated `.p12` yields valid PEM cert + key.
 
 ### [ ] Task 2.9 — `signing.ts` (Signature + custom Digest + validateXMLCertificate)
+
 **Files**: `packages/typescript/src/signing.ts`
 **Spec**: §4.3 `signing.ts` "Signature (xml-crypto) + custom Digest + validateXMLCertificate"; A.5
 exact algorithm — "rsa-sha256" signature, inclusive 1.0 C14N, enveloped-signature, SHA-256 base64,
@@ -271,12 +300,14 @@ exact algorithm — "rsa-sha256" signature, inclusive 1.0 C14N, enveloped-signat
 verifies.
 
 ### [ ] Task 2.10 — `transformer.ts` (xml-js)
+
 **Files**: `packages/typescript/src/transformer.ts`
 **Spec**: §4.3 `transformer.ts` "Transformer (xml-js): json2xml / xml2json".
 **Work**: `Transformer` wrapping `xml-js` `json2xml`/`xml2json` with compact output and sane options.
 **Acceptance**: Round-trip fixtures; JSON↔XML preserves the document model's string money fields.
 
 ### [ ] Task 2.11 — `utils.ts`
+
 **Files**: `packages/typescript/src/utils.ts`
 **Spec**: §4.3 `utils.ts` "security code, QR URLs, date/time, convertECF32ToRFCE, getXmlFromBodyResponse";
 A.7 exact behaviors — `getCodeSixDigitfromSignature` (first 6 of `<SignatureValue>`),
@@ -288,6 +319,7 @@ A.7 exact behaviors — `getCodeSixDigitfromSignature` (first 6 of `<SignatureVa
 **Acceptance**: Each helper matches A.7 with unit fixtures (incl. E43/E47 QR omission + RFCE wrapping).
 
 ### [ ] Task 2.12 — `client.ts` (ECF)
+
 **Files**: `packages/typescript/src/client.ts`
 **Spec**: §4.3 `client.ts` "ECF client (auth + all endpoints) — uses http + resilience + idempotency";
 §4.4 all ten methods; A.3 auth flow; A.4 multipart submission; A.9 caveats.
@@ -299,6 +331,7 @@ endpoint. `getCustomerDirectory` normalizes single→array (A.8); `getSummaryInv
 A.3/A.4; directory normalization and PROD-only guard enforced.
 
 ### [ ] Task 2.13 — `index.ts` public exports
+
 **Files**: `packages/typescript/src/index.ts`
 **Spec**: §4.3 `index.ts` "public exports"; §4.4 standalone helpers list.
 **Work**: Export all modules + standalone helpers (`P12Reader`, `Signature`, `Transformer`,
@@ -307,6 +340,7 @@ A.3/A.4; directory normalization and PROD-only guard enforced.
 **Acceptance**: Every §4.4 public symbol is importable from the package root.
 
 ### [ ] Task 2.14 — TypeScript tests
+
 **Files**: `packages/typescript/test/*`
 **Spec**: §3.6 "Comprehensive tests in both languages (unit + integration-skipped-by-default)."
 **Work**: Vitest unit suites per module; integration tests (real DGII) gated behind an env flag and
@@ -318,6 +352,7 @@ skipped by default.
 ## Phase 3 — Python package `dgii-ecf`
 
 ### [ ] Task 3.1 — Python package scaffolding + config
+
 **Files**: `packages/python/pyproject.toml`, `packages/python/README.md`, ruff/mypy/pytest config
 **Spec**: §5.1 "Env/build: **uv** (src layout, `hatchling` backend). Lint/format: **ruff**. Types:
 **mypy** (strict). CLI: **typer**. Test: **pytest**." §5.2 dependencies
@@ -329,18 +364,21 @@ config sections.
 **Acceptance**: `uv sync` succeeds; `uv build` produces sdist + wheel; entry point resolves.
 
 ### [ ] Task 3.2 — `environment.py`
+
 **Files**: `packages/python/src/dgii_ecf/environment.py`
 **Spec**: §5.3 mirror 1:1 of TS `environment`; A.1/A.2 constants.
 **Work**: `Environment` enum, `BaseUrl` map, endpoint constants, path builder — identical values to A.1/A.2.
 **Acceptance**: Constants match A.1/A.2; unit test on path composition.
 
 ### [ ] Task 3.3 — `types.py`
+
 **Files**: `packages/python/src/dgii_ecf/types.py`
 **Spec**: §5.3 mirror; §3.4 "Money is `Decimal` (Python)".
 **Work**: Pydantic/dataclass models for `AuthToken`, response types; monetary fields as `Decimal`.
 **Acceptance**: Monetary fields are `Decimal` (or `str` where the DGII wire format requires); mypy-strict clean.
 
 ### [ ] Task 3.4 — `errors.py`
+
 **Files**: `packages/python/src/dgii_ecf/errors.py`
 **Spec**: §5.3 mirror of `errors`; A.8 normalization.
 **Work**: `DgiiError` with `status`/`resource`/`data`/`mensajes`/`message` + `to_dgii_error()` normalizer
@@ -348,12 +386,14 @@ for bare string, `{ mensajes: [...] }`, ProblemDetails, HTML.
 **Acceptance**: A.8 shapes normalize to a single `DgiiError`; domain/IO errors do not raise.
 
 ### [ ] Task 3.5 — `result.py`
+
 **Files**: `packages/python/src/dgii_ecf/result.py`
 **Spec**: §3.1 "Python → `result` (`Result[T, E]`, `Ok`, `Err`)."
 **Work**: Re-export `result`; define `DgiiResult[T]` alias.
 **Acceptance**: Alias used across package; no thrown domain/IO exceptions.
 
 ### [ ] Task 3.6 — `resilience.py` (tenacity + pybreaker)
+
 **Files**: `packages/python/src/dgii_ecf/resilience.py`
 **Spec**: §3.3 "Python → tenacity (retry) + pybreaker (circuit breaker). Retry only transient
 failures … Never retry 4xx (except 408/429)"; §5.3 mirror of `resilience`.
@@ -362,6 +402,7 @@ failures … Never retry 4xx (except 408/429)"; §5.3 mirror of `resilience`.
 **Acceptance**: Tests prove 5xx/429/408/network retried, other 4xx not; breaker opens on consecutive failures.
 
 ### [ ] Task 3.7 — `http.py` (HttpClient + IdempotencyStore + InMemory)
+
 **Files**: `packages/python/src/dgii_ecf/http.py`
 **Spec**: §3.2 idempotency key + injectable store + persist-before-transmit; §5.3 mirror; §5.1
 `httpx2`; A.4 `files={"xml": (fileName, xml_bytes, "application/xml")}` + no manual Content-Length.
@@ -370,6 +411,7 @@ with multipart file part, bearer injection, resilience. Persist-before-transmit.
 **Acceptance**: Store injectable; key derivation matches spec; multipart uses `files={"xml": (...)}`.
 
 ### [ ] Task 3.8 — `certificate.py` (P12Reader)
+
 **Files**: `packages/python/src/dgii_ecf/certificate.py`
 **Spec**: §5.3 mirror of `certificate`; A.6 "Python: cryptography.hazmat.primitives.serialization
 .pkcs12.load_key_and_certificates."
@@ -378,10 +420,11 @@ with multipart file part, bearer injection, resilience. Persist-before-transmit.
 **Acceptance**: Unit test with a generated `.p12` yields valid PEM cert + key.
 
 ### [ ] Task 3.9 — `signing.py` (lxml + cryptography)
+
 **Files**: `packages/python/src/dgii_ecf/signing.py`
 **Spec**: §5.3 mirror of `signing`; A.5 "Python (lxml + cryptography) — no custom digest needed:
 use `etree.tostring(node, method='c14n', exclusive=False, with_comments=False)` … digest canonicalized
-root *before* appending `<Signature>`, build `SignedInfo` (ds namespace), canonicalize +
+root _before_ appending `<Signature>`, build `SignedInfo` (ds namespace), canonicalize +
 RSA-PKCS1v15-SHA256 sign it, append. X509Certificate = base64(DER of the cert)."
 **Work**: `Signature.sign_xml(xml, root_name, key, cert)` implementing inclusive C14N + RSA-SHA256 per
 A.5; `validate_xml_certificate`.
@@ -389,12 +432,14 @@ A.5; `validate_xml_certificate`.
 where feasible.
 
 ### [ ] Task 3.10 — `transformer.py`
+
 **Files**: `packages/python/src/dgii_ecf/transformer.py`
 **Spec**: §5.3 "Mirror the TypeScript module map 1:1" (transformer `json2xml`/`xml2json`).
 **Work**: `Transformer.json2xml`/`xml2json` (lxml-based; see Open Q #3 for the library decision).
 **Acceptance**: Round-trip fixtures; preserves `Decimal`/string money in the document model.
 
 ### [ ] Task 3.11 — `utils.py`
+
 **Files**: `packages/python/src/dgii_ecf/utils.py`
 **Spec**: §5.3 mirror of `utils`; A.7 exact helpers.
 **Work**: `get_code_six_digit_from_signature`, `generate_fc_qr_code_url`, `generate_ecf_qr_code_url`
@@ -404,6 +449,7 @@ where feasible.
 **Acceptance**: Each helper matches A.7 with unit fixtures (incl. E43/E47 omission + RFCE wrapping).
 
 ### [ ] Task 3.12 — `client.py` (ECF)
+
 **Files**: `packages/python/src/dgii_ecf/client.py`
 **Spec**: §5.3 mirror of `client` (auth + all endpoints, http + resilience + idempotency); §4.4 method
 list (mirrored); A.3/A.4/A.9.
@@ -414,12 +460,14 @@ each mirrored method hits its A.2 endpoint; `get_customer_directory` normalizes 
 A.3/A.4; normalization + PROD-only guard enforced.
 
 ### [ ] Task 3.13 — `cli.py` (typer)
+
 **Files**: `packages/python/src/dgii_ecf/cli.py`
 **Spec**: §5.1 "CLI: **typer** (`dgii-ecf` entry point)"; §5.3 module map includes `cli`.
 **Work**: Typer `app` wired to the entry point; subcommands over client methods (resolve Open Q #2).
 **Acceptance**: `dgii-ecf --help` renders; at least `sign`/`send`/`auth` subcommands functional.
 
 ### [ ] Task 3.14 — Python tests
+
 **Files**: `packages/python/tests/*`
 **Spec**: §3.6 "Comprehensive tests in both languages (unit + integration-skipped-by-default)."
 **Work**: pytest unit suites per module; integration tests (real DGII) skipped by default behind env flag.
@@ -430,33 +478,39 @@ A.3/A.4; normalization + PROD-only guard enforced.
 ## Phase 4 — Final integration + verification
 
 ### [ ] Task 4.1 — Both packages build clean
+
 **Spec**: §4.1 (tsup dual format), §5.1 (`uv build` sdist + wheel).
 **Work**: `bun run build` in TS emits `.js`/`.cjs`/`.d.ts`; `uv build` in Python emits sdist + wheel.
 **Acceptance**: No build errors or warnings; artifacts land in `dist/`.
 
 ### [ ] Task 4.2 — Both packages test green
+
 **Spec**: §3.6 comprehensive tests.
 **Work**: `bun run test` + `uv run pytest` (integration skipped) pass.
 **Acceptance**: Zero failing tests; integration suites skip cleanly.
 
 ### [ ] Task 4.3 — Lint + format + typecheck clean
+
 **Spec**: §6 pre-commit (ruff + prettier + general hooks); §5.1 ruff + mypy strict; §4.1 prettier.
 **Work**: `ruff check`, `ruff format --check`, `mypy src` (strict), `prettier --check`, pre-commit
 all-files.
 **Acceptance**: `mise run lint` and `pre-commit run --all-files` exit 0.
 
 ### [ ] Task 4.4 — Lockfiles generated + committed
+
 **Spec**: §4.1 `bun.lock`; §5.1 `uv` (lockfile).
 **Work**: `bun install` (bun.lock) + `uv lock` (uv.lock) committed.
 **Acceptance**: Lockfiles present and CI uses `--frozen-lockfile`/`--frozen` successfully.
 
 ### [ ] Task 4.5 — Release-please manifest consistency
+
 **Spec**: §6 manifest mode independent versions.
 **Work**: Verify `release-please-config.json` component paths map to `packages/typescript` and
 `packages/python`; manifest keys match component names.
 **Acceptance**: `release-please` (dry-run) can resolve both components without error.
 
 ### [ ] Task 4.6 — Full local CI green
+
 **Spec**: §6 conventional commits + release automation end-to-end.
 **Work**: Run `mise run ci` (lint + test + build) as the final gate.
 **Acceptance**: `mise run ci` exits 0 from a clean checkout.

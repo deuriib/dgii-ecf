@@ -39,16 +39,16 @@
 
 ## 2. Baseline observed before starting (evidence)
 
-| Fact | Value |
-| --- | --- |
-| Current branch | `docs/spanish-i18n` |
-| Docs pages | 9 files / 613 lines under `docs/` (`index`, `installation`, `typescript`, `python`, `examples`, `faq`, `guides/{signing,resilience,releases}`) |
-| `docs/es/` | does **not** exist |
-| `mkdocs.yml` | `site_url: https://deuriib.github.io/dgii-ecf/`, `docs_dir: docs`, `edit_uri: edit/main/docs/`, `theme.name: material`, `theme.language: en`, `plugins: [search]`, no i18n |
-| `.github/workflows/docs.yml` | build step `uvx --from mkdocs-material mkdocs build --strict`; triggers on `docs/**`, `mkdocs.yml`, the workflow file; deploys to Pages from `main` |
-| Current build | **green** — `mkdocs build --strict` succeeds today (1.16 s) |
-| `site/` | gitignored (`.gitignore:210`) |
-| No other repo file references `docs/<page>.md` | verified with grep — only `mkdocs.yml` nav, `edit_uri`, and `docs.yml` globs |
+| Fact                                           | Value                                                                                                                                                                      |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Current branch                                 | `docs/spanish-i18n`                                                                                                                                                        |
+| Docs pages                                     | 9 files / 613 lines under `docs/` (`index`, `installation`, `typescript`, `python`, `examples`, `faq`, `guides/{signing,resilience,releases}`)                             |
+| `docs/es/`                                     | does **not** exist                                                                                                                                                         |
+| `mkdocs.yml`                                   | `site_url: https://deuriib.github.io/dgii-ecf/`, `docs_dir: docs`, `edit_uri: edit/main/docs/`, `theme.name: material`, `theme.language: en`, `plugins: [search]`, no i18n |
+| `.github/workflows/docs.yml`                   | build step `uvx --from mkdocs-material mkdocs build --strict`; triggers on `docs/**`, `mkdocs.yml`, the workflow file; deploys to Pages from `main`                        |
+| Current build                                  | **green** — `mkdocs build --strict` succeeds today (1.16 s)                                                                                                                |
+| `site/`                                        | gitignored (`.gitignore:210`)                                                                                                                                              |
+| No other repo file references `docs/<page>.md` | verified with grep — only `mkdocs.yml` nav, `edit_uri`, and `docs.yml` globs                                                                                               |
 
 **Canonical local check command** (use for every task):
 
@@ -75,7 +75,7 @@ uvx --from mkdocs --with mkdocs-material --with mkdocs-static-i18n mkdocs build 
 
 ### Gap flagged against the issue body
 
-The issue's *Task* section says "translate the user-facing strings in the example scripts", but its **acceptance criteria** only require Spanish READMEs. Translating `console.log`/`print` output would change program output (code, not docs) and conflicts with "keep code in English". **Decision: do not touch example script strings.** The Spanish READMEs explain the flows in Spanish; commands and outputs stay English. If the issue author wants localized console output later, that is a separate issue.
+The issue's _Task_ section says "translate the user-facing strings in the example scripts", but its **acceptance criteria** only require Spanish READMEs. Translating `console.log`/`print` output would change program output (code, not docs) and conflicts with "keep code in English". **Decision: do not touch example script strings.** The Spanish READMEs explain the flows in Spanish; commands and outputs stay English. If the issue author wants localized console output later, that is a separate issue.
 
 ---
 
@@ -86,6 +86,7 @@ The issue's *Task* section says "translate the user-facing strings in the exampl
 **Description:** Create the `folder` structure required by `mkdocs-static-i18n` and wire the plugin into `mkdocs.yml`. English content moves unchanged (byte-for-byte apart from the path); Spanish is registered as a build target with `nav_translations` but no pages yet (fallback covers it until Tasks 3–6 land).
 
 **Files to change:**
+
 - **Move (git mv, content unchanged):**
   - `docs/index.md` → `docs/en/index.md`
   - `docs/installation.md` → `docs/en/installation.md`
@@ -118,9 +119,9 @@ plugins:
             Home: Inicio
             Installation: Instalación
             Guides: Guías
-            "Signing (XMLDSig)": Firma (XMLDSig)
-            "Resilience & idempotency": Resiliencia e idempotencia
-            "Releases & publishing": Versiones y publicación
+            'Signing (XMLDSig)': Firma (XMLDSig)
+            'Resilience & idempotency': Resiliencia e idempotencia
+            'Releases & publishing': Versiones y publicación
             Examples: Ejemplos
             FAQ: Preguntas frecuentes
 ```
@@ -128,11 +129,13 @@ plugins:
 > Nav keys must match the `nav:` titles exactly (including `&` and parentheses). `nav_translations` keys are the English titles, values are Spanish.
 
 **Do not:**
+
 - add `extra.alternate` by hand (plugin generates it);
 - change `theme.language`/palette/features;
 - translate any English page in this task.
 
 **Done when:**
+
 - `docs/en/**` contains the 9 pages, `docs/` has no loose `.md` at its root, and `git status` shows renames (not delete+add).
 - Build is green with the canonical command.
 - `site/index.html` exists (English at root) and `site/es/index.html` exists (fallback).
@@ -141,6 +144,7 @@ plugins:
 - No `site/en/` directory is produced.
 
 **Check commands:**
+
 ```bash
 uvx --from mkdocs --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
 test -f site/index.html && test -f site/es/index.html && test ! -d site/en
@@ -157,6 +161,7 @@ grep -q 'lang="es"' site/es/index.html && grep -q 'lang="en"' site/index.html
 **Description:** Make CI install the i18n plugin and keep `--strict`. No deploy logic changes: Pages already serves `site/`, and the plugin emits `/` (en) plus `/es/` (es) in the same artifact.
 
 **Files to change:**
+
 - `.github/workflows/docs.yml` — only the build step (and trigger paths if a gap is proven):
   ```yaml
   - name: Build site
@@ -166,12 +171,14 @@ grep -q 'lang="es"' site/es/index.html && grep -q 'lang="en"' site/index.html
 **Trigger paths:** the existing `docs/**` glob already covers `docs/en/**` and `docs/es/**`, so **no new docs path is required** — verify this rather than adding redundant globs. Add `examples/**/README*.md` **only if** a docs page links to those files (it does not today; do not add speculatively).
 
 **Done when:**
+
 - Workflow YAML is valid (`actionlint` if available, otherwise `python -c "import yaml,sys;yaml.safe_load(open(...))"`).
 - The build step command matches the canonical command above.
 - Trigger globs cover `docs/en/**` and `docs/es/**` (proven by the existing `docs/**`).
 - A green run on the PR is recorded (acceptance criterion 6).
 
 **Check commands:**
+
 ```bash
 python - <<'PY'
 import yaml
@@ -190,22 +197,26 @@ git diff --stat .github/workflows/docs.yml
 **Description:** Full Spanish translations of the landing page and the installation page.
 
 **Files to create:**
+
 - `docs/es/index.md` (from `docs/en/index.md`, 64 lines)
 - `docs/es/installation.md` (from `docs/en/installation.md`, 51 lines)
 
 **Translation rules specific to these pages:**
+
 - Keep both package names, registry links, and the comparison table structure; translate the table's prose headers (`Language`, `Package`, `Registry` → `Lenguaje`, `Paquete`, `Registro`) and the `!!! warning "Server-side only"` title.
 - Keep the `=== "TypeScript"` / `=== "Python"` tab labels and all code blocks byte-identical.
 - Keep relative links (`installation.md`, etc.) unchanged — the plugin resolves them per locale.
 - Do not reword the SDK design bullets into marketing copy; translate them faithfully.
 
 **Done when:**
+
 - Both files exist, are complete, and contain no English prose outside code.
 - `# DGII e-CF SDKs` is not the H1 of `docs/es/index.md` (translated H1, e.g. `# SDK de e-CF de la DGII`).
 - Build green; `site/es/index.html` and `site/es/installation.html` contain Spanish headings.
 - English pages unchanged (`git diff docs/en/index.md docs/en/installation.md` is empty).
 
 **Check commands:**
+
 ```bash
 uvx --from mkdocs --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
 test -f site/es/index.html && test -f site/es/installation.html
@@ -223,28 +234,32 @@ git diff --quiet docs/en/index.md docs/en/installation.md
 **Description:** Full Spanish translations of the two language guides. These are the largest pages and the most code-dense; the translation boundary matters most here.
 
 **Files to create:**
+
 - `docs/es/typescript.md` (from `docs/en/typescript.md`, 100 lines)
 - `docs/es/python.md` (from `docs/en/python.md`, 104 lines)
 
 **Translation rules specific to these pages:**
+
 - Every `ts` / `python` / `bash` fence stays byte-identical, including `console.log`, `if (auth.isErr()) throw auth.error;`, `process.env.CERT_PASSWORD`, and all imports.
 - Headings and prose (`Authenticate`, `Sign a document`, `Submit`, …) are translated; method names (`authenticate`, `sendElectronicDocument`, `signXml`) and env vars are not.
 - Translate the module-map table's prose column only; keep file names, class names, and function names verbatim.
 - Translate admonition titles, keep admonition types.
 
 **Done when:**
+
 - Both pages exist and are complete.
 - `diff` of code fences between `docs/en/*` and `docs/es/*` is empty, e.g.:
-  ```bash
+  ````bash
   for f in typescript python; do
     diff <(awk '/^```/{p=!p;print;next} p' docs/en/$f.md) \
          <(awk '/^```/{p=!p;print;next} p' docs/es/$f.md) && echo "$f code identical"
   done
-  ```
+  ````
 - Build green; `site/es/typescript.html` and `site/es/python.html` contain Spanish headings.
 - No English prose left (spot-check `grep -n "This\|the SDK\|You need" docs/es/typescript.md docs/es/python.md` returns nothing inside prose).
 
 **Check commands:**
+
 ```bash
 uvx --from mkdocs --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
 test -f site/es/typescript.html && test -f site/es/python.html
@@ -259,23 +274,27 @@ test -f site/es/typescript.html && test -f site/es/python.html
 **Description:** Full Spanish translations of the three guides under `guides/`.
 
 **Files to create:**
+
 - `docs/es/guides/signing.md` (66 lines)
 - `docs/es/guides/resilience.md` (60 lines)
 - `docs/es/guides/releases.md` (58 lines)
 
 **Translation rules specific to these pages:**
+
 - `signing.md`: keep the XML sample, C14N/RSA-SHA256 references, `xmlsec1 --verify --insecure signed.xml`, and the canonicalization identifiers verbatim. Translate the explanation of why inclusive C14N is required.
 - `resilience.md`: keep `retry`, `circuit breaker`, `timeout`, `idempotency key`, config field names, and numeric examples verbatim; translate only the surrounding prose and headings.
 - `releases.md`: keep `release-please`, `feat:`, `fix:`, `BREAKING CHANGE:`, `workflow_dispatch`, `npm trust github …`, `typescript-vX.Y.Z`, workflow names (`typescript.yml`, `python.yml`), and the bump table keys verbatim. Translate the numbered flow steps and notes.
 - `!!! note "First npm publish"` → translated title, same admonition type.
 
 **Done when:**
+
 - All three files exist and are complete.
 - Build green; the three `site/es/guides/*.html` files exist.
 - Code fences identical to English (same fence-diff check as Task 4).
 - `site/es/guides/releases.html` still contains `release-please` and `BREAKING CHANGE:` strings.
 
 **Check commands:**
+
 ```bash
 uvx --from mkdocs --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
 for f in signing resilience releases; do test -f site/es/guides/$f.html || exit 1; done
@@ -291,21 +310,25 @@ grep -q 'release-please' site/es/guides/releases.html
 **Description:** Full Spanish translations of the examples index (fixtures + flows tables) and the FAQ.
 
 **Files to create:**
+
 - `docs/es/examples.md` (61 lines)
 - `docs/es/faq.md` (49 lines)
 
 **Translation rules specific to these pages:**
+
 - `examples.md`: keep every file name (`fixtures/test.xml`, `sign_xml.py`, `sign-xml.ts`, …), the `examples/` link, and both table's command column verbatim. Translate the `Description` column and the `Flow` column prose only (flow names are prose; code identifiers are not).
 - `faq.md`: keep `Result<T, E>`, `httpx2`, `xmlsec1`, `getCertificateInfo`, `SECURITY.md` link, and code blocks verbatim. Translate questions and answers.
 - Keep the `SECURITY.md` external GitHub link unchanged.
 
 **Done when:**
+
 - Both files exist and are complete.
 - Build green; `site/es/examples.html` and `site/es/faq.html` exist.
 - Fixture/flow identifiers still present: `grep -c 'sign_xml.py' site/es/examples.html` > 0.
 - FAQ headings are Spanish (`grep -q 'Preguntas' site/es/faq.html` or the chosen translated H1).
 
 **Check commands:**
+
 ```bash
 uvx --from mkdocs --with mkdocs-material --with mkdocs-static-i18n mkdocs build --strict
 test -f site/es/examples.html && test -f site/es/faq.html
@@ -321,25 +344,30 @@ grep -q 'sign_xml.py' site/es/examples.html
 **Description:** Add Spanish versions of the two example READMEs and cross-link them from the English originals.
 
 **Files to create:**
+
 - `examples/python/README.es.md` (translation of `examples/python/README.md`, 1.6 KB)
 - `examples/typescript/README.es.md` (translation of `examples/typescript/README.md`, 1.7 KB)
 
 **Files to edit (one line each, at the top):**
+
 - `examples/python/README.md` — add a language link, e.g. `**English** · [Español](README.es.md)`
 - `examples/typescript/README.md` — same pattern.
 
 **Translation rules specific to these files:**
+
 - Every `bash` block, script name, env var (`DGII_P12_PATH`, `DGII_P12_PASSWORD`, `DGII_RNC`, `DGII_ENVIRONMENT`, `TesteCF | CerteCF | eCF`), and path (`../../packages/python`, `../output/`) stays byte-identical.
 - Translate headings and prose. Keep the `> ⚠️` blockquote text translated but keep `generate_cert.py` / `generate-cert` verbatim.
 - The relative link `../../packages/python` must remain relative and unchanged (it resolves from `examples/python/`).
 
 **Done when:**
+
 - Both `.es.md` files exist, are complete, and render with the project's Markdown conventions.
 - English READMEs link to them, and each Spanish README links back (`[English](README.md)`).
 - Code blocks in the Spanish READMEs are byte-identical to the English ones.
 - No example script (`*.py`, `*.ts`) is modified: `git status --short examples` shows only `README*` changes.
 
 **Check commands:**
+
 ```bash
 test -f examples/python/README.es.md && test -f examples/typescript/README.es.md
 grep -q 'README.es.md' examples/python/README.md
@@ -370,14 +398,14 @@ docs(i18n): add spanish readmes for python and typescript examples
 
 ## 6. Acceptance-criteria → task matrix
 
-| # | Acceptance criterion | Satisfied by | Verification |
-| --- | --- | --- | --- |
-| 1 | `mkdocs build --strict` succeeds with `en` + `es` | Tasks 1–6 | canonical build command |
-| 2 | Language switcher visible and works on every page | Task 1 (generated), verified in Tasks 3–6 | `grep 'href="/dgii-ecf/es/"'` on every `site/*.html` and `site/guides/*.html`; `grep 'href="/dgii-ecf/"'` on every `site/es/*.html` |
-| 3 | All nav pages have a Spanish translation | Tasks 3, 4, 5, 6 | 9 files exist under `docs/es/**`; `diff <(nav pages en) <(nav pages es)` shows 1:1 |
-| 4 | Spanish versions of both example READMEs | Task 7 | `test -f examples/*/README.es.md` |
-| 5 | Pages serves `/` and `/es/` | Task 2 (artifact) + Pages config | after merge: fetch `https://deuriib.github.io/dgii-ecf/` and `https://deuriib.github.io/dgii-ecf/es/`, both HTTP 200 with `<html lang="en">` / `<html lang="es">` |
-| 6 | Docs workflow stays green | Task 2 | green PR check `docs / Build docs` |
+| #   | Acceptance criterion                              | Satisfied by                              | Verification                                                                                                                                                      |
+| --- | ------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `mkdocs build --strict` succeeds with `en` + `es` | Tasks 1–6                                 | canonical build command                                                                                                                                           |
+| 2   | Language switcher visible and works on every page | Task 1 (generated), verified in Tasks 3–6 | `grep 'href="/dgii-ecf/es/"'` on every `site/*.html` and `site/guides/*.html`; `grep 'href="/dgii-ecf/"'` on every `site/es/*.html`                               |
+| 3   | All nav pages have a Spanish translation          | Tasks 3, 4, 5, 6                          | 9 files exist under `docs/es/**`; `diff <(nav pages en) <(nav pages es)` shows 1:1                                                                                |
+| 4   | Spanish versions of both example READMEs          | Task 7                                    | `test -f examples/*/README.es.md`                                                                                                                                 |
+| 5   | Pages serves `/` and `/es/`                       | Task 2 (artifact) + Pages config          | after merge: fetch `https://deuriib.github.io/dgii-ecf/` and `https://deuriib.github.io/dgii-ecf/es/`, both HTTP 200 with `<html lang="en">` / `<html lang="es">` |
+| 6   | Docs workflow stays green                         | Task 2                                    | green PR check `docs / Build docs`                                                                                                                                |
 
 **Final gate (run once all tasks are done):**
 
@@ -416,14 +444,14 @@ done
 
 ## 8. Execution log (orchestrator pipeline)
 
-| Phase | Agent | Result |
-| --- | --- | --- |
-| Planning | project-manager-senior | This task list (7 tasks) |
-| Implementation | engineering-technical-writer ×5 (parallel) | Tasks 1-7 delivered |
-| QA attempt 1 | testing-evidence-collector | FAIL — 12 minor findings (leftover English terms, H1/nav mismatch, Spanish polish) |
-| Fix loop 1 | engineering-technical-writer | 12/12 findings fixed, build green |
-| QA attempt 2 | testing-evidence-collector | PASS — parity suite green, 9/9 pages non-fallback, switcher contextual on all 19 pages |
-| Integration | testing-reality-checker | PASS — English URLs and rendered content byte-identical to `main`; 1 medium (shared `404.html` rendered in Spanish) |
+| Phase          | Agent                                      | Result                                                                                                              |
+| -------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Planning       | project-manager-senior                     | This task list (7 tasks)                                                                                            |
+| Implementation | engineering-technical-writer ×5 (parallel) | Tasks 1-7 delivered                                                                                                 |
+| QA attempt 1   | testing-evidence-collector                 | FAIL — 12 minor findings (leftover English terms, H1/nav mismatch, Spanish polish)                                  |
+| Fix loop 1     | engineering-technical-writer               | 12/12 findings fixed, build green                                                                                   |
+| QA attempt 2   | testing-evidence-collector                 | PASS — parity suite green, 9/9 pages non-fallback, switcher contextual on all 19 pages                              |
+| Integration    | testing-reality-checker                    | PASS — English URLs and rendered content byte-identical to `main`; 1 medium (shared `404.html` rendered in Spanish) |
 
 Verification command (same as CI):
 

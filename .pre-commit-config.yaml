@@ -2,7 +2,7 @@
 # Install with `mise run hooks-install`; run everything with `mise run hooks`.
 # See CONTRIBUTING.md §Git hooks.
 
-minimum_pre_commit_version: "4.0.0"
+minimum_pre_commit_version: '4.0.0'
 
 default_language_version:
   python: python3.12
