@@ -10,7 +10,7 @@
     "url": "git+https://github.com/deuriib/dgii-ecf.git",
     "directory": "packages/typescript"
   },
-  "homepage": "https://github.com/deuriib/dgii-ecf/tree/main/packages/typescript",
+  "homepage": "https://deuriib.github.io/dgii-ecf/",
   "keywords": [
     "dgii",
     "ecf",
