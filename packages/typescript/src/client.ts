@@ -139,11 +139,16 @@ export class ECF {
   }
 
   private buildIdempotencyKey(signedXml: string): string {
-    const rnc = extractElementText(signedXml, 'RNCEmisor') ?? 'unknown-rnc';
-    // ACECF carries `eNCF`; ANECF uses `RangoNCF`. Fall back to the hash if
-    // neither is present, so the key is still unique per document.
+    // ECF/ACECF use `RNCEmisor`; the ANECF schema spells it `RncEmisor`.
+    const rnc =
+      extractElementText(signedXml, 'RNCEmisor') ??
+      extractElementText(signedXml, 'RncEmisor') ??
+      'unknown-rnc';
+    // ECF/ACECF carry `eNCF`; ANECF carries the first `SecuenciaeNCFDesde`.
+    // `RangoNCF` stays as a fallback for hand-built documents.
     const ncf =
       extractElementText(signedXml, 'eNCF') ??
+      extractElementText(signedXml, 'SecuenciaeNCFDesde') ??
       extractElementText(signedXml, 'RangoNCF') ??
       'unknown-ncf';
     return `${rnc}:${ncf}:${sha256Hex(signedXml)}`;

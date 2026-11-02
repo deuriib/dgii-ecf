@@ -449,6 +449,35 @@ describe('ECF client', () => {
       );
     });
 
+    it('keys the void flow on the ANECF schema elements', async () => {
+      const store = new InMemoryIdempotencyStore();
+      const xml =
+        '<ANECF><Encabezado><Version>1.0</Version>' +
+        '<RncEmisor>130862346</RncEmisor>' +
+        '<CantidadeNCFAnulados>10</CantidadeNCFAnulados>' +
+        '<FechaHoraAnulacioneNCF>01-01-2026 10:00:00</FechaHoraAnulacioneNCF>' +
+        '</Encabezado><DetalleAnulacion><Anulacion><NoLinea>1</NoLinea>' +
+        '<TipoeCF>31</TipoeCF><TablaRangoSecuenciasAnuladaseNCF>' +
+        '<Secuencias><SecuenciaeNCFDesde>E310000000010</SecuenciaeNCFDesde>' +
+        '<SecuenciaeNCFHasta>E310000000019</SecuenciaeNCFHasta>' +
+        '</Secuencias></TablaRangoSecuenciasAnuladaseNCF>' +
+        '</Anulacion></DetalleAnulacion></ANECF>';
+      const digest = createHash('sha256').update(xml, 'utf8').digest('hex');
+      const fetchImpl = mockFetch(async () => jsonResponse(voidPayload));
+      const ecf = new ECF(credentials, Environment.Dev, {
+        token: 'tok',
+        fetchImpl,
+        idempotencyStore: store,
+      });
+
+      const result = await ecf.voidENCF(xml, 'anecf.xml');
+
+      expect(result.isOk()).toBe(true);
+      expect(await store.get(`130862346:E310000000010:${digest}`)).toEqual(
+        voidPayload,
+      );
+    });
+
     it('refuses a commercial approval that is already pending', async () => {
       const store = new InMemoryIdempotencyStore();
       const xml = approvalXml('130862346', 'E310000000002');
