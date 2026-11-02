@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Illustrative ANECF (range voiding) document. Replace the fields with a
+  DGII-schema-compliant payload before submitting to a real environment.
+-->
+<ANECF>
+  <Encabezado>
+    <Version>1.0</Version>
+    <RNCEmisor>130862346</RNCEmisor>
+    <FechaEmision>01-01-2026</FechaEmision>
+  </Encabezado>
+  <DetalleAnulacion>
+    <TipoeCF>31</TipoeCF>
+    <RangoNCF>E310000000010</RangoNCF>
+    <CantidadNCF>10</CantidadNCF>
+  </DetalleAnulacion>
+</ANECF>

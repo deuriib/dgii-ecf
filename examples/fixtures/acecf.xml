@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Illustrative ACECF (commercial approval) document. Replace the fields with a
+  DGII-schema-compliant payload before submitting to a real environment.
+-->
+<ACECF>
+  <DetalleAprobacionComercial>
+    <Version>1.0</Version>
+    <RNCEmisor>130862346</RNCEmisor>
+    <RNCComprador>40102368</RNCComprador>
+    <eNCF>E310000000001</eNCF>
+    <FechaEmision>01-01-2026</FechaEmision>
+    <MontoTotal>1180.00</MontoTotal>
+    <Estado>1</Estado>
+  </DetalleAprobacionComercial>
+</ACECF>

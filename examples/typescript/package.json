@@ -6,7 +6,11 @@
     "generate-cert": "bun run generate-cert.ts",
     "transform": "bun run transform.ts",
     "sign": "bun run sign-xml.ts",
-    "send": "bun run send-invoice.ts"
+    "send": "bun run send-invoice.ts",
+    "send-summary": "bun run send-summary.ts",
+    "customer-directory": "bun run customer-directory.ts",
+    "commercial-approval": "bun run commercial-approval.ts",
+    "void": "bun run void.ts"
   },
   "dependencies": {
     "node-forge": "^1.3.1"

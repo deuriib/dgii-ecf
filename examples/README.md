@@ -7,10 +7,25 @@ Runnable examples for both SDKs, plus DGII sample fixtures.
 | Path | Description |
 | --- | --- |
 | `fixtures/test.xml` | Full DGII e-CF sample document (from [victors1681/dgii-ecf](https://github.com/victors1681/dgii-ecf), MIT). |
-| `fixtures/invoice-31.xml` | Minimal unsigned ECF-31 invoice used by the signing examples. |
-| `fixtures/invoice-31.json` | The same invoice as compact JSON, used by the transform examples. |
+| `fixtures/invoice-31.xml` | Minimal unsigned ECF-31 invoice. |
+| `fixtures/invoice-31.json` | The same invoice as compact JSON. |
+| `fixtures/invoice-32.xml` | Minimal ECF-32 (factura de consumo) for the summary flow. |
+| `fixtures/acecf.xml` | Illustrative ACECF (commercial approval). |
+| `fixtures/anecf.xml` | Illustrative ANECF (range voiding). |
 | `python/` | Python examples (`py-dgii-ecf`). |
 | `typescript/` | TypeScript examples (`@deuriib/dgii-ecf`). |
+
+## Flows
+
+| Flow | Python | TypeScript |
+| --- | --- | --- |
+| Sign an e-CF | `sign_xml.py` | `sign-xml.ts` |
+| JSON → XML | `transform.py` | `transform.ts` |
+| Submit an e-CF | `send_invoice.py` | `send-invoice.ts` |
+| Submit a summary (RFCE) | `send_summary.py` | `send-summary.ts` |
+| Customer directory | `customer_directory.py` | `customer-directory.ts` |
+| Commercial approval | `commercial_approval.py` | `commercial-approval.ts` |
+| Void a range | `void.py` | `void.ts` |
 
 ## Quick start
 
