@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/deuriib/dgii-ecf/compare/python-v0.2.1...python-v0.2.2) (2026-11-02)
+
+
+### Documentation
+
+* add MkDocs Material documentation site ([fc5fd9c](https://github.com/deuriib/dgii-ecf/commit/fc5fd9c39e193fec6192e2eef85c6fc63fdc91df))
+* **python:** correct CLI argument order in README ([07a8d96](https://github.com/deuriib/dgii-ecf/commit/07a8d96f71137ab8206074514110d5b09f1945d1))
+
 ## [0.2.1](https://github.com/deuriib/dgii-ecf/compare/python-v0.2.0...python-v0.2.1) (2026-11-02)
 
 
