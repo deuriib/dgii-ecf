@@ -41,9 +41,16 @@ def _ds(name: str) -> str:
 
 
 def _canonicalize(node: etree._Element) -> bytes:
-    """Inclusive C14N 1.0 without comments — the bytes DGII will hash."""
+    """Inclusive C14N 1.0 without comments — the bytes DGII will hash.
+
+    lxml emits spurious ``xmlns=""`` attributes when canonicalizing a detached
+    subtree that lives in a default namespace. Serializing the node to a
+    standalone document and re-parsing it before canonicalizing yields the
+    spec-correct bytes (the ones a .NET/DGII verifier will compute).
+    """
+    standalone = etree.fromstring(etree.tostring(node))
     result: bytes = etree.tostring(
-        node, method="c14n", exclusive=False, with_comments=False
+        standalone, method="c14n", exclusive=False, with_comments=False
     )
     return result
 
@@ -134,6 +141,10 @@ class Signature:
             digest
         ).decode("ascii")
 
+        # Attach the Signature before signing it so the ancestor namespace
+        # context used for canonicalization matches the emitted document.
+        root.append(signature)
+
         signature_value = self._private_key.sign(
             _canonicalize(signed_info),
             padding.PKCS1v15(),
@@ -148,8 +159,6 @@ class Signature:
         etree.SubElement(x509_data, _ds("X509Certificate")).text = base64.b64encode(
             self._certificate.public_bytes(serialization.Encoding.DER)
         ).decode("ascii")
-
-        root.append(signature)
 
 
 @dataclass(frozen=True, slots=True)
