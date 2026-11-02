@@ -29,6 +29,13 @@ from .result import DgiiResult, Err, Ok
 from .signing import Signature
 from .types import AuthToken
 
+_PENDING_MARKER: JsonObject = {"__pending__": True}
+
+
+def _is_pending(value: JsonObject) -> bool:
+    return value.get("__pending__") is True
+
+
 _TAG_RE_CACHE: dict[str, re.Pattern[str]] = {}
 
 
@@ -177,6 +184,14 @@ class ECF:
         key = self._build_idempotency_key(signed_xml)
         cached = self._idempotency.get(key)
         if cached is not None:
+            if _is_pending(cached):
+                return Err(
+                    DgiiError(
+                        "A submission with this key is already pending; "
+                        "reconcile via a status lookup before retrying",
+                        code=DgiiErrorCode.IDEMPOTENCY,
+                    )
+                )
             return Ok(cached)
 
         url = (
@@ -184,11 +199,15 @@ class ECF:
             if buyer_host
             else build_url(self._environment, Endpoint.SEND_INVOICE)
         )
+        # Persist-before-transmit: mark as pending before the network call.
+        self._idempotency.set(key, dict(_PENDING_MARKER))
         result = self._http.post_multipart(url, file_name, signed_xml)
         if result.is_err():
+            self._idempotency.delete(key)
             return Err(result.unwrap_err())
         data = result.unwrap()
         if not isinstance(data, dict):
+            self._idempotency.delete(key)
             return Err(
                 DgiiError(
                     "Unexpected DGII response payload",
@@ -208,14 +227,26 @@ class ECF:
         key = self._build_idempotency_key(signed_xml)
         cached = self._idempotency.get(key)
         if cached is not None:
+            if _is_pending(cached):
+                return Err(
+                    DgiiError(
+                        "A submission with this key is already pending; "
+                        "reconcile via a status lookup before retrying",
+                        code=DgiiErrorCode.IDEMPOTENCY,
+                    )
+                )
             return Ok(cached)
 
         url = build_url(self._environment, Endpoint.SEND_SUMMARY, BaseUrl.CF.value)
+        # Persist-before-transmit (see send_electronic_document).
+        self._idempotency.set(key, dict(_PENDING_MARKER))
         result = self._http.post_multipart(url, file_name, signed_xml)
         if result.is_err():
+            self._idempotency.delete(key)
             return Err(result.unwrap_err())
         data = result.unwrap()
         if not isinstance(data, dict):
+            self._idempotency.delete(key)
             return Err(
                 DgiiError(
                     "Unexpected DGII response payload",
