@@ -9,13 +9,36 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  # Needed to dispatch the publish workflows with the repository token.
+  actions: write
 
 jobs:
   release-please:
     runs-on: ubuntu-24.04
     steps:
-      - uses: googleapis/release-please-action@v5
+      - id: release
+        uses: googleapis/release-please-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # GitHub suppresses `push`/`release` events created with GITHUB_TOKEN, so
+      # the `on: push: tags` publish triggers never fire for release-please's
+      # tags. `workflow_dispatch` is explicitly exempt from that suppression,
+      # so we dispatch the publish workflows ourselves — no PAT required.
+      - name: Dispatch TypeScript publish
+        if: steps.release.outputs['packages/typescript--release_created'] == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run typescript.yml \
+            --ref "${{ steps.release.outputs['packages/typescript--tag_name'] }}"
+
+      - name: Dispatch Python publish
+        if: steps.release.outputs['packages/python--release_created'] == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run python.yml \
+            --ref "${{ steps.release.outputs['packages/python--tag_name'] }}"

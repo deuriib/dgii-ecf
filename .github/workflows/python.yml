@@ -52,8 +52,11 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/p/py-dgii-ecf
+    # OIDC trusted publishing — no PYPI_TOKEN. `contents: read` is required
+    # so actions/checkout can read the repository.
     permissions:
       id-token: write
+      contents: read
     defaults:
       run:
         working-directory: packages/python
