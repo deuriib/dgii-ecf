@@ -1,0 +1,55 @@
+{
+  "ECF": {
+    "Encabezado": {
+      "Version": { "_text": "1.0" },
+      "IdDoc": {
+        "TipoeCF": { "_text": "31" },
+        "eNCF": { "_text": "E310000000001" },
+        "IndicadorEnvioDiferido": { "_text": "0" },
+        "IndicadorMontoGravado": { "_text": "1" },
+        "TipoIngresos": { "_text": "01" },
+        "TipoPago": { "_text": "1" },
+        "FechaLimitePago": { "_text": "2026-12-31" },
+        "TablaFormasPago": {
+          "FormaDePago": {
+            "FormaPago": { "_text": "1" },
+            "MontoPago": { "_text": "1180.00" }
+          }
+        }
+      },
+      "Emisor": {
+        "RNCEmisor": { "_text": "130862346" },
+        "RazonSocialEmisor": { "_text": "Example SRL" },
+        "NombreComercial": { "_text": "Example" },
+        "DireccionEmisor": { "_text": "Av. Example 123" },
+        "Municipio": { "_text": "10000" },
+        "Provincia": { "_text": "10000" },
+        "CorreoEmisor": { "_text": "billing@example.com" },
+        "FechaEmision": { "_text": "01-01-2026" }
+      },
+      "Comprador": {
+        "RNCComprador": { "_text": "40102368" },
+        "RazonSocialComprador": { "_text": "Buyer SA" }
+      },
+      "Totales": {
+        "MontoGravadoTotal": { "_text": "1000.00" },
+        "MontoGravadoI1": { "_text": "1000.00" },
+        "TotalITBIS": { "_text": "180.00" },
+        "TotalITBIS1": { "_text": "180.00" },
+        "MontoTotal": { "_text": "1180.00" }
+      }
+    },
+    "DetallesItems": {
+      "Item": {
+        "NumeroLinea": { "_text": "1" },
+        "IndicadorFacturacion": { "_text": "1" },
+        "NombreItem": { "_text": "Consulting services" },
+        "IndicadorBienoServicio": { "_text": "2" },
+        "CantidadItem": { "_text": "1.00" },
+        "UnidadMedida": { "_text": "1" },
+        "PrecioUnitarioItem": { "_text": "1000.00" },
+        "MontoItem": { "_text": "1000.00" }
+      }
+    }
+  }
+}

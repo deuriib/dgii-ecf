@@ -202,3 +202,7 @@ secrets/
 .DS_Store
 *.local
 
+# Example outputs / generated artifacts
+examples/output/
+examples/**/certs/
+

@@ -6,7 +6,9 @@
 *.pem binary
 *.pfx binary
 *.key binary
-*.lock binary
+
+# Lockfiles are text (diffable, mergeable).
+*.lock text eol=lf
 
 # Linguist hints.
 packages/typescript/src/** linguist-language=TypeScript
