@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.4.1...typescript-v0.5.0) (2026-11-02)
+
+
+### Features
+
+* **auth:** refresh the token before expiry and on 401 ([#99](https://github.com/deuriib/dgii-ecf/issues/99)) ([aa889ab](https://github.com/deuriib/dgii-ecf/commit/aa889ab60a7d3288ba361049e8ea031a78511026))
+* **reception:** route documents by type and amount ([#98](https://github.com/deuriib/dgii-ecf/issues/98)) ([b5dd4b1](https://github.com/deuriib/dgii-ecf/commit/b5dd4b1d91caf4fece64c3433584b11b9d7b1fbf))
+
 ## [0.4.1](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.4.0...typescript-v0.4.1) (2026-11-02)
 
 
