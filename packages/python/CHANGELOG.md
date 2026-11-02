@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.3.2...python-v0.4.0) (2026-11-02)
+
+
+### Features
+
+* key commercial approval and void submissions ([#65](https://github.com/deuriib/dgii-ecf/issues/65)) ([7940855](https://github.com/deuriib/dgii-ecf/commit/79408554ea2d2cd86718351b11fbe5171b012157))
+
 ## [0.3.2](https://github.com/deuriib/dgii-ecf/compare/python-v0.3.1...python-v0.3.2) (2026-11-02)
 
 
