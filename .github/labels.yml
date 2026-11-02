@@ -81,3 +81,44 @@
 - name: invalid
   color: e4e669
   description: This doesn't seem right
+
+# Priority layer. Exactly one per issue, alongside exactly one type label.
+- name: priority:p0
+  color: b60205
+  description: Broken in production right now
+- name: priority:p1
+  color: d93f0b
+  description: Do next
+- name: priority:p2
+  color: fbca04
+  description: Queued
+- name: priority:p3
+  color: c5def5
+  description: Someday
+
+# Status layer. Exactly one per issue. `status:needs-triage` is only removed
+# once a type, a priority and a status are all set.
+- name: status:needs-triage
+  color: ededed
+  description: Not yet triaged
+- name: status:needs-repro
+  color: d4c5f9
+  description: Waiting on exact reproduction steps
+- name: status:ready
+  color: 0e8a16
+  description: Triaged, shaped, ready to take
+- name: status:blocked
+  color: f9d0c4
+  description: Blocked by another issue or external dependency
+- name: status:stale
+  color: ededed
+  description: No activity, pending closure
+
+# Managed by release-please. Declared here because the sync workflow runs with
+# `skip-delete: false` and would otherwise remove them on every push.
+- name: "autorelease: pending"
+  color: ededed
+  description: Release PR opened by release-please, not yet tagged
+- name: "autorelease: tagged"
+  color: ededed
+  description: Release tagged by release-please
