@@ -7,12 +7,25 @@ contiene ejemplos ejecutables para ambos SDKs y fixtures de muestra de la DGII.
 
 | Archivo | Descripción |
 | --- | --- |
-| `fixtures/test.xml` | Documento de muestra completo de un e-CF de la DGII. |
+| `fixtures/test.xml` | Documento de muestra completo de un e-CF de la DGII. **Solo referencia** — ver la advertencia. |
 | `fixtures/invoice-31.xml` | ECF-31 mínimo sin firmar. |
 | `fixtures/invoice-31.json` | La misma factura en JSON compacto. |
 | `fixtures/invoice-32.xml` | ECF-32 mínimo para el flujo de resumen (RFCE). |
 | `fixtures/acecf.xml` | ACECF ilustrativo (aprobación comercial). |
 | `fixtures/anecf.xml` | ANECF ilustrativo (anulación de rango). |
+
+!!! warning "Certificado del fixture vencido"
+    `fixtures/test.xml` es solo una referencia histórica y **no debe** usarse como
+    fuente de verdad para firmar. El certificado incrustado venció el
+    **2024-12-04**, y su `DigestValue` ya no coincide con el contenido porque el
+    documento fue editado después de firmarse.
+
+    Por eso `utilities.py` / `utilities.ts` reportan `certificate valid: false`
+    para este archivo, y ese es el resultado esperado.
+
+    Para firmar de punta a punta usa `fixtures/invoice-31.xml` (o
+    `fixtures/invoice-32.xml` para el flujo RFCE) junto con un `output/test.p12`
+    generado.
 
 ## Flujos
 
