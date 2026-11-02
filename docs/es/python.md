@@ -34,6 +34,16 @@ if signed.is_err():
     raise SystemExit(signed.unwrap_err())
 ```
 
+Para construir el firmador directamente desde un archivo `.p12`, usa
+`try_from_p12` — devuelve un `Result` en lugar de lanzar una excepción:
+
+```python
+signer = Signature.try_from_p12("identity.p12", password)
+if signer.is_err():
+    raise SystemExit(signer.unwrap_err())
+signed = signer.unwrap().sign_xml(xml)
+```
+
 ## Envía el documento
 
 ```python
