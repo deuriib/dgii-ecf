@@ -85,8 +85,12 @@ in **manifest mode** (independent versions per package):
 1. Merging a PR with `feat`/`fix` commits updates a release-please PR.
 2. Merging the release-please PR creates a tag (`typescript-vX.Y.Z` /
    `python-vX.Y.Z`), bumps the version, and generates the changelog.
-3. Tag push triggers the publish workflow → npm (`@deuriib/dgii-ecf`) and PyPI
-   (`dgii-ecf`).
+3. Tags created with `GITHUB_TOKEN` do not trigger other workflows, so the
+   release-please workflow dispatches the publish workflows explicitly
+   (`workflow_dispatch`) → npm (`@deuriib/dgii-ecf`) and PyPI (`py-dgii-ecf`).
+4. Publishing uses **OIDC trusted publishing** — no `NPM_TOKEN` or `PYPI_TOKEN`
+   secrets. The first npm release is published manually to create the package;
+   subsequent releases publish from GitHub Actions.
 
 ## Security
 
