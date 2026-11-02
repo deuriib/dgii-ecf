@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.3.0...typescript-v0.3.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* make idempotency key extraction robust to namespaces/attributes ([32898e0](https://github.com/deuriib/dgii-ecf/commit/32898e06b8713dcd80f87089d02cdbd301e402a8))
+* **typescript:** extract idempotency elements tolerantly ([1a80fa9](https://github.com/deuriib/dgii-ecf/commit/1a80fa91172bcf0175d27a622a698741fc8f57cb)), closes [#34](https://github.com/deuriib/dgii-ecf/issues/34)
+
 ## [0.3.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.2.3...typescript-v0.3.0) (2026-11-02)
 
 
