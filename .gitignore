@@ -206,3 +206,6 @@ secrets/
 examples/output/
 examples/**/certs/
 
+# MkDocs build output
+site/
+
