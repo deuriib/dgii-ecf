@@ -4,15 +4,17 @@
 [tools]
 bun = "1.4.4"
 node = "26.13.0"
+pre-commit = "4.7.0"
 python = "3.12"
 uv = "0.13.6"
+"aqua:gitleaks/gitleaks" = "8.30.1"
 
 # ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 [tasks.bootstrap]
 description = "Install all toolchains and dependencies"
-depends = ["bootstrap-tools", "bootstrap-typescript", "bootstrap-python"]
+depends = ["bootstrap-tools", "bootstrap-typescript", "bootstrap-python", "hooks-install"]
 
 [tasks.bootstrap-tools]
 description = "Install pinned toolchain versions"
@@ -27,6 +29,17 @@ run = "bun install"
 description = "Install Python package dependencies"
 dir = "packages/python"
 run = "uv sync"
+
+# ---------------------------------------------------------------------------
+# Git hooks
+# ---------------------------------------------------------------------------
+[tasks.hooks-install]
+description = "Install the pre-commit git hooks (pre-commit + commit-msg)"
+run = "pre-commit install --install-hooks && pre-commit install --hook-type commit-msg"
+
+[tasks.hooks]
+description = "Run every pre-commit hook against the whole repository"
+run = "pre-commit run --all-files"
 
 # ---------------------------------------------------------------------------
 # Lint
