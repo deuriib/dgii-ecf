@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.2](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.2.1...typescript-v0.2.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* correct XMLDSig canonicalization and persist submissions before transmit ([1d368f2](https://github.com/deuriib/dgii-ecf/commit/1d368f23e0235ae42e649817665909276ee02b72))
+* **typescript:** digest documents with inclusive C14N ([312b294](https://github.com/deuriib/dgii-ecf/commit/312b2949611dc1a52751749515ea36e62db13204))
+* **typescript:** persist submissions before transmit ([3605cc4](https://github.com/deuriib/dgii-ecf/commit/3605cc4940226b24f033849e7118ce74fc82bb7c))
+
 ## [0.2.1](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.2.0...typescript-v0.2.1) (2026-11-02)
 
 
