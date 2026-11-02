@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from cryptography import x509
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
@@ -85,6 +86,28 @@ class Signature:
         ).decode("utf-8")
         cert_pem = certificate.public_bytes(serialization.Encoding.PEM).decode("utf-8")
         return cls(key_pem, cert_pem)
+
+    @classmethod
+    def try_from_p12(
+        cls, file_name: str | Path, password: str
+    ) -> DgiiResult[Signature]:
+        """Build a signer from a .p12 file, reporting failures as ``Err``.
+
+        Additive counterpart to :meth:`from_p12`, which raises. Prefer this
+        when the caller already threads ``Result``: an unreadable file, a wrong
+        password or a PKCS#12 without a key pair becomes a ``DgiiError`` with
+        code ``CERTIFICATE`` instead of an exception.
+        """
+        try:
+            return Ok(cls.from_p12(file_name, password))
+        except (OSError, TypeError, ValueError, UnsupportedAlgorithm) as exc:
+            return Err(
+                DgiiError(
+                    f"Failed to load PKCS#12: {exc}",
+                    code=DgiiErrorCode.CERTIFICATE,
+                    cause=exc,
+                )
+            )
 
     def sign_xml(self, xml: str, root_name: str | None = None) -> DgiiResult[str]:
         """Sign ``xml`` and return the signed document (declaration included)."""

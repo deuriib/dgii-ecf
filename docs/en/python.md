@@ -34,6 +34,16 @@ if signed.is_err():
     raise SystemExit(signed.unwrap_err())
 ```
 
+To build the signer directly from a `.p12` file, use `try_from_p12` — it
+returns a `Result` instead of raising:
+
+```python
+signer = Signature.try_from_p12("identity.p12", password)
+if signer.is_err():
+    raise SystemExit(signer.unwrap_err())
+signed = signer.unwrap().sign_xml(xml)
+```
+
 ## Submit
 
 ```python

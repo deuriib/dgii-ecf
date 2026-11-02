@@ -5,10 +5,16 @@ from __future__ import annotations
 import base64
 import hashlib
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
+import pytest
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.serialization import (
+    BestAvailableEncryption,
+    pkcs12,
+)
 from lxml import etree
 
 from py_dgii_ecf import signing
@@ -164,3 +170,65 @@ def test_invalid_xml_is_rejected(
     result = Signature(key_pem, cert_pem).sign_xml("<ECF><broken>")
     assert result.is_err()
     assert result.unwrap_err().code == DgiiErrorCode.INVALID_XML
+
+
+P12_PASSWORD = "test-password"
+
+
+def _write_p12(tmp_path: Path, key_pem: str, cert_pem: str) -> Path:
+    """Materialize the self-signed fixture as a PKCS#12 file."""
+    key = serialization.load_pem_private_key(key_pem.encode("utf-8"), password=None)
+    certificate = x509.load_pem_x509_certificate(cert_pem.encode("utf-8"))
+    data = pkcs12.serialize_key_and_certificates(
+        name=b"dgii-ecf-test",
+        key=key,
+        cert=certificate,
+        cas=None,
+        encryption_algorithm=BestAvailableEncryption(P12_PASSWORD.encode("utf-8")),
+    )
+    path = tmp_path / "identity.p12"
+    path.write_bytes(data)
+    return path
+
+
+def test_try_from_p12_loads_a_working_signer(
+    self_signed: tuple[str, str, x509.Certificate], tmp_path: Path
+) -> None:
+    key_pem, cert_pem, _ = self_signed
+    path = _write_p12(tmp_path, key_pem, cert_pem)
+
+    result = Signature.try_from_p12(path, P12_PASSWORD)
+
+    assert result.is_ok()
+    assert result.unwrap().sign_xml(ECF_XML).is_ok()
+
+
+def test_try_from_p12_reports_a_missing_file(tmp_path: Path) -> None:
+    result = Signature.try_from_p12(tmp_path / "absent.p12", P12_PASSWORD)
+
+    assert result.is_err()
+    error = result.unwrap_err()
+    assert error.code is DgiiErrorCode.CERTIFICATE
+    assert "PKCS#12" in str(error)
+
+
+def test_try_from_p12_reports_a_wrong_password(
+    self_signed: tuple[str, str, x509.Certificate], tmp_path: Path
+) -> None:
+    key_pem, cert_pem, _ = self_signed
+    path = _write_p12(tmp_path, key_pem, cert_pem)
+
+    result = Signature.try_from_p12(path, "wrong-password")
+
+    assert result.is_err()
+    assert result.unwrap_err().code is DgiiErrorCode.CERTIFICATE
+
+
+def test_from_p12_still_raises(
+    self_signed: tuple[str, str, x509.Certificate], tmp_path: Path
+) -> None:
+    key_pem, cert_pem, _ = self_signed
+    path = _write_p12(tmp_path, key_pem, cert_pem)
+
+    with pytest.raises(ValueError):
+        Signature.from_p12(path, "wrong-password")
