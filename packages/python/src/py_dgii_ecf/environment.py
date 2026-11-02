@@ -34,6 +34,7 @@ class Endpoint(enum.StrEnum):
     INQUIRY_STATUS = "consultaestado/api/Consultas/Estado"
     ALL_TRACKING_ECF = "ConsultaTrackIds/api/TrackIds/Consulta"
     DIRECTORY = "consultadirectorio/api/consultas/obtenerdirectorioporrnc"
+    DIRECTORY_LIST = "consultadirectorio/api/consultas/listado"
     VOID = "anulacionrangos/api/operaciones/anularrango"
 
 

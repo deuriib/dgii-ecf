@@ -518,3 +518,51 @@ describe('ECF client', () => {
     });
   });
 });
+
+describe('directory listing', () => {
+  const entry = {
+    nombre: 'RECEPTOR SRL',
+    rnc: '131880657',
+    urlRecepcion: 'https://receptor.example/fe/recepcion',
+    urlAceptacion: 'https://receptor.example/fe/aprobacion',
+    urlOpcional: 'https://receptor.example/fe/autenticacion',
+  };
+
+  it('lists every published receiver', async () => {
+    let capturedUrl = '';
+    const fetchImpl = mockFetch(async (url) => {
+      capturedUrl = url;
+      return jsonResponse([entry, { ...entry, rnc: '101000001' }]);
+    });
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+
+    const result = await ecf.getDirectoryListing();
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toHaveLength(2);
+    expect(result.value[0]?.urlRecepcion).toBe(
+      'https://receptor.example/fe/recepcion',
+    );
+    expect(capturedUrl).toContain(
+      '/TesteCF/consultadirectorio/api/consultas/listado',
+    );
+  });
+
+  it('normalizes a single-object payload', async () => {
+    const fetchImpl = mockFetch(async () => jsonResponse(entry));
+    const ecf = new ECF(credentials, Environment.Dev, {
+      token: 'tok',
+      fetchImpl,
+    });
+
+    const result = await ecf.getDirectoryListing();
+
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toHaveLength(1);
+  });
+});

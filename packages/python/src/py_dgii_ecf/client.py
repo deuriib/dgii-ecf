@@ -466,6 +466,14 @@ class ECF:
             return Ok(None)
         return _parse_list(ServiceDirectoryResponse, data)
 
+    def get_directory_listing(self) -> DgiiResult[list[ServiceDirectoryResponse]]:
+        """General directory listing — every receiver that publishes URLs."""
+        url = build_url(self._environment, Endpoint.DIRECTORY_LIST)
+        result = self._http.get(url)
+        if result.is_err():
+            return Err(result.unwrap_err())
+        return _parse_list(ServiceDirectoryResponse, result.unwrap())
+
     def get_summary_invoice_inquiry(
         self, rnc: str, encf: str, cod_seguridad: str
     ) -> DgiiResult[InquiryInvoiceSummary]:

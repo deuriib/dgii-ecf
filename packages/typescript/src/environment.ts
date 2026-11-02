@@ -29,6 +29,7 @@ export enum Endpoint {
   InquiryStatus = 'consultaestado/api/Consultas/Estado',
   AllTrackingEcf = 'ConsultaTrackIds/api/TrackIds/Consulta',
   Directory = 'consultadirectorio/api/consultas/obtenerdirectorioporrnc',
+  DirectoryList = 'consultadirectorio/api/consultas/listado',
   Void = 'anulacionrangos/api/operaciones/anularrango',
 }
 
