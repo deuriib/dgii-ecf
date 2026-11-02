@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/deuriib/dgii-ecf/compare/python-v0.6.0...python-v0.6.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **python:** accept the partial payloads DGII actually sends ([#101](https://github.com/deuriib/dgii-ecf/issues/101)) ([4e9881a](https://github.com/deuriib/dgii-ecf/commit/4e9881a2bdc551074d0375af1094a9c72036ae2b))
+* **types:** preserve string message codes and keep the key ([#102](https://github.com/deuriib/dgii-ecf/issues/102)) ([d424c98](https://github.com/deuriib/dgii-ecf/commit/d424c98e32849ec408020a80541580b24c5c48f9))
+
 ## [0.6.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.5.1...python-v0.6.0) (2026-11-02)
 
 
