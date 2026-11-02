@@ -85,3 +85,49 @@ larga duración no crece sin límite. Ambos valores son configurables:
 
 Sigue siendo local al proceso: usa Redis o Postgres cuando más de una
 instancia pueda enviar el mismo documento.
+
+## Reconciliar un envío pendiente
+
+Un envío escribe un marcador **pendiente** antes de transmitir. Si el proceso
+muere a mitad de camino, el marcador queda y el siguiente intento con el mismo
+documento devuelve `IDEMPOTENCY` en lugar de reenviar. Ese es el default seguro:
+un reenvío nunca debe duplicar un comprobante fiscal.
+
+`reconcileSubmission` / `reconcile_submission` resuelve ese estado preguntándole
+a la DGII qué sabe del e-NCF:
+
+=== "TypeScript"
+
+    ```ts
+    const outcome = await ecf.reconcileSubmission(signedXml);
+    if (outcome.isOk()) {
+      if (outcome.value.delivered) {
+        // La DGII ya tiene el documento — no reintentar.
+      } else if (outcome.value.cleared) {
+        // La DGII no tiene registro; el marcador se limpió y reintentar es seguro.
+      }
+    }
+    ```
+
+=== "Python"
+
+    ```python
+    outcome = ecf.reconcile_submission(signed_xml)
+    if outcome.is_ok():
+        result = outcome.unwrap()
+        if result.delivered:
+            ...  # la DGII ya lo tiene — no reintentar
+        elif result.cleared:
+            ...  # sin registro; reintentar es seguro
+    ```
+
+El marcador se limpia **solo** cuando la DGII responde `No encontrado`. Si la
+DGII tiene registro, el marcador se mantiene — es el candado que impide un
+segundo envío — y `delivered` te dice que pares.
+
+`canReuseSequence` / `can_reuse_sequence` responde la pregunta siguiente ante un
+rechazo: si la secuencia del e-NCF puede volver a usarse. La DGII pone
+`secuenciaUtilizada: false` cuando el rechazo deja la secuencia reutilizable
+(certificado o firma inválida, XML inválido, firmante no delegado, e-NCF no
+autorizado o vencido, emisor no electrónico, RNC inexistente o inactivo). Un
+flag ausente se trata como **no** reutilizable.

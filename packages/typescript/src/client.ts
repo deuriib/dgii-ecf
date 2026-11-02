@@ -19,6 +19,11 @@ import {
 } from './http.js';
 import type { ResilienceOptions } from './resilience.js';
 import { checkB2BApplicability, resolveReceptionRoute } from './reception.js';
+import {
+  PENDING_SUBMISSION_MESSAGE,
+  canReuseSequence,
+  type ReconciliationResult,
+} from './reconciliation.js';
 import { Signature } from './signing.js';
 import { extractElementText } from './xml.js';
 import type { P12ReaderData } from './certificate.js';
@@ -169,10 +174,7 @@ export class ECF {
     if (cached !== undefined) {
       if (isPendingSubmission(cached)) {
         return err(
-          new DgiiError(
-            'A submission with this key is already pending; reconcile via a status lookup before retrying',
-            { code: 'IDEMPOTENCY' },
-          ),
+          new DgiiError(PENDING_SUBMISSION_MESSAGE, { code: 'IDEMPOTENCY' }),
         );
       }
       return ok(cached);
@@ -344,6 +346,50 @@ export class ECF {
       ...(query !== undefined ? { query } : {}),
       skipAuthHooks: true,
       omitAuth: true,
+    });
+  }
+
+  /**
+   * Resolve what happened to a submission whose idempotency marker is pending.
+   *
+   * Queries DGII by e-NCF. When DGII has no record of the document the marker
+   * is cleared, because re-submitting cannot double-issue. When DGII does have
+   * a record the marker stays in place — it is the lock that prevents a second
+   * submission of a document that already exists — and `delivered` tells the
+   * caller to stop retrying.
+   */
+  async reconcileSubmission(
+    signedXml: string,
+  ): Promise<Result<ReconciliationResult, DgiiError>> {
+    const rnc =
+      extractElementText(signedXml, 'RNCEmisor') ??
+      extractElementText(signedXml, 'RncEmisor');
+    const encf =
+      extractElementText(signedXml, 'eNCF') ??
+      extractElementText(signedXml, 'SecuenciaeNCFDesde');
+    if (rnc === undefined || encf === undefined) {
+      return err(
+        new DgiiError('The document has no emitter RNC or e-NCF to reconcile', {
+          code: 'VALIDATION',
+        }),
+      );
+    }
+
+    const inquiry = await this.inquiryStatus(rnc, encf);
+    if (inquiry.isErr()) {
+      return err(inquiry.error);
+    }
+
+    const delivered = inquiry.value.estado !== 'No encontrado';
+    const cleared = !delivered;
+    if (cleared) {
+      await this.idempotency.delete(this.buildIdempotencyKey(signedXml));
+    }
+    return ok({
+      inquiry: inquiry.value,
+      delivered,
+      canReuseSequence: canReuseSequence(inquiry.value),
+      cleared,
     });
   }
 

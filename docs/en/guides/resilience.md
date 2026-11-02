@@ -83,3 +83,49 @@ grow without bound. Both are configurable:
 
 It is still process-local: use Redis or Postgres when more than one instance
 can submit the same document.
+
+## Reconciling a pending submission
+
+A submission writes a **pending** marker before transmitting. If the process
+dies mid-flight, the marker stays and the next attempt with the same document
+returns `IDEMPOTENCY` instead of re-sending. That is the safe default: a
+retried send must never double-issue a fiscal document.
+
+`reconcileSubmission` / `reconcile_submission` resolves that state by asking
+DGII what it knows about the e-NCF:
+
+=== "TypeScript"
+
+    ```ts
+    const outcome = await ecf.reconcileSubmission(signedXml);
+    if (outcome.isOk()) {
+      if (outcome.value.delivered) {
+        // DGII already has the document — do not retry.
+      } else if (outcome.value.cleared) {
+        // DGII has no record; the marker was cleared and a retry is safe.
+      }
+    }
+    ```
+
+=== "Python"
+
+    ```python
+    outcome = ecf.reconcile_submission(signed_xml)
+    if outcome.is_ok():
+        result = outcome.unwrap()
+        if result.delivered:
+            ...  # DGII already has it — do not retry
+        elif result.cleared:
+            ...  # no record; retry is safe
+    ```
+
+The marker is cleared **only** when DGII reports `No encontrado`. When DGII has
+a record the marker stays in place — it is the lock that prevents a second
+submission — and `delivered` tells you to stop.
+
+`canReuseSequence` / `can_reuse_sequence` answers the follow-up question for a
+rejection: whether the e-NCF may be used again. DGII sets
+`secuenciaUtilizada: false` for a rejection that leaves the sequence reusable
+(invalid certificate or signature, invalid XML, non-delegated signer,
+unauthorized or expired e-NCF, non-electronic issuer, unknown or inactive RNC).
+An absent flag is treated as **not** reusable.

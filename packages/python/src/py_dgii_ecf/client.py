@@ -32,6 +32,11 @@ from .http import (
     InMemoryIdempotencyStore,
 )
 from .reception import check_b2b_applicability, resolve_reception_route
+from .reconciliation import (
+    PENDING_SUBMISSION_MESSAGE,
+    ReconciliationResult,
+    can_reuse_sequence,
+)
 from .resilience import ResilienceOptions
 from .result import DgiiResult, Err, Ok
 from .signing import Signature
@@ -270,8 +275,7 @@ class ECF:
             if _is_pending(cached):
                 return Err(
                     DgiiError(
-                        "A submission with this key is already pending; "
-                        "reconcile via a status lookup before retrying",
+                        PENDING_SUBMISSION_MESSAGE,
                         code=DgiiErrorCode.IDEMPOTENCY,
                     )
                 )
@@ -455,6 +459,47 @@ class ECF:
                     "codigoSeguridad": codigo_seguridad,
                 },
             ),
+        )
+
+    def reconcile_submission(self, signed_xml: str) -> DgiiResult[ReconciliationResult]:
+        """Resolve what happened to a submission whose marker is pending.
+
+        Queries DGII by e-NCF. When DGII has no record of the document the
+        marker is cleared, because re-submitting cannot double-issue. When DGII
+        does have a record the marker stays in place — it is the lock that
+        prevents a second submission of a document that already exists — and
+        ``delivered`` tells the caller to stop retrying.
+        """
+        rnc = extract_element_text(signed_xml, "RNCEmisor") or extract_element_text(
+            signed_xml, "RncEmisor"
+        )
+        encf = extract_element_text(signed_xml, "eNCF") or extract_element_text(
+            signed_xml, "SecuenciaeNCFDesde"
+        )
+        if rnc is None or encf is None:
+            return Err(
+                DgiiError(
+                    "The document has no emitter RNC or e-NCF to reconcile",
+                    code=DgiiErrorCode.VALIDATION,
+                )
+            )
+
+        inquiry = self.inquiry_status(rnc, encf)
+        if inquiry.is_err():
+            return Err(inquiry.unwrap_err())
+
+        value = inquiry.unwrap()
+        delivered = value.estado != "No encontrado"
+        cleared = not delivered
+        if cleared:
+            self._idempotency.delete(self._build_idempotency_key(signed_xml))
+        return Ok(
+            ReconciliationResult(
+                inquiry=value,
+                delivered=delivered,
+                can_reuse_sequence=can_reuse_sequence(value),
+                cleared=cleared,
+            )
         )
 
     def track_statuses(

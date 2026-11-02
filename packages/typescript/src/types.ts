@@ -47,6 +47,8 @@ export type InquiryStatus =
 export interface InquiryStatusResponse {
   codigo: InquiryStatusCode;
   estado: InquiryStatus;
+  /** `true` when the e-NCF sequence is already consumed. */
+  secuenciaUtilizada?: boolean;
   rncEmisor?: string;
   ncfElectronico?: string;
   montoTotal?: number;
