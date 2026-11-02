@@ -49,6 +49,16 @@ jobs:
       - name: Test
         run: bun run test
 
+      # Independent XMLDSig gate: sign documents with the SDK and verify the
+      # emitted signatures with libxmlsec1 — the same library DGII/.NET uses.
+      # A self-consistent unit test would agree with a broken canonicalization;
+      # this one will not.
+      - name: Install libxmlsec1
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xmlsec1
+
+      - name: Verify signature with libxmlsec1
+        run: bun run scripts/verify-signing.ts
+
       - name: Build
         run: bun run build
 

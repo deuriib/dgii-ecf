@@ -81,6 +81,13 @@ description = "Run the Python (pytest) test suite"
 dir = "packages/python"
 run = "uv run pytest"
 
+# Requires the `xmlsec1` binary — this is the independent verification gate,
+# not part of `mise run test` so the unit suite stays dependency-free.
+[tasks.verify-signing-typescript]
+description = "Verify TypeScript SDK signatures with libxmlsec1"
+dir = "packages/typescript"
+run = "bun run scripts/verify-signing.ts"
+
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
