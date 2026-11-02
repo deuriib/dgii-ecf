@@ -1,5 +1,11 @@
 # pre-commit hooks for the dgii-ecf monorepo.
-# Install with: `pre-commit install` (see CONTRIBUTING.md).
+# Install with `mise run hooks-install`; run everything with `mise run hooks`.
+# See CONTRIBUTING.md §Git hooks.
+
+minimum_pre_commit_version: "4.0.0"
+
+default_language_version:
+  python: python3.12
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -14,24 +20,79 @@ repos:
       - id: check-yaml
       - id: detect-private-key
       - id: end-of-file-fixer
+        # Signed XML fixtures are byte-sensitive; see .prettierignore.
+        exclude: ^examples/fixtures/
       - id: mixed-line-ending
         args: [--fix=lf]
+        exclude: ^examples/fixtures/
       - id: no-commit-to-branch
         args: [--branch, main]
       - id: trailing-whitespace
+        exclude: ^examples/fixtures/
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.10
+  # Everything below runs the repository's own pinned toolchain rather than a
+  # copy vendored by a hook repository. Two of these were already diverging:
+  # `mirrors-prettier` was pinned to a git tag that does not exist (the npm
+  # version had been copied into a `rev:` field), and `ruff-pre-commit@v0.9.10`
+  # still emitted UP038, which the repo's ruff 0.17.3 no longer has — so the
+  # hook failed on every commit while CI passed. Running the binaries from
+  # `uv`/`node_modules` removes that class of mistake and keeps the hooks
+  # byte-identical to `bun run lint` and `uv run ruff/mypy`.
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix]
-        files: ^packages/python/
-      - id: ruff-format
+        name: ruff (fix, whole package)
+        language: system
+        # --frozen: never let a hook rewrite uv.lock as a side effect.
+        entry: bash -c 'cd packages/python && uv run --frozen ruff check --fix .'
+        pass_filenames: false
         files: ^packages/python/
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.5.3
-    hooks:
+      - id: ruff-format
+        name: ruff format (whole package)
+        language: system
+        entry: bash -c 'cd packages/python && uv run --frozen ruff format .'
+        pass_filenames: false
+        files: ^packages/python/
+
       - id: prettier
-        types_or: [javascript, ts, json, yaml, markdown]
-        exclude: ^packages/python/
+        name: prettier (packages/typescript)
+        language: system
+        entry: packages/typescript/node_modules/.bin/prettier --check
+        files: ^packages/typescript/
+        types_or: [javascript, jsx, ts, tsx, json, yaml, markdown]
+        exclude: ^packages/typescript/(dist|coverage)/
+
+      - id: tsc
+        name: tsc --noEmit (whole project)
+        language: system
+        entry: packages/typescript/node_modules/.bin/tsc --noEmit --project packages/typescript/tsconfig.json
+        pass_filenames: false
+        files: ^packages/typescript/.*\.tsx?$
+
+      - id: mypy
+        name: mypy (strict, whole package)
+        language: system
+        entry: bash -c 'cd packages/python && uv run --frozen mypy src'
+        pass_filenames: false
+        files: ^packages/python/.*\.py$
+
+      - id: gitleaks
+        name: gitleaks
+        language: system
+        entry: gitleaks dir . --redact --no-banner
+        pass_filenames: false
+        # Secrets are not tied to a file type, so never skip this one.
+        always_run: true
+
+      - id: certificate-material
+        name: reject certificate and key material
+        language: fail
+        entry: Certificate and private-key material must never be committed. Generate it locally — see CONTRIBUTING.md §Certificates.
+        files: \.(p12|pfx|pem|jks|jceks|keystore|der|p8)$
+
+      - id: conventional-commit
+        name: conventional commit message
+        language: system
+        entry: bash scripts/check_commit_msg.sh
+        stages: [commit-msg]

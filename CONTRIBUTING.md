@@ -47,10 +47,43 @@ mise run ci       # lint + test + build
 
 ## Git hooks (pre-commit)
 
+Hooks are managed with [`pre-commit`](https://pre-commit.com/) and pinned in
+`mise.toml`, so every contributor runs the same versions. After `mise install`:
+
 ```bash
-pre-commit install
-pre-commit run --all-files
+mise run hooks-install   # one-time: installs the pre-commit + commit-msg hooks
+mise run hooks           # run every hook against the whole repository
 ```
+
+`mise run bootstrap` calls `hooks-install` for you.
+
+The hooks run the repository's own pinned toolchain — `ruff`, `mypy`,
+`prettier`, `tsc`, `gitleaks` — rather than versions vendored by a hook
+repository, so they are byte-identical to `bun run lint` and `uv run mypy src`.
+`mypy` and `tsc` typecheck their whole package, so they run once per commit
+instead of once per file.
+
+What is enforced:
+
+| Hook | Scope |
+| --- | --- |
+| `ruff`, `ruff-format` | `packages/python` |
+| `mypy --strict` | `packages/python/src` |
+| `tsc --noEmit` | `packages/typescript` |
+| `prettier --check` | `packages/typescript` |
+| `gitleaks` | every file |
+| `certificate-material` | rejects `*.p12`, `*.pfx`, `*.pem`, `*.jks`, `*.der`, `*.p8` |
+| `conventional-commit` | the commit subject |
+
+The hooks are not a substitute for CI: the `pre-commit` workflow runs
+`mise run hooks` on every pull request, so a commit made with `--no-verify`
+is still verified before merge.
+
+## Certificates
+
+Never commit DGII certificates or private keys — the `certificate-material`
+hook rejects them, and `gitleaks` scans every file. Generate them locally
+instead; `examples/output/` is gitignored for exactly this reason.
 
 ## Commit conventions
 

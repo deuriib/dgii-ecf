@@ -116,9 +116,9 @@
 
 # Managed by release-please. Declared here because the sync workflow runs with
 # `skip-delete: false` and would otherwise remove them on every push.
-- name: "autorelease: pending"
+- name: 'autorelease: pending'
   color: ededed
   description: Release PR opened by release-please, not yet tagged
-- name: "autorelease: tagged"
+- name: 'autorelease: tagged'
   color: ededed
   description: Release tagged by release-please
