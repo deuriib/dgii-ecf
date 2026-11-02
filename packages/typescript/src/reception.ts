@@ -146,3 +146,79 @@ export const resolveReceptionRoute = (
       )
     : ok(GENERAL);
 };
+
+/** Type codes DGII excludes from the direct Emisor↔Receptor flow. */
+const B2B_EXCLUDED_TYPES: readonly EcfTypeCode[] = [
+  '41',
+  '43',
+  '45',
+  '46',
+  '47',
+];
+
+/**
+ * Whether a signed document may be delivered directly to a buyer host.
+ *
+ * DGII excludes E32 below RD$250,000 (only the RFCE summary applies) plus
+ * E41, E43, E45, E46 and E47. E31, E33, E34, E44 and an E32 at or above the
+ * threshold can go peer-to-peer.
+ */
+export const checkB2BApplicability = (
+  signedXml: string,
+): Result<void, DgiiError> => {
+  const root = extractRootElementName(signedXml);
+  if (root === 'RFCE') {
+    return err(
+      validationError(
+        'An RFCE summary cannot be delivered directly to a buyer host',
+      ),
+    );
+  }
+  if (root !== 'ECF') {
+    return err(
+      validationError(
+        `Unsupported document root "${root ?? 'unknown'}"; expected "ECF"`,
+      ),
+    );
+  }
+
+  const tipo = extractElementText(signedXml, 'TipoeCF');
+  if (tipo === undefined) {
+    return err(validationError('TipoeCF is missing from the document'));
+  }
+  if (!isEcfTypeCode(tipo)) {
+    return err(validationError(`Unknown TipoeCF "${tipo}"`));
+  }
+  if (B2B_EXCLUDED_TYPES.includes(tipo)) {
+    return err(
+      validationError(
+        `An e-CF of type ${tipo} cannot be delivered directly to a buyer host`,
+      ),
+    );
+  }
+  if (tipo !== CONSUMPTION_TYPE) {
+    return ok(undefined);
+  }
+
+  const total = extractElementText(signedXml, 'MontoTotal');
+  if (total === undefined) {
+    return err(
+      validationError(
+        'MontoTotal is required to check B2B applicability of an E32',
+      ),
+    );
+  }
+  if (!DECIMAL_PATTERN.test(total)) {
+    return err(
+      validationError(`MontoTotal "${total}" is not a decimal amount`),
+    );
+  }
+  if (compareDecimal(total, CONSUMPTION_SUMMARY_THRESHOLD) < 0) {
+    return err(
+      validationError(
+        'An E32 below RD$250,000 cannot be delivered directly to a buyer host; send the RFCE summary to DGII instead',
+      ),
+    );
+  }
+  return ok(undefined);
+};

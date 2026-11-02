@@ -119,3 +119,63 @@ def resolve_reception_route(signed_xml: str) -> DgiiResult[ReceptionRoute]:
             )
         )
     return Ok(GENERAL_ROUTE)
+
+
+#: Type codes DGII excludes from the direct Emisor↔Receptor flow.
+_B2B_EXCLUDED_TYPES: Final[frozenset[EcfTypeCode]] = frozenset(
+    {"41", "43", "45", "46", "47"}
+)
+
+
+def check_b2b_applicability(signed_xml: str) -> DgiiResult[None]:
+    """Whether a signed document may be delivered directly to a buyer host.
+
+    DGII excludes E32 below RD$250,000 (only the RFCE summary applies) plus
+    E41, E43, E45, E46 and E47. E31, E33, E34, E44 and an E32 at or above the
+    threshold can go peer-to-peer.
+    """
+    root = extract_root_element_name(signed_xml)
+    if root == "RFCE":
+        return Err(
+            _validation_error(
+                "An RFCE summary cannot be delivered directly to a buyer host"
+            )
+        )
+    if root != "ECF":
+        return Err(
+            _validation_error(
+                f'Unsupported document root "{root or "unknown"}"; expected "ECF"'
+            )
+        )
+
+    tipo = extract_element_text(signed_xml, "TipoeCF")
+    if tipo is None:
+        return Err(_validation_error("TipoeCF is missing from the document"))
+    if not is_ecf_type_code(tipo):
+        return Err(_validation_error(f'Unknown TipoeCF "{tipo}"'))
+    if tipo in _B2B_EXCLUDED_TYPES:
+        return Err(
+            _validation_error(
+                f"An e-CF of type {tipo} cannot be delivered directly to a buyer host"
+            )
+        )
+    if tipo != _CONSUMPTION_TYPE:
+        return Ok(None)
+
+    total = extract_element_text(signed_xml, "MontoTotal")
+    if total is None:
+        return Err(
+            _validation_error(
+                "MontoTotal is required to check B2B applicability of an E32"
+            )
+        )
+    if not _DECIMAL_PATTERN.match(total):
+        return Err(_validation_error(f'MontoTotal "{total}" is not a decimal amount'))
+    if compare_decimal(total, CONSUMPTION_SUMMARY_THRESHOLD) < 0:
+        return Err(
+            _validation_error(
+                "An E32 below RD$250,000 cannot be delivered directly to a "
+                "buyer host; send the RFCE summary to DGII instead"
+            )
+        )
+    return Ok(None)

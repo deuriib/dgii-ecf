@@ -76,6 +76,25 @@ if (result.isOk()) {
 | `sendCommercialApproval(xml, fileName)`             | `Result<CommercialApprovalResponse>`              |
 | `voidENCF(xml, fileName)`                           | `Result<VoidNCFResponse>`                         |
 
+### B2B applicability
+
+A direct Emisor↔Receptor delivery (`buyerHost` / `buyer_host`) is not allowed for
+every document type. DGII excludes **E32 below RD$250,000** (only the RFCE
+summary applies) plus **E41, E43, E45, E46 and E47**. E31, E33, E34, E44 and an
+E32 at or above the threshold can be delivered peer-to-peer.
+
+The client checks this before issuing the request and fails with `VALIDATION`
+without calling the buyer host. Disable the check with `enforceB2BRules: false`
+(TypeScript) or `enforce_b2b_rules=False` (Python) when you need to reproduce a
+certification scenario:
+
+```ts
+const result = await ecf.sendElectronicDocument(xml, 'f.xml', buyerHost);
+if (result.isErr() && result.error.code === 'VALIDATION') {
+  // The type or amount is not eligible for direct delivery.
+}
+```
+
 ### Production-only endpoints
 
 `getSummaryInvoiceInquiry` (RFCE inquiry, `fc.dgii.gov.do/consultarfce`) is only

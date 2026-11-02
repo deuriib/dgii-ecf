@@ -31,7 +31,7 @@ from .http import (
     IdempotencyStore,
     InMemoryIdempotencyStore,
 )
-from .reception import resolve_reception_route
+from .reception import check_b2b_applicability, resolve_reception_route
 from .resilience import ResilienceOptions
 from .result import DgiiResult, Err, Ok
 from .signing import Signature
@@ -153,6 +153,7 @@ class ECF:
         token_refresh_skew_s: float = 5 * 60,
         now: Callable[[], float] = time.time,
         status_api_key: str | None = None,
+        enforce_b2b_rules: bool = True,
     ) -> None:
         self._credentials = credentials
         self._environment = environment
@@ -160,6 +161,7 @@ class ECF:
             idempotency_store or InMemoryIdempotencyStore()
         )
         self._status_api_key = status_api_key
+        self._enforce_b2b_rules = enforce_b2b_rules
         self._token_refresh_skew_s = token_refresh_skew_s
         self._now = now
         self._token_expires_at: float | None = None
@@ -362,6 +364,10 @@ class ECF:
         buyer_host: str | None = None,
     ) -> DgiiResult[InvoiceResponse]:
         """Submit a signed e-CF (idempotent on RNC + eNCF + document hash)."""
+        if buyer_host is not None and self._enforce_b2b_rules:
+            applicable = check_b2b_applicability(signed_xml)
+            if applicable.is_err():
+                return Err(applicable.unwrap_err())
         url = (
             build_sender_receiver_url(buyer_host, SenderReceiverEndpoint.SEND_INVOICE)
             if buyer_host
