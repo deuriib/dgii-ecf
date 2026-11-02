@@ -7,3 +7,12 @@ packages/python/src/dgii_ecf/__pycache__/
 *.lock
 *.min.js
 CHANGELOG.md
+
+# MkDocs build output.
+site/
+
+# Signed XML fixtures are byte-sensitive: XMLDSig canonicalization digests the
+# document, so any reformatting invalidates the fixture. Never let a formatter
+# touch them — the `examples/fixtures/` directory is also excluded from the
+# whitespace hooks in .pre-commit-config.yaml for the same reason.
+examples/fixtures/

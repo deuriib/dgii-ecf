@@ -1,0 +1,49 @@
+name: pre-commit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: pre-commit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hooks:
+    name: pre-commit (all files)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: jdx/mise-action@v5
+        with:
+          install: true
+
+      # Restored before the hooks run: a warm hook cache is the difference
+      # between a ~10s job and one that spends a minute building ruff.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: pre-commit-
+
+      # The prettier and tsc hooks run the package's own binaries, and mypy
+      # resolves its types from the package virtualenv.
+      - name: Install dependencies
+        run: |
+          (cd packages/typescript && bun install --frozen-lockfile)
+          (cd packages/python && uv sync --frozen)
+
+      - name: Run pre-commit
+        # `no-commit-to-branch` guards a local commit against landing on a
+        # protected branch. In CI the checkout is already `main`, so the hook
+        # can only ever fail — and on `main` it is branch protection, not a
+        # local hook, that is the actual gate.
+        env:
+          SKIP: no-commit-to-branch
+        run: mise run hooks
