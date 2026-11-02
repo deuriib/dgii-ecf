@@ -15,7 +15,7 @@ sharing one behaviour contract and implemented in two languages:
 | Package               | Language / runtime                     | Registry | Dist name           |
 | --------------------- | -------------------------------------- | -------- | ------------------- |
 | `packages/typescript` | TypeScript, Bun-first, Node-compatible | npm      | `@deuriib/dgii-ecf` |
-| `packages/python`     | Python ≥3.11, uv                       | PyPI     | `dgii-ecf`          |
+| `packages/python`     | Python ≥3.11, uv                       | PyPI     | `py-dgii-ecf`       |
 
 Both SDKs: authenticate against DGII web services, sign documents with **XMLDSig (inclusive C14N
 
@@ -61,7 +61,7 @@ Both SDKs: authenticate against DGII web services, sign documents with **XMLDSig
 | `utils.ts`       | security code, QR URLs, date/time, RFCE, XML-body helpers    |
 | `client.ts`      | `ECFClient` (auth + all endpoints)                           |
 
-### Python (`packages/python/src/dgii_ecf/`)
+### Python (`packages/python/src/py_dgii_ecf/`)
 
 Mirrors the TS map 1:1, with `cli.py` (Python-only) replacing `index.ts` as the "extra" module;
 `__init__.py` is the package surface (analogous to `index.ts`).
@@ -80,7 +80,7 @@ Mirrors the TS map 1:1, with `cli.py` (Python-only) replacing `index.ts` as the 
 | `transformer.py` | `Transformer` (internal `dict_to_xml`/`xml_to_dict`)         |
 | `utils.py`       | security code, QR URLs, date/time, RFCE, XML-body helpers    |
 | `client.py`      | `ECFClient` (auth + all endpoints)                           |
-| `cli.py`         | typer `app` → `dgii-ecf` entry point                         |
+| `cli.py`         | typer `app` → `py-dgii-ecf` entry point                      |
 
 ---
 
@@ -417,7 +417,7 @@ Re-exports every §4.4 symbol: `ECFClient`, `P12Reader`, `Signature`, `Transform
 
 ---
 
-## 5. Module contracts — Python (`dgii_ecf`)
+## 5. Module contracts — Python (`py_dgii_ecf`)
 
 Mirror of §4 with snake_case naming, `DgiiResult[T] = Result[T, DgiiError]`, and synchronous
 `httpx2` (no `async`). Only deviations from the TS contract are shown.
@@ -608,7 +608,7 @@ Endpoint wiring identical to §4.11. `get_summary_invoice_inquiry` raises/return
 
 ```python
 import typer
-app = typer.Typer(name="dgii-ecf", no_args_is_help=True)
+app = typer.Typer(name="py-dgii-ecf", no_args_is_help=True)
 
 @app.command()
 def sign(xml: str, key: str, cert: str, root: str = "ECF") -> None: ...
@@ -618,7 +618,7 @@ def authenticate(env: str, p12: str, password: str) -> None: ...
 def status(track_id: str) -> None: ...
 ```
 
-Entry point (pyproject `[project.scripts] dgii-ecf = "dgii_ecf.cli:app"`). Minimal surface — see §12.3.
+Entry point (pyproject `[project.scripts] py-dgii-ecf = "py_dgii_ecf.cli:app"`). Minimal surface — see §12.3.
 
 ### 5.13 `__init__.py`
 
@@ -834,7 +834,7 @@ Money round-trips as `string` (TS) / `Decimal`→`str` (Python); no numeric coer
    **Pin `httpx2>=2.13,<3`.** The SDK uses the **synchronous** `httpx2.Client`.
 2. **Python transformer — no extra dependency.** Implement a small internal `dict_to_xml`/`xml_to_dict`
    over `lxml` that mirrors xml-js compact semantics (§11). No `xmltodict`/`dicttoxml` added.
-3. **CLI surface (minimal, concrete).** typer `app`, entry point `dgii-ecf`, `no_args_is_help=True`.
+3. **CLI surface (minimal, concrete).** typer `app`, entry point `py-dgii-ecf`, `no_args_is_help=True`.
    Commands: `sign` (xml/key/cert/root), `authenticate` (env/p12/password), `status <track_id>`.
    Plus `--help` on every command. No invented features beyond these three.
 4. **Endpoint mapping confirmed:** `statusTrackId` → `TRACK_RESULT_STATUS`
@@ -865,7 +865,7 @@ Money round-trips as `string` (TS) / `Decimal`→`str` (Python); no numeric coer
 | Idempotency   | store `get`/`set`/`delete`; key derivation matches spec; persist-before-transmit ordering                                                                            | same                                                            |
 | Client        | mocked transport (undici/fetch mock; `httpx2.MockTransport`) asserts endpoint paths, auth header, multipart part name `xml`, directory single→array, PROD-only guard | same                                                            |
 | Utils         | every A.7 helper incl. E43/E47 QR omission + RFCE wrap                                                                                                               | same                                                            |
-| CLI           | n/a                                                                                                                                                                  | `dgii-ecf --help` renders; subcommands parse                    |
+| CLI           | n/a                                                                                                                                                                  | `py-dgii-ecf --help` renders; subcommands parse                 |
 
 ### Integration (skipped by default)
 

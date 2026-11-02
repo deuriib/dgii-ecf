@@ -46,7 +46,7 @@ Both SDKs share the same design contract:
 ```text
 packages/
 ├── typescript/   # @deuriib/dgii-ecf — bun, tsup, vitest, native fetch
-└── python/       # dgii-ecf — uv, ruff, mypy, typer, httpx2
+└── python/       # py-dgii-ecf — uv, ruff, mypy, typer, httpx2
 ```
 
 ## 🚀 Quick start
