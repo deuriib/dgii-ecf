@@ -28,6 +28,15 @@ describe('getCodeSixDigitfromSignature', () => {
     if (result.isOk()) expect(result.value).toBe('abcdef');
   });
 
+  it('tolerates a namespace prefix and attributes (ds:SignatureValue)', () => {
+    const xml =
+      '<ECF><ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#">' +
+      '<ds:SignatureValue Id="sig-1">abcdef123456</ds:SignatureValue></ds:Signature></ECF>';
+    const result = getCodeSixDigitfromSignature(xml);
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value).toBe('abcdef');
+  });
+
   it('fails when SignatureValue is missing', () => {
     expect(getCodeSixDigitfromSignature('<ECF></ECF>').isErr()).toBe(true);
   });

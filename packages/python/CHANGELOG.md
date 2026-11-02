@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/deuriib/dgii-ecf/compare/python-v0.3.0...python-v0.3.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* make idempotency key extraction robust to namespaces/attributes ([32898e0](https://github.com/deuriib/dgii-ecf/commit/32898e06b8713dcd80f87089d02cdbd301e402a8))
+* **python:** extract idempotency elements tolerantly ([bbbe463](https://github.com/deuriib/dgii-ecf/commit/bbbe463d710e76821d1475bc2f8ceccff004572f)), closes [#34](https://github.com/deuriib/dgii-ecf/issues/34)
+
 ## [0.3.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.2.3...python-v0.3.0) (2026-11-02)
 
 
