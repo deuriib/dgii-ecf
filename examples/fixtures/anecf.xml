@@ -1,17 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Illustrative ANECF (range voiding) document. Replace the fields with a
-  DGII-schema-compliant payload before submitting to a real environment.
+  Illustrative ANECF (range voiding) document.
+
+  Structure follows `ANECF v.1.0`: `Encabezado` carries the issuer, the total
+  count and the timestamp; `DetalleAnulacion` holds 1..10 `Anulacion` entries,
+  each with `NoLinea`, `TipoeCF`, a `TablaRangoSecuenciasAnuladaseNCF` of
+  1..10000 `Secuencias` ranges, and its own `CantidadeNCFAnulados`.
+
+  The document is unsigned on purpose — sign it with the SDK before sending.
 -->
 <ANECF>
   <Encabezado>
     <Version>1.0</Version>
-    <RNCEmisor>130862346</RNCEmisor>
-    <FechaEmision>01-01-2026</FechaEmision>
+    <RncEmisor>130862346</RncEmisor>
+    <CantidadeNCFAnulados>10</CantidadeNCFAnulados>
+    <FechaHoraAnulacioneNCF>01-01-2026 10:00:00</FechaHoraAnulacioneNCF>
   </Encabezado>
   <DetalleAnulacion>
-    <TipoeCF>31</TipoeCF>
-    <RangoNCF>E310000000010</RangoNCF>
-    <CantidadNCF>10</CantidadNCF>
+    <Anulacion>
+      <NoLinea>1</NoLinea>
+      <TipoeCF>31</TipoeCF>
+      <TablaRangoSecuenciasAnuladaseNCF>
+        <Secuencias>
+          <SecuenciaeNCFDesde>E310000000010</SecuenciaeNCFDesde>
+          <SecuenciaeNCFHasta>E310000000019</SecuenciaeNCFHasta>
+        </Secuencias>
+      </TablaRangoSecuenciasAnuladaseNCF>
+      <CantidadeNCFAnulados>10</CantidadeNCFAnulados>
+    </Anulacion>
   </DetalleAnulacion>
 </ANECF>
