@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 
 import httpx2
 
@@ -147,8 +148,14 @@ class ECF:
 
     def _build_idempotency_key(self, signed_xml: str) -> str:
         rnc = extract_element_text(signed_xml, "RNCEmisor") or "unknown-rnc"
-        encf = extract_element_text(signed_xml, "eNCF") or "unknown-encf"
-        return f"{rnc}:{encf}:{_sha256_hex(signed_xml)}"
+        # ACECF carries ``eNCF``; ANECF uses ``RangoNCF``. Fall back to the hash
+        # when neither is present, so the key stays unique per document.
+        ncf = (
+            extract_element_text(signed_xml, "eNCF")
+            or extract_element_text(signed_xml, "RangoNCF")
+            or "unknown-ncf"
+        )
+        return f"{rnc}:{ncf}:{_sha256_hex(signed_xml)}"
 
     def _cache_submission(
         self, key: str, model: type[_ModelT], data: JsonValue
@@ -173,6 +180,37 @@ class ECF:
             return Err(parsed.unwrap_err())
         self._idempotency.set(key, data)
         return parsed
+
+    def _submit_idempotent(
+        self,
+        key: str,
+        model: type[_ModelT],
+        send: Callable[[], DgiiResult[JsonValue]],
+    ) -> DgiiResult[_ModelT]:
+        """Run a submission through the persist-before-transmit flow.
+
+        The pending marker is written first so an interrupted send can be
+        reconciled instead of re-issued; a successful response replaces it and
+        a failure clears it so the caller can retry.
+        """
+        cached = self._idempotency.get(key)
+        if cached is not None:
+            if _is_pending(cached):
+                return Err(
+                    DgiiError(
+                        "A submission with this key is already pending; "
+                        "reconcile via a status lookup before retrying",
+                        code=DgiiErrorCode.IDEMPOTENCY,
+                    )
+                )
+            return _parse_one(model, cached)
+
+        self._idempotency.set(key, dict(_PENDING_MARKER))
+        result = send()
+        if result.is_err():
+            self._idempotency.delete(key)
+            return Err(result.unwrap_err())
+        return self._cache_submission(key, model, result.unwrap())
 
     def authenticate(self, buyer_host: str | None = None) -> DgiiResult[AuthToken]:
         """Authenticate against DGII (or a buyer host) and store the token."""
@@ -257,31 +295,16 @@ class ECF:
         buyer_host: str | None = None,
     ) -> DgiiResult[InvoiceResponse]:
         """Submit a signed e-CF (idempotent on RNC + eNCF + document hash)."""
-        key = self._build_idempotency_key(signed_xml)
-        cached = self._idempotency.get(key)
-        if cached is not None:
-            if _is_pending(cached):
-                return Err(
-                    DgiiError(
-                        "A submission with this key is already pending; "
-                        "reconcile via a status lookup before retrying",
-                        code=DgiiErrorCode.IDEMPOTENCY,
-                    )
-                )
-            return _parse_one(InvoiceResponse, cached)
-
         url = (
             build_sender_receiver_url(buyer_host, SenderReceiverEndpoint.SEND_INVOICE)
             if buyer_host
             else build_url(self._environment, Endpoint.SEND_INVOICE)
         )
-        # Persist-before-transmit: mark as pending before the network call.
-        self._idempotency.set(key, dict(_PENDING_MARKER))
-        result = self._http.post_multipart(url, file_name, signed_xml)
-        if result.is_err():
-            self._idempotency.delete(key)
-            return Err(result.unwrap_err())
-        return self._cache_submission(key, InvoiceResponse, result.unwrap())
+        return self._submit_idempotent(
+            self._build_idempotency_key(signed_xml),
+            InvoiceResponse,
+            lambda: self._http.post_multipart(url, file_name, signed_xml),
+        )
 
     def send_summary(
         self,
@@ -289,27 +312,12 @@ class ECF:
         file_name: str,
     ) -> DgiiResult[InvoiceSummaryResponse]:
         """Submit a signed summary invoice (RFCE), idempotently."""
-        key = self._build_idempotency_key(signed_xml)
-        cached = self._idempotency.get(key)
-        if cached is not None:
-            if _is_pending(cached):
-                return Err(
-                    DgiiError(
-                        "A submission with this key is already pending; "
-                        "reconcile via a status lookup before retrying",
-                        code=DgiiErrorCode.IDEMPOTENCY,
-                    )
-                )
-            return _parse_one(InvoiceSummaryResponse, cached)
-
         url = build_url(self._environment, Endpoint.SEND_SUMMARY, BaseUrl.CF.value)
-        # Persist-before-transmit (see send_electronic_document).
-        self._idempotency.set(key, dict(_PENDING_MARKER))
-        result = self._http.post_multipart(url, file_name, signed_xml)
-        if result.is_err():
-            self._idempotency.delete(key)
-            return Err(result.unwrap_err())
-        return self._cache_submission(key, InvoiceSummaryResponse, result.unwrap())
+        return self._submit_idempotent(
+            self._build_idempotency_key(signed_xml),
+            InvoiceSummaryResponse,
+            lambda: self._http.post_multipart(url, file_name, signed_xml),
+        )
 
     def status_track_id(self, track_id: str) -> DgiiResult[TrackingStatusResponse]:
         """Query the status of a submission by track id."""
@@ -390,16 +398,19 @@ class ECF:
     def send_commercial_approval(
         self, signed_xml: str, file_name: str
     ) -> DgiiResult[CommercialApprovalResponse]:
-        """Submit a signed commercial approval (ACECF)."""
+        """Submit a signed commercial approval (ACECF), idempotently."""
         url = build_url(self._environment, Endpoint.COMMERCIAL_APPROVAL)
-        return _parse_response(
+        return self._submit_idempotent(
+            self._build_idempotency_key(signed_xml),
             CommercialApprovalResponse,
-            self._http.post_multipart(url, file_name, signed_xml),
+            lambda: self._http.post_multipart(url, file_name, signed_xml),
         )
 
     def void_encf(self, signed_xml: str, file_name: str) -> DgiiResult[VoidNCFResponse]:
-        """Submit a signed range-voiding request (ANECF)."""
+        """Submit a signed range-voiding request (ANECF), idempotently."""
         url = build_url(self._environment, Endpoint.VOID)
-        return _parse_response(
-            VoidNCFResponse, self._http.post_multipart(url, file_name, signed_xml)
+        return self._submit_idempotent(
+            self._build_idempotency_key(signed_xml),
+            VoidNCFResponse,
+            lambda: self._http.post_multipart(url, file_name, signed_xml),
         )

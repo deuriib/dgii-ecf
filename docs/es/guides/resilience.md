@@ -38,7 +38,9 @@ Un e-CF rechazado (por ejemplo `400`, `401`) **nunca** se reenvía a ciegas.
 ## Idempotencia
 
 Los envíos se identifican por `RNC + eNCF + SHA-256(signed XML)`. Una llamada
-repetida devuelve la respuesta en caché en lugar de emitir dos veces.
+repetida devuelve la respuesta en caché en lugar de emitir dos veces. El mismo
+flujo cubre e-CF, resumen (RFCE), aprobación comercial (ACECF) y anulación de
+rango (ANECF); la anulación usa `RangoNCF` en lugar de `eNCF`.
 
 Usa un almacén persistente (Redis/Postgres) en producción:
 

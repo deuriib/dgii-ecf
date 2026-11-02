@@ -274,4 +274,153 @@ describe('ECF client', () => {
     if (result.isErr()) return;
     expect(result.value.encf).toBe('E320000000001');
   });
+
+  describe('commercial approval and void idempotency', () => {
+    const approvalXml = (rnc: string, encf: string): string =>
+      `<ACECF><DetalleAprobacionComercial><RNCEmisor>${rnc}</RNCEmisor>` +
+      `<eNCF>${encf}</eNCF></DetalleAprobacionComercial></ACECF>`;
+
+    const voidXml = (rnc: string, range: string): string =>
+      `<ANECF><Encabezado><RNCEmisor>${rnc}</RNCEmisor></Encabezado>` +
+      `<DetalleAnulacion><RangoNCF>${range}</RangoNCF></DetalleAnulacion></ANECF>`;
+
+    const approvalPayload = {
+      codigo: '01',
+      estado: 'Aprobación Comercial Aprobada.',
+      mensaje: [],
+    };
+    const voidPayload = {
+      rnc: '130862346',
+      codigo: '0',
+      nombre: 'Accepted',
+      mensajes: [],
+    };
+
+    it('is idempotent for repeated commercial approvals', async () => {
+      let calls = 0;
+      const fetchImpl = mockFetch(async () => {
+        calls += 1;
+        return jsonResponse(approvalPayload);
+      });
+      const ecf = new ECF(credentials, Environment.Dev, {
+        token: 'tok',
+        fetchImpl,
+      });
+      const xml = approvalXml('130862346', 'E310000000001');
+
+      const first = await ecf.sendCommercialApproval(xml, 'acecf.xml');
+      const second = await ecf.sendCommercialApproval(xml, 'acecf.xml');
+
+      expect(first.isOk()).toBe(true);
+      expect(second.isOk()).toBe(true);
+      expect(calls).toBe(1);
+    });
+
+    it('is idempotent for repeated void requests', async () => {
+      let calls = 0;
+      const fetchImpl = mockFetch(async () => {
+        calls += 1;
+        return jsonResponse(voidPayload);
+      });
+      const ecf = new ECF(credentials, Environment.Dev, {
+        token: 'tok',
+        fetchImpl,
+      });
+      const xml = voidXml('130862346', 'E310000000010');
+
+      const first = await ecf.voidENCF(xml, 'anecf.xml');
+      const second = await ecf.voidENCF(xml, 'anecf.xml');
+
+      expect(first.isOk()).toBe(true);
+      expect(second.isOk()).toBe(true);
+      expect(calls).toBe(1);
+    });
+
+    it('keys the void flow on RangoNCF when eNCF is absent', async () => {
+      const store = new InMemoryIdempotencyStore();
+      const xml = voidXml('130862346', 'E310000000010');
+      const digest = createHash('sha256').update(xml, 'utf8').digest('hex');
+      const fetchImpl = mockFetch(async () => jsonResponse(voidPayload));
+      const ecf = new ECF(credentials, Environment.Dev, {
+        token: 'tok',
+        fetchImpl,
+        idempotencyStore: store,
+      });
+
+      const result = await ecf.voidENCF(xml, 'anecf.xml');
+
+      expect(result.isOk()).toBe(true);
+      expect(await store.get(`130862346:E310000000010:${digest}`)).toEqual(
+        voidPayload,
+      );
+    });
+
+    it('refuses a commercial approval that is already pending', async () => {
+      const store = new InMemoryIdempotencyStore();
+      const xml = approvalXml('130862346', 'E310000000002');
+      const key = `130862346:E310000000002:${createHash('sha256').update(xml, 'utf8').digest('hex')}`;
+      await store.set(key, { pending: true });
+      let calls = 0;
+      const fetchImpl = mockFetch(async () => {
+        calls += 1;
+        return jsonResponse(approvalPayload);
+      });
+      const ecf = new ECF(credentials, Environment.Dev, {
+        token: 'tok',
+        fetchImpl,
+        idempotencyStore: store,
+      });
+
+      const result = await ecf.sendCommercialApproval(xml, 'acecf.xml');
+
+      expect(result.isErr()).toBe(true);
+      if (result.isOk()) return;
+      expect(result.error.code).toBe('IDEMPOTENCY');
+      expect(calls).toBe(0);
+    });
+
+    it('clears the pending marker when a void fails', async () => {
+      const store = new InMemoryIdempotencyStore();
+      const xml = voidXml('130862346', 'E310000000011');
+      const key = `130862346:E310000000011:${createHash('sha256').update(xml, 'utf8').digest('hex')}`;
+      let calls = 0;
+      const fetchImpl = mockFetch(async () => {
+        calls += 1;
+        return jsonResponse({ mensajes: [{ valor: 'bad', codigo: 1 }] }, 400);
+      });
+      const ecf = new ECF(credentials, Environment.Dev, {
+        token: 'tok',
+        fetchImpl,
+        idempotencyStore: store,
+      });
+
+      const first = await ecf.voidENCF(xml, 'anecf.xml');
+
+      expect(first.isErr()).toBe(true);
+      expect(await store.get(key)).toBeUndefined();
+    });
+
+    it('separates documents that share RNC and eNCF but differ in content', async () => {
+      let calls = 0;
+      const fetchImpl = mockFetch(async () => {
+        calls += 1;
+        return jsonResponse(approvalPayload);
+      });
+      const ecf = new ECF(credentials, Environment.Dev, {
+        token: 'tok',
+        fetchImpl,
+      });
+
+      await ecf.sendCommercialApproval(
+        approvalXml('130862346', 'E310000000003'),
+        'a.xml',
+      );
+      await ecf.sendCommercialApproval(
+        `${approvalXml('130862346', 'E310000000003')}\n<!-- revised -->`,
+        'b.xml',
+      );
+
+      expect(calls).toBe(2);
+    });
+  });
 });
