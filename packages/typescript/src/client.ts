@@ -493,6 +493,27 @@ export class ECF {
     return ok(Array.isArray(data) ? data : [data]);
   }
 
+  /** General directory listing — every receiver that publishes service URLs. */
+  async getDirectoryListing(): Promise<
+    Result<ServiceDirectoryResponse[], DgiiError>
+  > {
+    const url = buildUrl(this.environment, Endpoint.DirectoryList);
+    const result = await this.http.get<
+      ServiceDirectoryResponse[] | ServiceDirectoryResponse
+    >(url, undefined, {
+      absoluteUrl: true,
+      resource: Endpoint.DirectoryList,
+    });
+    if (result.isErr()) {
+      return err(result.error);
+    }
+    const data = result.value;
+    if (data === undefined || data === null) {
+      return ok([]);
+    }
+    return ok(Array.isArray(data) ? data : [data]);
+  }
+
   /** RFCE inquiry — DGII production only. */
   async getSummaryInvoiceInquiry(
     rnc: string,

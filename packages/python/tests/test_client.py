@@ -705,3 +705,56 @@ def test_parse_failure_keeps_the_idempotency_key() -> None:
     second = ecf.send_summary(RFCE_XML, "f.xml")
     assert second.is_err()
     assert calls["n"] == 1
+
+
+def test_directory_listing_returns_every_receiver() -> None:
+    entry = {
+        "nombre": "RECEPTOR SRL",
+        "rnc": "131880657",
+        "urlRecepcion": "https://receptor.example/fe/recepcion",
+        "urlAceptacion": "https://receptor.example/fe/aprobacion",
+        "urlOpcional": "https://receptor.example/fe/autenticacion",
+    }
+    captured: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured.append(str(request.url))
+        return httpx2.Response(200, json=[entry, {**entry, "rnc": "101000001"}])
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    result = ecf.get_directory_listing()
+
+    assert result.is_ok()
+    assert len(result.unwrap()) == 2
+    assert result.unwrap()[0].url_recepcion == "https://receptor.example/fe/recepcion"
+    assert "/TesteCF/consultadirectorio/api/consultas/listado" in captured[0]
+
+
+def test_directory_listing_normalizes_a_single_object() -> None:
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            200,
+            json={
+                "nombre": "RECEPTOR SRL",
+                "rnc": "131880657",
+                "urlRecepcion": "https://receptor.example/fe/recepcion",
+            },
+        )
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    result = ecf.get_directory_listing()
+
+    assert result.is_ok()
+    assert len(result.unwrap()) == 1
