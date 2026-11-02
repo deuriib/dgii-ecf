@@ -159,6 +159,27 @@ in **manifest mode** (independent versions per package):
    secrets. The first npm release is published manually to create the package;
    subsequent releases publish from GitHub Actions.
 
+### The Python lockfile is versioned
+
+`packages/python/uv.lock` records the project version in its
+`[[package]] name = "py-dgii-ecf"` entry, so it drifts every time
+release-please bumps `pyproject.toml`. The release PR updates both: the
+`extra-files` entry in `release-please-config.json` rewrites
+`$.package[?(@.name.value=='py-dgii-ecf')].version` in the lock.
+
+That JSONPath carries a `.value` and that is not a typo. release-please's
+TOML updater parses scalars into tagged objects to track byte offsets, so a
+plain `@.name=='py-dgii-ecf'` filter matches nothing and release-please logs
+`No entries modified` while still opening a green-looking PR. The `.value`
+reaches the actual string. If the lock ever stops being updated, CI fails on
+the release PR — the drift is never silent.
+
+- Do not hand-edit that line — if you changed dependencies, run `uv lock` and
+  commit the result.
+- CI runs `uv lock --check`, which fails when the lock does not match
+  `pyproject.toml`. `uv sync --frozen` installs from the lock *without* that
+  validation, so the explicit check is what keeps the two honest.
+
 ## Security
 
 Never commit `.p12`, `.pem`, private keys, tokens, or production credentials.
