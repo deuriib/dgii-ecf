@@ -20,8 +20,14 @@ directory contains runnable examples for both SDKs and DGII sample fixtures.
 | --- | --- | --- |
 | Sign an e-CF | `sign_xml.py` | `sign-xml.ts` |
 | JSON → XML | `transform.py` | `transform.ts` |
+| Utilities (QR, code, cert) | `utilities.py` | `utilities.ts` |
+| Certificate info | `certificate_info.py` | `certificate-info.ts` |
 | Submit an e-CF | `send_invoice.py` | `send-invoice.ts` |
 | Submit a summary (RFCE) | `send_summary.py` | `send-summary.ts` |
+| Status by track id | `status_track_id.py` | `status-track-id.ts` |
+| Inquiry status | `inquiry_status.py` | `inquiry-status.ts` |
+| Track statuses | `track_statuses.py` | `track-statuses.ts` |
+| Summary inquiry (RFCE) | `summary_inquiry.py` | `summary-inquiry.ts` |
 | Customer directory | `customer_directory.py` | `customer-directory.ts` |
 | Commercial approval | `commercial_approval.py` | `commercial-approval.ts` |
 | Void a range | `void.py` | `void.ts` |
@@ -32,7 +38,7 @@ directory contains runnable examples for both SDKs and DGII sample fixtures.
 cd examples/python
 uv sync
 uv run python generate_cert.py   # ephemeral self-signed .p12
-uv run python transform.py       # JSON -> XML
+uv run python utilities.py       # offline helpers
 uv run python sign_xml.py        # sign + validate certificate
 ```
 
@@ -42,12 +48,12 @@ uv run python sign_xml.py        # sign + validate certificate
 cd examples/typescript
 bun install
 bun run generate-cert
-bun run transform
+bun run utilities
 bun run sign
 ```
 
-The `send_*` / `send*` flows require a real DGII certificate and network access.
-Configure `DGII_P12_PATH`, `DGII_P12_PASSWORD`, `DGII_RNC` and
+The `send_*` / `send*` and query flows require a real DGII certificate and
+network access. Configure `DGII_P12_PATH`, `DGII_P12_PASSWORD`, `DGII_RNC` and
 `DGII_ENVIRONMENT`.
 
 !!! warning
