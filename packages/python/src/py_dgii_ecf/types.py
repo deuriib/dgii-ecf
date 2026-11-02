@@ -94,6 +94,10 @@ def _as_optional_int(value: object, key: str) -> int | None:
     return None if value is None else _as_int(value, key)
 
 
+def _as_optional_bool(value: object, key: str) -> bool | None:
+    return None if value is None else _as_bool(value, key)
+
+
 def _as_float(value: object, key: str) -> float:
     if isinstance(value, bool):
         raise _type_error(key, "a number", value)
@@ -169,29 +173,35 @@ _ModelT = TypeVar("_ModelT", bound=ResponseModel)
 
 @dataclass(frozen=True, slots=True)
 class TrackingStatusResponse:
-    """Result of ``statusTrackId`` (``consultaresultado/api/Consultas/Estado``)."""
+    """Result of ``statusTrackId`` (``consultaresultado/api/Consultas/Estado``).
 
-    track_id: str
+    DGII omits the fiscal fields on a "No encontrado" answer, so everything
+    except ``codigo`` and ``estado`` is optional.
+    """
+
     codigo: int
     estado: str
-    rnc: str
-    encf: str
-    secuencia_utilizada: bool
-    fecha_recepcion: str
+    track_id: str | None = None
+    rnc: str | None = None
+    encf: str | None = None
+    secuencia_utilizada: bool | None = None
+    fecha_recepcion: str | None = None
     mensajes: tuple[Mensaje, ...] = ()
 
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> TrackingStatusResponse:
         return cls(
-            track_id=_as_str(data.get("trackId"), "trackId"),
             codigo=_as_int(data.get("codigo"), "codigo"),
             estado=_as_str(data.get("estado"), "estado"),
-            rnc=_as_str(data.get("rnc"), "rnc"),
-            encf=_as_str(data.get("encf"), "encf"),
-            secuencia_utilizada=_as_bool(
+            track_id=_as_optional_str(data.get("trackId"), "trackId"),
+            rnc=_as_optional_str(data.get("rnc"), "rnc"),
+            encf=_as_optional_str(data.get("encf"), "encf"),
+            secuencia_utilizada=_as_optional_bool(
                 data.get("secuenciaUtilizada"), "secuenciaUtilizada"
             ),
-            fecha_recepcion=_as_str(data.get("fechaRecepcion"), "fechaRecepcion"),
+            fecha_recepcion=_as_optional_str(
+                data.get("fechaRecepcion"), "fechaRecepcion"
+            ),
             mensajes=_parse_mensajes(data.get("mensajes")),
         )
 
@@ -200,16 +210,18 @@ class TrackingStatusResponse:
 class SummaryTrackingStatusResponse:
     """One entry of ``trackStatuses`` (``ConsultaTrackIds``)."""
 
-    track_id: str
     estado: str
-    fecha_recepcion: str
+    track_id: str | None = None
+    fecha_recepcion: str | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> SummaryTrackingStatusResponse:
         return cls(
-            track_id=_as_str(data.get("trackId"), "trackId"),
             estado=_as_str(data.get("estado"), "estado"),
-            fecha_recepcion=_as_str(data.get("fechaRecepcion"), "fechaRecepcion"),
+            track_id=_as_optional_str(data.get("trackId"), "trackId"),
+            fecha_recepcion=_as_optional_str(
+                data.get("fechaRecepcion"), "fechaRecepcion"
+            ),
         )
 
 
@@ -278,8 +290,8 @@ class InvoiceSummaryResponse:
 
     codigo: int
     estado: str
-    encf: str
-    secuencia_utilizada: bool
+    encf: str | None = None
+    secuencia_utilizada: bool | None = None
     mensajes: tuple[Mensaje, ...] = ()
 
     @classmethod
@@ -287,8 +299,8 @@ class InvoiceSummaryResponse:
         return cls(
             codigo=_as_int(data.get("codigo"), "codigo"),
             estado=_as_str(data.get("estado"), "estado"),
-            encf=_as_str(data.get("encf"), "encf"),
-            secuencia_utilizada=_as_bool(
+            encf=_as_optional_str(data.get("encf"), "encf"),
+            secuencia_utilizada=_as_optional_bool(
                 data.get("secuenciaUtilizada"), "secuenciaUtilizada"
             ),
             mensajes=_parse_mensajes(data.get("mensajes")),
@@ -321,23 +333,23 @@ class ServiceDirectoryResponse:
 class InquiryInvoiceSummary:
     """Result of ``getSummaryInvoiceInquiry`` (RFCE inquiry, production only)."""
 
-    rnc: str
-    encf: str
-    secuencia_utilizada: bool
     codigo: int
     estado: str
+    rnc: str | None = None
+    encf: str | None = None
+    secuencia_utilizada: bool | None = None
     mensajes: tuple[Mensaje, ...] = ()
 
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> InquiryInvoiceSummary:
         return cls(
-            rnc=_as_str(data.get("rnc"), "rnc"),
-            encf=_as_str(data.get("encf"), "encf"),
-            secuencia_utilizada=_as_bool(
-                data.get("secuenciaUtilizada"), "secuenciaUtilizada"
-            ),
             codigo=_as_int(data.get("codigo"), "codigo"),
             estado=_as_str(data.get("estado"), "estado"),
+            rnc=_as_optional_str(data.get("rnc"), "rnc"),
+            encf=_as_optional_str(data.get("encf"), "encf"),
+            secuencia_utilizada=_as_optional_bool(
+                data.get("secuenciaUtilizada"), "secuenciaUtilizada"
+            ),
             mensajes=_parse_mensajes(data.get("mensajes")),
         )
 

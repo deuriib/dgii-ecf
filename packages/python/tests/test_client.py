@@ -295,7 +295,7 @@ def test_malformed_payload_becomes_validation_error() -> None:
     assert result.is_err()
     error = result.unwrap_err()
     assert error.code.value == "VALIDATION"
-    assert "trackId" in error.message
+    assert "codigo" in error.message
 
 
 def test_directory_returns_typed_models() -> None:
