@@ -54,3 +54,30 @@ markdown_extensions:
 
 plugins:
   - search
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        # `es` is listed first on purpose: the plugin has no per-locale 404
+        # page support, so the last built locale wins the shared `404.html`.
+        # Building `en` last keeps that shared page in the default language.
+        - locale: es
+          name: Español
+          build: true
+          nav_translations:
+            Home: Inicio
+            Installation: Instalación
+            TypeScript: TypeScript
+            Python: Python
+            Guides: Guías
+            Signing (XMLDSig): Firma (XMLDSig)
+            Resilience & idempotency: Resiliencia e idempotencia
+            Releases & publishing: Lanzamientos y publicación
+            Examples: Ejemplos
+            FAQ: Preguntas frecuentes
+        - locale: en
+          default: true
+          name: English
+          build: true

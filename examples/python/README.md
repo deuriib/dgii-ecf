@@ -1,5 +1,7 @@
 # Python examples
 
+[English](README.md) · [Español](README.es.md)
+
 Runnable examples for [`py-dgii-ecf`](../../packages/python).
 
 ## Setup

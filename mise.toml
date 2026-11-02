@@ -80,6 +80,17 @@ dir = "packages/python"
 run = "uv build"
 
 # ---------------------------------------------------------------------------
+# Docs
+# ---------------------------------------------------------------------------
+[tasks.docs-build]
+description = "Build the docs site (en + es) with strict validation"
+run = "uvx --from mkdocs --with mkdocs-material --with \"mkdocs-static-i18n>=1.0,<2\" mkdocs build --strict"
+
+[tasks.docs-serve]
+description = "Serve the docs site locally with live reload"
+run = "uvx --from mkdocs --with mkdocs-material --with \"mkdocs-static-i18n>=1.0,<2\" mkdocs serve"
+
+# ---------------------------------------------------------------------------
 # Full CI
 # ---------------------------------------------------------------------------
 [tasks.ci]
