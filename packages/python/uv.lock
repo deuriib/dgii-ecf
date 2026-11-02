@@ -829,7 +829,7 @@ wheels = [
 
 [[package]]
 name = "py-dgii-ecf"
-version = "0.1.0"
+version = "0.2.3"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
