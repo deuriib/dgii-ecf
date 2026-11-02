@@ -18,20 +18,27 @@ becomes ``<ECF><Encabezado><Version>1.0</Version></Encabezado></ECF>``.
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from lxml import etree
 
 from .errors import DgiiError, DgiiErrorCode
 from .result import DgiiResult, Err, Ok
 
-_MONETARY_RE = re.compile(r"^\d+\.\d+$")
+_MONETARY_RE = re.compile(r"^-?\d+\.\d+$")
+_CENTS = Decimal("0.01")
 
 
 def _round_monetary(value: str) -> str:
+    """Round a decimal string to 2 places with ``ROUND_HALF_UP``.
+
+    This is the DGII contract (and the TypeScript SDK's behaviour): ``2.675``
+    becomes ``2.68``. ``Decimal``'s default ``ROUND_HALF_EVEN`` would give
+    ``2.68`` here too but ``2.665`` would become ``2.66`` instead of ``2.67``.
+    """
     if _MONETARY_RE.match(value):
         try:
-            return str(Decimal(value).quantize(Decimal("0.01")))
+            return str(Decimal(value).quantize(_CENTS, rounding=ROUND_HALF_UP))
         except InvalidOperation:
             return value
     return value
