@@ -1,0 +1,9 @@
+[project]
+name = "py-dgii-ecf-examples"
+version = "0.0.0"
+description = "Runnable examples for the py-dgii-ecf SDK."
+requires-python = ">=3.11"
+dependencies = ["py-dgii-ecf"]
+
+[tool.uv.sources]
+py-dgii-ecf = { path = "../../packages/python", editable = true }

@@ -1,0 +1,18 @@
+{
+  "name": "@deuriib/dgii-ecf-examples",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate-cert": "bun run generate-cert.ts",
+    "transform": "bun run transform.ts",
+    "sign": "bun run sign-xml.ts",
+    "send": "bun run send-invoice.ts"
+  },
+  "dependencies": {
+    "node-forge": "^1.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/node-forge": "^1.3.11"
+  }
+}
