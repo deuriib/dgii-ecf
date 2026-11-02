@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.4.0...python-v0.5.0) (2026-11-02)
+
+
+### Features
+
+* **python:** add Result-returning Signature.try_from_p12 ([#67](https://github.com/deuriib/dgii-ecf/issues/67)) ([6a24c70](https://github.com/deuriib/dgii-ecf/commit/6a24c70ef636eac4e798aee90684e47a85743f34))
+
 ## [0.4.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.3.2...python-v0.4.0) (2026-11-02)
 
 
