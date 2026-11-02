@@ -44,6 +44,32 @@ def _round_monetary(value: str) -> str:
     return value
 
 
+def _prune_empty(value: object) -> object | None:
+    """Drop empty leaves and the containers they leave behind.
+
+    DGII forbids empty tags: any element without a value must be omitted
+    entirely instead of being serialized as ``<Tag/>``. A dict that only
+    carries ``_attributes`` is *not* empty — it still renders an element.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, (list, tuple)):
+        items = [
+            pruned
+            for pruned in (_prune_empty(item) for item in value)
+            if pruned is not None
+        ]
+        return items or None
+    if isinstance(value, dict):
+        output: dict[str, object] = {}
+        for key, item in value.items():
+            pruned = _prune_empty(item)
+            if pruned is not None:
+                output[key] = pruned
+        return output or None
+    return value
+
+
 class Transformer:
     """Convert between DGII XML documents and the compact JSON shape."""
 
@@ -55,9 +81,10 @@ class Transformer:
     ) -> DgiiResult[str]:
         """Serialize a single-root compact JSON object to an XML string."""
         try:
-            if len(data) != 1:
+            pruned = _prune_empty(data)
+            if not isinstance(pruned, dict) or len(pruned) != 1:
                 raise ValueError("Expected exactly one root element")
-            root_tag, root_value = next(iter(data.items()))
+            root_tag, root_value = next(iter(pruned.items()))
             root = self._build(root_tag, root_value, round_monetary)
             body: str = etree.tostring(root, encoding="unicode")
             return Ok(f'<?xml version="1.0" encoding="utf-8"?>{body}')

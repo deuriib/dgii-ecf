@@ -69,3 +69,64 @@ describe('Transformer', () => {
     expect(parsed.value.ECF.Encabezado.MontoTotal._text).toBe('100.50');
   });
 });
+
+describe('Transformer empty-tag pruning', () => {
+  const build = (payload: unknown): string => {
+    const result = new Transformer().json2xml(payload as object);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return '';
+    return result.value;
+  };
+
+  it.each([
+    ['empty string', ''],
+    ['null', null],
+    ['undefined', undefined],
+    ['empty array', []],
+    ['empty object', {}],
+  ])('omits an element with an %s value', (_label, empty) => {
+    const xml = build({
+      ECF: { Encabezado: { Version: '1.0', MontoExento: empty } },
+    });
+
+    expect(xml).not.toContain('MontoExento');
+    expect(xml).not.toContain('<MontoExento/>');
+    expect(xml).not.toContain('<MontoExento></MontoExento>');
+  });
+
+  it('omits an element whose only content is an empty _text', () => {
+    const xml = build({
+      ECF: { Encabezado: { Version: '1.0', MontoExento: { _text: '' } } },
+    });
+
+    expect(xml).not.toContain('MontoExento');
+    expect(xml).toContain('<Version>1.0</Version>');
+  });
+
+  it('keeps an element that only carries attributes', () => {
+    const xml = build({
+      ECF: {
+        Signature: {
+          _attributes: { xmlns: 'http://www.w3.org/2000/09/xmldsig#' },
+        },
+      },
+    });
+
+    expect(xml).toContain('<Signature xmlns=');
+  });
+
+  it('keeps a zero value', () => {
+    const xml = build({ ECF: { Totales: { MontoExento: 0 } } });
+
+    expect(xml).toContain('<MontoExento>0</MontoExento>');
+  });
+
+  it('drops empty items from a repeated element', () => {
+    const xml = build({
+      ECF: { DetallesItems: { Item: ['', { NombreItem: 'A' }] } },
+    });
+
+    expect(xml).not.toContain('<Item/>');
+    expect(xml).toContain('<NombreItem>A</NombreItem>');
+  });
+});

@@ -1,7 +1,7 @@
 import { BaseUrl, Environment } from './environment.js';
 import { err, ok, type Result } from './result.js';
 import { DgiiError } from './errors.js';
-import { Transformer } from './transformer.js';
+import { Transformer, pruneEmptyValues } from './transformer.js';
 import { extractElementText } from './xml.js';
 
 /** First 6 chars of the `<SignatureValue>` (DGII security code). */
@@ -163,43 +163,6 @@ const toArray = <T>(value: T | T[] | undefined | null): T[] => {
   return Array.isArray(value) ? value : [value];
 };
 
-const isEmptyObject = (value: unknown): boolean =>
-  typeof value === 'object' &&
-  value !== null &&
-  !Array.isArray(value) &&
-  Object.keys(value as Record<string, unknown>).length === 0;
-
-const removeEmptyValues = (input: unknown): unknown => {
-  if (input === null || input === undefined || input === '') {
-    return undefined;
-  }
-  if (Array.isArray(input)) {
-    const filtered = input
-      .map(removeEmptyValues)
-      .filter(
-        (item) =>
-          item !== null &&
-          item !== undefined &&
-          item !== '' &&
-          !isEmptyObject(item),
-      );
-    return filtered.length ? filtered : undefined;
-  }
-  if (typeof input === 'object') {
-    const output: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(
-      input as Record<string, unknown>,
-    )) {
-      const cleaned = removeEmptyValues(value);
-      if (cleaned !== undefined && cleaned !== '' && !isEmptyObject(cleaned)) {
-        output[key] = cleaned;
-      }
-    }
-    return Object.keys(output).length ? output : undefined;
-  }
-  return input;
-};
-
 /**
  * Build the RFCE (summary invoice) document from a signed ECF-32 document.
  * Returns the unsigned RFCE XML plus the 6-digit security code.
@@ -223,7 +186,7 @@ export const convertECF32ToRFCE = (
     encabezado?.Totales?.ImpuestosAdicionales?.ImpuestoAdicional,
   );
 
-  const rfce = removeEmptyValues({
+  const rfce = pruneEmptyValues({
     RFCE: {
       Encabezado: {
         Version: encabezado?.Version,
