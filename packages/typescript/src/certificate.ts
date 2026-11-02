@@ -31,17 +31,18 @@ export class P12Reader {
   }
 
   private extractKey(p12: forge.pkcs12.Pkcs12Pfx): string | undefined {
-    const keyBags = p12.getBags({
-      bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
-    });
-    const pkcs8Key = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
-    if (pkcs8Key?.key) {
-      return forge.pki.privateKeyToPem(pkcs8Key.key);
-    }
-    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-    const certBag = certBags[forge.pki.oids.certBag]?.[0];
-    if (certBag?.key) {
-      return forge.pki.privateKeyToPem(certBag.key);
+    // DGII bundles normally carry a shrouded (encrypted) PKCS#8 key bag, but
+    // unencrypted bundles use a plain keyBag. A certBag never holds a private
+    // key, so it must not be used as a fallback.
+    const keyBagTypes = [
+      forge.pki.oids.pkcs8ShroudedKeyBag,
+      forge.pki.oids.keyBag,
+    ];
+    for (const bagType of keyBagTypes) {
+      const bag = p12.getBags({ bagType })[bagType]?.[0];
+      if (bag?.key) {
+        return forge.pki.privateKeyToPem(bag.key);
+      }
     }
     return undefined;
   }

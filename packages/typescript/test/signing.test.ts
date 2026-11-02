@@ -57,14 +57,22 @@ describe('Signature', () => {
     expect(result.isOk()).toBe(true);
   });
 
-  it('rejects invalid XML with a typed error', () => {
+  it('rejects invalid XML with INVALID_XML (same code as Python)', () => {
     const { privateKey, certificate } = createSelfSigned();
     const result = new Signature(privateKey, certificate).signXml(
       '<ECF><broken>',
     );
     expect(result.isErr()).toBe(true);
     if (result.isOk()) return;
-    expect(result.error.code).toBe('SIGNING');
+    expect(result.error.code).toBe('INVALID_XML');
+  });
+
+  it('rejects an empty document with INVALID_XML', () => {
+    const { privateKey, certificate } = createSelfSigned();
+    const result = new Signature(privateKey, certificate).signXml('   ');
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('INVALID_XML');
   });
 });
 
@@ -76,6 +84,20 @@ describe('validateXMLCertificate', () => {
     if (result.isErr()) return;
 
     const validation = validateXMLCertificate(result.value);
+    expect(validation.isValid).toBe(true);
+    expect(validation.subject).toContain('dgii-ecf-test');
+  });
+
+  it('validates a certificate with a namespace prefix (ds:)', () => {
+    const { privateKey, certificate } = createSelfSigned();
+    const result = new Signature(privateKey, certificate).signXml(ECF_XML);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+
+    const prefixed = result.value
+      .replace('<X509Certificate>', '<ds:X509Certificate>')
+      .replace('</X509Certificate>', '</ds:X509Certificate>');
+    const validation = validateXMLCertificate(prefixed);
     expect(validation.isValid).toBe(true);
     expect(validation.subject).toContain('dgii-ecf-test');
   });

@@ -107,8 +107,24 @@ export class Signature {
     xml: string,
     rootElName?: DgiiDocumentType,
   ): Result<string, DgiiError> {
+    let parsed: StrictParseResult;
     try {
-      const { doc, rootName } = parseStrict(xml);
+      parsed = parseStrict(xml);
+    } catch (error) {
+      // Malformed input is an INVALID_XML error, not a signing failure —
+      // aligning with the Python SDK.
+      return err(
+        new DgiiError(
+          error instanceof Error
+            ? error.message
+            : `Invalid XML: ${String(error)}`,
+          { code: 'INVALID_XML', cause: error },
+        ),
+      );
+    }
+
+    try {
+      const { doc, rootName } = parsed;
       const elementName = rootElName ?? rootName;
 
       const sig = new SignedXml({
@@ -155,12 +171,18 @@ export interface XmlCertificateValidation {
   error?: string;
 }
 
+/**
+ * Matches `<X509Certificate>` with or without a namespace prefix (`ds:`).
+ */
+const X509_CERTIFICATE_RE =
+  /<(?:[\w]+:)?X509Certificate>([\s\S]*?)<\/(?:[\w]+:)?X509Certificate>/;
+
 /** Validate the embedded X509 certificate of a signed XML document. */
 export const validateXMLCertificate = (
   xml: string,
 ): XmlCertificateValidation => {
   try {
-    const match = xml.match(/<X509Certificate>([\s\S]*?)<\/X509Certificate>/);
+    const match = xml.match(X509_CERTIFICATE_RE);
     if (!match?.[1]) {
       return { isValid: false, error: 'X509Certificate not found' };
     }
