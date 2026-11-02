@@ -69,3 +69,65 @@ def test_xml_to_json_round_trip() -> None:
 def test_invalid_xml_is_rejected() -> None:
     result = Transformer().xml_to_json("<ECF><broken>")
     assert result.is_err()
+
+
+def test_json_to_xml_omits_empty_values() -> None:
+    xml = Transformer().json_to_xml(
+        {
+            "ECF": {
+                "Encabezado": {
+                    "Version": "1.0",
+                    "MontoExento": "",
+                    "MontoNoFacturable": None,
+                    "Vacio": {},
+                    "Lista": [],
+                }
+            }
+        }
+    )
+
+    assert xml.is_ok()
+    body = xml.unwrap()
+    for tag in ("MontoExento", "MontoNoFacturable", "Vacio", "Lista"):
+        assert tag not in body
+    assert "<MontoExento/>" not in body
+
+
+def test_json_to_xml_omits_an_empty_text_node() -> None:
+    xml = Transformer().json_to_xml(
+        {
+            "ECF": {
+                "Encabezado": {
+                    "Version": "1.0",
+                    "MontoExento": {"_text": ""},
+                }
+            }
+        }
+    )
+
+    assert xml.is_ok()
+    body = xml.unwrap()
+    assert "MontoExento" not in body
+    assert "<Version>1.0</Version>" in body
+
+
+def test_json_to_xml_keeps_an_attributes_only_element() -> None:
+    xml = Transformer().json_to_xml(
+        {
+            "ECF": {
+                "Signature": {
+                    "_attributes": {"xmlns": "http://www.w3.org/2000/09/xmldsig#"}
+                }
+            }
+        }
+    )
+
+    assert xml.is_ok()
+    assert "<Signature xmlns=" in xml.unwrap()
+
+
+def test_json_to_xml_keeps_a_zero_value() -> None:
+    xml = Transformer().json_to_xml({"ECF": {"Totales": {"MontoExento": 0}}})
+
+    assert xml.is_ok()
+    assert "<MontoExento>0</MontoExento>" in xml.unwrap()

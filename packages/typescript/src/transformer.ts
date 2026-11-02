@@ -45,6 +45,50 @@ export const roundHalfUpToCents = (value: string): string => {
   return `${sign}${padded.slice(0, -2)}.${padded.slice(-2)}`;
 };
 
+const isEmptyObject = (value: unknown): boolean =>
+  typeof value === 'object' &&
+  value !== null &&
+  !Array.isArray(value) &&
+  Object.keys(value as Record<string, unknown>).length === 0;
+
+/**
+ * Drop empty leaves and the containers they leave behind.
+ *
+ * DGII forbids empty tags: any element without a value must be omitted
+ * entirely instead of being serialized as `<Tag/>` or `<Tag></Tag>`. An object
+ * that only carries `_attributes` is *not* empty — it still renders an element.
+ */
+export const pruneEmptyValues = (input: unknown): unknown => {
+  if (input === null || input === undefined || input === '') {
+    return undefined;
+  }
+  if (Array.isArray(input)) {
+    const filtered = input
+      .map(pruneEmptyValues)
+      .filter(
+        (item) =>
+          item !== null &&
+          item !== undefined &&
+          item !== '' &&
+          !isEmptyObject(item),
+      );
+    return filtered.length ? filtered : undefined;
+  }
+  if (typeof input === 'object') {
+    const output: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(
+      input as Record<string, unknown>,
+    )) {
+      const cleaned = pruneEmptyValues(value);
+      if (cleaned !== undefined && cleaned !== '' && !isEmptyObject(cleaned)) {
+        output[key] = cleaned;
+      }
+    }
+    return Object.keys(output).length ? output : undefined;
+  }
+  return input;
+};
+
 /**
  * Converts between the DGII XML documents and the "compact" JSON shape used by
  * `xml-js` (a dict key is an element, an array is a repeated element, and
@@ -53,16 +97,21 @@ export const roundHalfUpToCents = (value: string): string => {
 export class Transformer {
   json2xml(dataObject: object, round = false): Result<string, DgiiError> {
     try {
+      const pruned = pruneEmptyValues(dataObject);
       const data: Record<string, unknown> = {
         _declaration: { _attributes: { version: '1.0', encoding: 'utf-8' } },
-        ...dataObject,
+        ...(pruned !== null &&
+        pruned !== undefined &&
+        typeof pruned === 'object' &&
+        !Array.isArray(pruned)
+          ? (pruned as Record<string, unknown>)
+          : {}),
       };
 
       const xml = convert.js2xml(data as convert.ElementCompact, {
         compact: true,
         ignoreComment: true,
         spaces: 2,
-        fullTagEmptyElement: true,
         textFn: (value: string, label: string) => {
           if (round && label.toLowerCase() !== 'version') {
             return roundHalfUpToCents(value);
