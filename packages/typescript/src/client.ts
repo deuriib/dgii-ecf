@@ -16,6 +16,7 @@ import {
 } from './http.js';
 import type { ResilienceOptions } from './resilience.js';
 import { Signature } from './signing.js';
+import { extractElementText } from './xml.js';
 import type { P12ReaderData } from './certificate.js';
 import type {
   AuthToken,
@@ -55,11 +56,6 @@ const isPendingSubmission = (value: unknown): value is PendingSubmission =>
 const sha256Hex = (value: string): string =>
   createHash('sha256').update(value, 'utf8').digest('hex');
 
-const extractTag = (xml: string, tag: string): string | undefined => {
-  const match = xml.match(new RegExp(`<${tag}>([^<]*)</${tag}>`));
-  return match?.[1]?.trim();
-};
-
 /**
  * DGII e-CF client. Every method returns a `Result` — no thrown domain errors.
  */
@@ -98,8 +94,8 @@ export class ECF {
   }
 
   private buildIdempotencyKey(signedXml: string): string {
-    const rnc = extractTag(signedXml, 'RNCEmisor') ?? 'unknown-rnc';
-    const encf = extractTag(signedXml, 'eNCF') ?? 'unknown-encf';
+    const rnc = extractElementText(signedXml, 'RNCEmisor') ?? 'unknown-rnc';
+    const encf = extractElementText(signedXml, 'eNCF') ?? 'unknown-encf';
     return `${rnc}:${encf}:${sha256Hex(signedXml)}`;
   }
 
