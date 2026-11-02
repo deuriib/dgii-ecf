@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/deuriib/dgii-ecf/compare/python-v0.3.1...python-v0.3.2) (2026-11-02)
+
+
+### Performance Improvements
+
+* expire and evict InMemoryIdempotencyStore entries ([#63](https://github.com/deuriib/dgii-ecf/issues/63)) ([d54883f](https://github.com/deuriib/dgii-ecf/commit/d54883f08889cde55007cb447c0db4a87774f3f0))
+
 ## [0.3.1](https://github.com/deuriib/dgii-ecf/compare/python-v0.3.0...python-v0.3.1) (2026-11-02)
 
 
