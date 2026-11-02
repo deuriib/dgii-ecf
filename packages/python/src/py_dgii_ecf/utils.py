@@ -7,23 +7,20 @@ from datetime import datetime
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
+from ._xml import extract_element_text
 from .environment import BaseUrl, Environment
 from .errors import DgiiError, DgiiErrorCode
 from .result import DgiiResult, Err, Ok
 from .transformer import Transformer
 
 _SANTO_DOMINGO = ZoneInfo("America/Santo_Domingo")
-_SIGNATURE_RE = re.compile(
-    r"<(?:[\w]+:)?SignatureValue>([\s\S]*?)</(?:[\w]+:)?SignatureValue>"
-)
 
 
 def get_code_six_digit_from_signature(signed_xml: str) -> DgiiResult[str]:
     """Return the first 6 chars of ``<SignatureValue>`` (DGII security code)."""
-    match = _SIGNATURE_RE.search(signed_xml)
-    if match is None:
+    value = extract_element_text(signed_xml, "SignatureValue")
+    if value is None:
         return Err(DgiiError("SignatureValue not found", code=DgiiErrorCode.SIGNING))
-    value = match.group(1).strip()
     if len(value) < 6:
         return Err(DgiiError("SignatureValue is too short", code=DgiiErrorCode.SIGNING))
     return Ok(value[:6])

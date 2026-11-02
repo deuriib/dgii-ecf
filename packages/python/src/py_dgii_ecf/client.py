@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-import re
 
 import httpx2
 
 from ._json import JsonObject, JsonValue
+from ._xml import extract_element_text
 from .certificate import P12ReaderData
 from .environment import (
     BaseUrl,
@@ -49,17 +49,8 @@ def _is_pending(value: JsonObject) -> bool:
     return value.get("__pending__") is True
 
 
-_TAG_RE_CACHE: dict[str, re.Pattern[str]] = {}
-
-
 def _sha256_hex(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
-
-
-def _extract_tag(xml: str, tag: str) -> str | None:
-    pattern = _TAG_RE_CACHE.setdefault(tag, re.compile(rf"<{tag}>([^<]*)</{tag}>"))
-    match = pattern.search(xml)
-    return match.group(1).strip() if match else None
 
 
 def _parse_one(model: type[_ModelT], data: JsonValue) -> DgiiResult[_ModelT]:
@@ -155,8 +146,8 @@ class ECF:
         )
 
     def _build_idempotency_key(self, signed_xml: str) -> str:
-        rnc = _extract_tag(signed_xml, "RNCEmisor") or "unknown-rnc"
-        encf = _extract_tag(signed_xml, "eNCF") or "unknown-encf"
+        rnc = extract_element_text(signed_xml, "RNCEmisor") or "unknown-rnc"
+        encf = extract_element_text(signed_xml, "eNCF") or "unknown-encf"
         return f"{rnc}:{encf}:{_sha256_hex(signed_xml)}"
 
     def _cache_submission(
