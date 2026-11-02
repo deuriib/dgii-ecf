@@ -265,6 +265,8 @@ class InquiryStatusResponse:
 
     codigo: int
     estado: str
+    #: ``True`` when the e-NCF sequence is already consumed.
+    secuencia_utilizada: bool | None = None
     rnc_emisor: str | None = None
     ncf_electronico: str | None = None
     monto_total: float | None = None
@@ -280,6 +282,9 @@ class InquiryStatusResponse:
         return cls(
             codigo=_as_int(data.get("codigo"), "codigo"),
             estado=_as_str(data.get("estado"), "estado"),
+            secuencia_utilizada=_as_optional_bool(
+                data.get("secuenciaUtilizada"), "secuenciaUtilizada"
+            ),
             rnc_emisor=_as_optional_str(data.get("rncEmisor"), "rncEmisor"),
             ncf_electronico=_as_optional_str(
                 data.get("ncfElectronico"), "ncfElectronico"

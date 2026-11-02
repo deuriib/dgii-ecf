@@ -42,6 +42,11 @@ from .reception import (
     is_ecf_type_code,
     resolve_reception_route,
 )
+from .reconciliation import (
+    PENDING_SUBMISSION_MESSAGE,
+    ReconciliationResult,
+    can_reuse_sequence,
+)
 from .resilience import ResilienceOptions, ResiliencePolicy, is_retryable_error
 from .result import DgiiResult, Err, Ok, Result
 from .signing import Signature, XmlCertificateValidation, validate_xml_certificate
@@ -90,6 +95,7 @@ __all__ = [
     "CONSUMPTION_SUMMARY_THRESHOLD",
     "ECF",
     "ECF_TYPE_CODES",
+    "PENDING_SUBMISSION_MESSAGE",
     "AuthToken",
     "B2BCommercialApprovalResponse",
     "BaseUrl",
@@ -118,6 +124,7 @@ __all__ = [
     "P12Reader",
     "P12ReaderData",
     "ReceptionRoute",
+    "ReconciliationResult",
     "ResilienceOptions",
     "ResiliencePolicy",
     "ResponseModel",
@@ -140,6 +147,7 @@ __all__ = [
     "build_sender_receiver_url",
     "build_status_url",
     "build_url",
+    "can_reuse_sequence",
     "compare_decimal",
     "convert_ecf32_to_rfce",
     "extract_dgii_error_message",
