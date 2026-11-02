@@ -9,24 +9,32 @@ cd examples/python
 uv sync
 ```
 
-## Run
+## Offline examples
 
 ```bash
-# 1. Generate an ephemeral self-signed .p12 (for local signing only)
-uv run python generate_cert.py
+uv run python generate_cert.py   # ephemeral self-signed .p12 (local signing only)
+uv run python transform.py       # JSON -> XML
+uv run python sign_xml.py        # sign + validate certificate
+```
 
-# 2. Convert the sample JSON invoice to XML
-uv run python transform.py
+## Network flows
 
-# 3. Sign a DGII e-CF document
-uv run python sign_xml.py
+These require a real DGII certificate and network access. Configure the
+environment:
 
-# 4. Authenticate + submit to DGII (requires a real certificate + network)
+```bash
 export DGII_P12_PATH=/secure/identity.p12
 export DGII_P12_PASSWORD=secret
 export DGII_RNC=130862346
-export DGII_ENVIRONMENT=TesteCF
-uv run python send_invoice.py
+export DGII_ENVIRONMENT=TesteCF   # TesteCF | CerteCF | eCF
+```
+
+```bash
+uv run python send_invoice.py          # authenticate + submit a signed e-CF
+uv run python send_summary.py          # sign ECF-32 -> RFCE -> submit summary
+uv run python customer_directory.py <rnc>
+uv run python commercial_approval.py   # sign ACECF -> submit commercial approval
+uv run python void.py                  # sign ANECF -> void a range
 ```
 
 Outputs are written to `../output/` (gitignored).
