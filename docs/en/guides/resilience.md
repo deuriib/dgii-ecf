@@ -37,7 +37,9 @@ A rejected e-CF (e.g. `400`, `401`) is **never** blindly re-sent.
 ## Idempotency
 
 Submissions are keyed by `RNC + eNCF + SHA-256(signed XML)`. A repeated call
-returns the cached response instead of double-issuing.
+returns the cached response instead of double-issuing. The same flow covers
+e-CF, summary (RFCE), commercial approval (ACECF) and range voiding (ANECF);
+the void flow uses `RangoNCF` in place of `eNCF`.
 
 Provide a persistent store (Redis/Postgres) in production:
 

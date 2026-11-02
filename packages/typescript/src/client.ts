@@ -95,8 +95,48 @@ export class ECF {
 
   private buildIdempotencyKey(signedXml: string): string {
     const rnc = extractElementText(signedXml, 'RNCEmisor') ?? 'unknown-rnc';
-    const encf = extractElementText(signedXml, 'eNCF') ?? 'unknown-encf';
-    return `${rnc}:${encf}:${sha256Hex(signedXml)}`;
+    // ACECF carries `eNCF`; ANECF uses `RangoNCF`. Fall back to the hash if
+    // neither is present, so the key is still unique per document.
+    const ncf =
+      extractElementText(signedXml, 'eNCF') ??
+      extractElementText(signedXml, 'RangoNCF') ??
+      'unknown-ncf';
+    return `${rnc}:${ncf}:${sha256Hex(signedXml)}`;
+  }
+
+  /**
+   * Run a submission through the persist-before-transmit idempotency flow.
+   *
+   * The pending marker is written first so an interrupted send can be
+   * reconciled instead of re-issued; a successful response replaces it, and
+   * a failure clears it so the caller can retry.
+   */
+  private async submitIdempotent<T>(
+    key: string,
+    send: () => Promise<Result<T, DgiiError>>,
+  ): Promise<Result<T, DgiiError>> {
+    const cached = await this.idempotency.get<T | PendingSubmission>(key);
+    if (cached !== undefined) {
+      if (isPendingSubmission(cached)) {
+        return err(
+          new DgiiError(
+            'A submission with this key is already pending; reconcile via a status lookup before retrying',
+            { code: 'IDEMPOTENCY' },
+          ),
+        );
+      }
+      return ok(cached);
+    }
+    return this.singleFlight(key, async () => {
+      await this.idempotency.set(key, PENDING_SUBMISSION);
+      const result = await send();
+      if (result.isOk()) {
+        await this.idempotency.set(key, result.value);
+      } else {
+        await this.idempotency.delete(key);
+      }
+      return result;
+    });
   }
 
   private async singleFlight<T>(
@@ -193,39 +233,16 @@ export class ECF {
     buyerHost?: string,
   ): Promise<Result<InvoiceResponse, DgiiError>> {
     const key = this.buildIdempotencyKey(signedXml);
-    const cached = await this.idempotency.get<
-      InvoiceResponse | PendingSubmission
-    >(key);
-    if (cached !== undefined) {
-      if (isPendingSubmission(cached)) {
-        return err(
-          new DgiiError(
-            'A submission with this key is already pending; reconcile via a status lookup before retrying',
-            { code: 'IDEMPOTENCY' },
-          ),
-        );
-      }
-      return ok(cached);
-    }
-    return this.singleFlight(key, async () => {
-      // Persist-before-transmit: record the pending submission before the
-      // network call so an interrupted send can be reconciled, not re-issued.
-      await this.idempotency.set(key, PENDING_SUBMISSION);
+    return this.submitIdempotent(key, () => {
       const url = buyerHost
         ? buildSenderReceiverUrl(buyerHost, SenderReceiverEndpoint.SendInvoice)
         : buildUrl(this.environment, Endpoint.SendInvoice);
-      const result = await this.http.postMultipart<InvoiceResponse>(
+      return this.http.postMultipart<InvoiceResponse>(
         url,
         fileName,
         signedXml,
         { absoluteUrl: true, resource: Endpoint.SendInvoice },
       );
-      if (result.isOk()) {
-        await this.idempotency.set(key, result.value);
-      } else {
-        await this.idempotency.delete(key);
-      }
-      return result;
     });
   }
 
@@ -235,37 +252,14 @@ export class ECF {
     fileName: string,
   ): Promise<Result<InvoiceSummaryResponse, DgiiError>> {
     const key = this.buildIdempotencyKey(signedXml);
-    const cached = await this.idempotency.get<
-      InvoiceSummaryResponse | PendingSubmission
-    >(key);
-    if (cached !== undefined) {
-      if (isPendingSubmission(cached)) {
-        return err(
-          new DgiiError(
-            'A submission with this key is already pending; reconcile via a status lookup before retrying',
-            { code: 'IDEMPOTENCY' },
-          ),
-        );
-      }
-      return ok(cached);
-    }
-    return this.singleFlight(key, async () => {
-      // Persist-before-transmit (see sendElectronicDocument).
-      await this.idempotency.set(key, PENDING_SUBMISSION);
-      const url = buildUrl(this.environment, Endpoint.SendSummary, BaseUrl.CF);
-      const result = await this.http.postMultipart<InvoiceSummaryResponse>(
-        url,
+    return this.submitIdempotent(key, () =>
+      this.http.postMultipart<InvoiceSummaryResponse>(
+        buildUrl(this.environment, Endpoint.SendSummary, BaseUrl.CF),
         fileName,
         signedXml,
         { absoluteUrl: true, resource: Endpoint.SendSummary },
-      );
-      if (result.isOk()) {
-        await this.idempotency.set(key, result.value);
-      } else {
-        await this.idempotency.delete(key);
-      }
-      return result;
-    });
+      ),
+    );
   }
 
   statusTrackId(
@@ -349,27 +343,41 @@ export class ECF {
     );
   }
 
+  /**
+   * Submit a signed commercial approval (ACECF). Idempotent like submissions,
+   * keyed on `RNC + eNCF + SHA-256(signed XML)`.
+   */
   sendCommercialApproval(
     signedXml: string,
     fileName: string,
   ): Promise<Result<CommercialApprovalResponse, DgiiError>> {
-    const url = buildUrl(this.environment, Endpoint.CommercialApproval);
-    return this.http.postMultipart<CommercialApprovalResponse>(
-      url,
-      fileName,
-      signedXml,
-      { absoluteUrl: true, resource: Endpoint.CommercialApproval },
+    const key = this.buildIdempotencyKey(signedXml);
+    return this.submitIdempotent(key, () =>
+      this.http.postMultipart<CommercialApprovalResponse>(
+        buildUrl(this.environment, Endpoint.CommercialApproval),
+        fileName,
+        signedXml,
+        { absoluteUrl: true, resource: Endpoint.CommercialApproval },
+      ),
     );
   }
 
+  /**
+   * Submit a signed range-voiding request (ANECF). Idempotent like
+   * submissions, keyed on `RNC + RangoNCF + SHA-256(signed XML)`.
+   */
   voidENCF(
     signedXml: string,
     fileName: string,
   ): Promise<Result<VoidNCFResponse, DgiiError>> {
-    const url = buildUrl(this.environment, Endpoint.Void);
-    return this.http.postMultipart<VoidNCFResponse>(url, fileName, signedXml, {
-      absoluteUrl: true,
-      resource: Endpoint.Void,
-    });
+    const key = this.buildIdempotencyKey(signedXml);
+    return this.submitIdempotent(key, () =>
+      this.http.postMultipart<VoidNCFResponse>(
+        buildUrl(this.environment, Endpoint.Void),
+        fileName,
+        signedXml,
+        { absoluteUrl: true, resource: Endpoint.Void },
+      ),
+    );
   }
 }

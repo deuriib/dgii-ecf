@@ -9,6 +9,7 @@ import httpx2
 from py_dgii_ecf.certificate import P12ReaderData
 from py_dgii_ecf.client import ECF
 from py_dgii_ecf.environment import Environment
+from py_dgii_ecf.errors import DgiiErrorCode
 from py_dgii_ecf.http import InMemoryIdempotencyStore
 from py_dgii_ecf.resilience import ResilienceOptions
 from py_dgii_ecf.types import (
@@ -383,3 +384,169 @@ def test_summary_inquiry_works_in_production() -> None:
     inquiry = result.unwrap()
     assert isinstance(inquiry, InquiryInvoiceSummary)
     assert inquiry.encf == "E320000000001"
+
+
+APPROVAL_PAYLOAD = {
+    "codigo": "01",
+    "estado": "Aprobación Comercial Aprobada.",
+    "mensaje": [],
+}
+
+VOID_PAYLOAD = {
+    "rnc": "130862346",
+    "codigo": "0",
+    "nombre": "Accepted",
+    "mensajes": [],
+}
+
+
+def approval_xml(rnc: str, encf: str) -> str:
+    return (
+        f"<ACECF><DetalleAprobacionComercial><RNCEmisor>{rnc}</RNCEmisor>"
+        f"<eNCF>{encf}</eNCF></DetalleAprobacionComercial></ACECF>"
+    )
+
+
+def void_xml(rnc: str, rango: str) -> str:
+    return (
+        f"<ANECF><Encabezado><RNCEmisor>{rnc}</RNCEmisor></Encabezado>"
+        f"<DetalleAnulacion><RangoNCF>{rango}</RangoNCF>"
+        f"</DetalleAnulacion></ANECF>"
+    )
+
+
+def test_commercial_approval_is_idempotent() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json=APPROVAL_PAYLOAD)
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+    xml = approval_xml("130862346", "E310000000001")
+
+    first = ecf.send_commercial_approval(xml, "acecf.xml")
+    second = ecf.send_commercial_approval(xml, "acecf.xml")
+
+    assert first.is_ok()
+    assert second.is_ok()
+    assert calls["n"] == 1
+
+
+def test_void_is_idempotent() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json=VOID_PAYLOAD)
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+    xml = void_xml("130862346", "E310000000010")
+
+    first = ecf.void_encf(xml, "anecf.xml")
+    second = ecf.void_encf(xml, "anecf.xml")
+
+    assert first.is_ok()
+    assert second.is_ok()
+    assert calls["n"] == 1
+
+
+def test_void_key_uses_rango_ncf_when_encf_is_absent() -> None:
+    store = InMemoryIdempotencyStore()
+    xml = void_xml("130862346", "E310000000010")
+    digest = hashlib.sha256(xml.encode("utf-8")).hexdigest()
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json=VOID_PAYLOAD)
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+    )
+    result = ecf.void_encf(xml, "anecf.xml")
+
+    assert result.is_ok()
+    assert store.get(f"130862346:E310000000010:{digest}") == VOID_PAYLOAD
+
+
+def test_refuses_pending_commercial_approval() -> None:
+    store = InMemoryIdempotencyStore()
+    xml = approval_xml("130862346", "E310000000002")
+    digest = hashlib.sha256(xml.encode("utf-8")).hexdigest()
+    store.set(f"130862346:E310000000002:{digest}", {"__pending__": True})
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json=APPROVAL_PAYLOAD)
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+    )
+    result = ecf.send_commercial_approval(xml, "acecf.xml")
+
+    assert result.is_err()
+    assert result.unwrap_err().code is DgiiErrorCode.IDEMPOTENCY
+    assert calls["n"] == 0
+
+
+def test_clears_pending_marker_when_void_fails() -> None:
+    store = InMemoryIdempotencyStore()
+    xml = void_xml("130862346", "E310000000011")
+    digest = hashlib.sha256(xml.encode("utf-8")).hexdigest()
+    key = f"130862346:E310000000011:{digest}"
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(400, json={"mensajes": [{"valor": "bad", "codigo": 1}]})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+    )
+    result = ecf.void_encf(xml, "anecf.xml")
+
+    assert result.is_err()
+    assert store.get(key) is None
+
+
+def test_separates_documents_sharing_rnc_and_encf() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json=APPROVAL_PAYLOAD)
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+
+    ecf.send_commercial_approval(approval_xml("130862346", "E310000000003"), "a.xml")
+    ecf.send_commercial_approval(
+        approval_xml("130862346", "E310000000003") + "\n<!-- revised -->",
+        "b.xml",
+    )
+
+    assert calls["n"] == 2
