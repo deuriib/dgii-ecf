@@ -49,3 +49,20 @@ export const extractElementText = (
   const text = match?.[1]?.trim();
   return text === undefined || text === '' ? undefined : text;
 };
+
+const ROOT_PATTERN = /<\s*(?:[A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)[\s/>]/;
+
+/**
+ * Local name of the document's root element, ignoring the XML declaration and
+ * any leading comments. Returns `undefined` when no element is present.
+ *
+ * DGII routing depends on the root: `<ECF>` goes to the general reception and
+ * `<RFCE>` to the consumption-summary reception.
+ */
+export const extractRootElementName = (xml: string): string | undefined => {
+  const stripped = xml
+    .replace(/<\?[\s\S]*?\?>/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .trimStart();
+  return ROOT_PATTERN.exec(stripped)?.[1];
+};
