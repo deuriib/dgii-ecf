@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+
 import httpx2
 
 from py_dgii_ecf.certificate import P12ReaderData
 from py_dgii_ecf.client import ECF
 from py_dgii_ecf.environment import Environment
+from py_dgii_ecf.http import InMemoryIdempotencyStore
 from py_dgii_ecf.resilience import ResilienceOptions
 
 CREDENTIALS = P12ReaderData(key="unused", cert="unused")
@@ -139,3 +142,57 @@ def test_normalizes_single_object_directory() -> None:
     assert directory is not None
     assert isinstance(directory, list)
     assert len(directory) == 1
+
+
+def test_refuses_pending_submission() -> None:
+    store = InMemoryIdempotencyStore()
+    xml = signed_ecf("4", "E4")
+    key = f"4:E4:{hashlib.sha256(xml.encode()).hexdigest()}"
+    store.set(key, {"__pending__": True})
+
+    calls = {"n": 0}
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={"trackId": "x"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        idempotency_store=store,
+        http_client=make_client(handler),
+    )
+    result = ecf.send_electronic_document(xml, "f.xml")
+
+    assert result.is_err()
+    assert result.unwrap_err().code.value == "IDEMPOTENCY"
+    assert calls["n"] == 0
+
+
+def test_clears_pending_marker_on_failure() -> None:
+    store = InMemoryIdempotencyStore()
+    xml = signed_ecf("5", "E5")
+    key = f"5:E5:{hashlib.sha256(xml.encode()).hexdigest()}"
+
+    calls = {"n": 0}
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(400, json={"mensajes": [{"valor": "bad", "codigo": 1}]})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        idempotency_store=store,
+        http_client=make_client(handler),
+    )
+
+    first = ecf.send_electronic_document(xml, "f.xml")
+    assert first.is_err()
+    assert store.get(key) is None
+
+    # A retry after failure re-sends instead of returning a pending error.
+    ecf.send_electronic_document(xml, "f.xml")
+    assert calls["n"] == 2

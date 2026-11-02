@@ -41,6 +41,17 @@ export interface EcfOptions {
   fetchImpl?: typeof fetch;
 }
 
+interface PendingSubmission {
+  readonly pending: true;
+}
+
+const PENDING_SUBMISSION: PendingSubmission = { pending: true };
+
+const isPendingSubmission = (value: unknown): value is PendingSubmission =>
+  typeof value === 'object' &&
+  value !== null &&
+  (value as { pending?: unknown }).pending === true;
+
 const sha256Hex = (value: string): string =>
   createHash('sha256').update(value, 'utf8').digest('hex');
 
@@ -186,11 +197,24 @@ export class ECF {
     buyerHost?: string,
   ): Promise<Result<InvoiceResponse, DgiiError>> {
     const key = this.buildIdempotencyKey(signedXml);
-    const cached = await this.idempotency.get<InvoiceResponse>(key);
-    if (cached) {
+    const cached = await this.idempotency.get<
+      InvoiceResponse | PendingSubmission
+    >(key);
+    if (cached !== undefined) {
+      if (isPendingSubmission(cached)) {
+        return err(
+          new DgiiError(
+            'A submission with this key is already pending; reconcile via a status lookup before retrying',
+            { code: 'IDEMPOTENCY' },
+          ),
+        );
+      }
       return ok(cached);
     }
     return this.singleFlight(key, async () => {
+      // Persist-before-transmit: record the pending submission before the
+      // network call so an interrupted send can be reconciled, not re-issued.
+      await this.idempotency.set(key, PENDING_SUBMISSION);
       const url = buyerHost
         ? buildSenderReceiverUrl(buyerHost, SenderReceiverEndpoint.SendInvoice)
         : buildUrl(this.environment, Endpoint.SendInvoice);
@@ -202,6 +226,8 @@ export class ECF {
       );
       if (result.isOk()) {
         await this.idempotency.set(key, result.value);
+      } else {
+        await this.idempotency.delete(key);
       }
       return result;
     });
@@ -213,11 +239,23 @@ export class ECF {
     fileName: string,
   ): Promise<Result<InvoiceSummaryResponse, DgiiError>> {
     const key = this.buildIdempotencyKey(signedXml);
-    const cached = await this.idempotency.get<InvoiceSummaryResponse>(key);
-    if (cached) {
+    const cached = await this.idempotency.get<
+      InvoiceSummaryResponse | PendingSubmission
+    >(key);
+    if (cached !== undefined) {
+      if (isPendingSubmission(cached)) {
+        return err(
+          new DgiiError(
+            'A submission with this key is already pending; reconcile via a status lookup before retrying',
+            { code: 'IDEMPOTENCY' },
+          ),
+        );
+      }
       return ok(cached);
     }
     return this.singleFlight(key, async () => {
+      // Persist-before-transmit (see sendElectronicDocument).
+      await this.idempotency.set(key, PENDING_SUBMISSION);
       const url = buildUrl(this.environment, Endpoint.SendSummary, BaseUrl.CF);
       const result = await this.http.postMultipart<InvoiceSummaryResponse>(
         url,
@@ -227,6 +265,8 @@ export class ECF {
       );
       if (result.isOk()) {
         await this.idempotency.set(key, result.value);
+      } else {
+        await this.idempotency.delete(key);
       }
       return result;
     });
