@@ -33,6 +33,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run typescript.yml \
+            --repo "${{ github.repository }}" \
             --ref "${{ steps.release.outputs['packages/typescript--tag_name'] }}"
 
       - name: Dispatch Python publish
@@ -41,4 +42,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh workflow run python.yml \
+            --repo "${{ github.repository }}" \
             --ref "${{ steps.release.outputs['packages/python--tag_name'] }}"
