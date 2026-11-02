@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.5.0...typescript-v0.5.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **types:** preserve string message codes and keep the key ([#102](https://github.com/deuriib/dgii-ecf/issues/102)) ([d424c98](https://github.com/deuriib/dgii-ecf/commit/d424c98e32849ec408020a80541580b24c5c48f9))
+
 ## [0.5.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.4.1...typescript-v0.5.0) (2026-11-02)
 
 
