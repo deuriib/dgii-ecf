@@ -41,6 +41,13 @@ export interface EcfOptions {
   timeoutMs?: number;
   /** Injectable fetch (useful for tests). */
   fetchImpl?: typeof fetch;
+  /**
+   * Refresh the token when its remaining lifetime falls below this window.
+   * Defaults to 5 minutes.
+   */
+  tokenRefreshSkewMs?: number;
+  /** Injectable clock (epoch milliseconds); useful for tests. */
+  now?: () => number;
 }
 
 interface PendingSubmission {
@@ -57,6 +64,15 @@ const isPendingSubmission = (value: unknown): value is PendingSubmission =>
 const sha256Hex = (value: string): string =>
   createHash('sha256').update(value, 'utf8').digest('hex');
 
+/** Parse DGII's ISO-8601 `expira` into epoch milliseconds. */
+const parseExpiry = (value: string | undefined): number | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
 /**
  * DGII e-CF client. Every method returns a `Result` — no thrown domain errors.
  */
@@ -69,6 +85,10 @@ export class ECF {
     string,
     Promise<Result<unknown, DgiiError>>
   >();
+  private readonly tokenRefreshSkewMs: number;
+  private readonly now: () => number;
+  private tokenExpiresAt: number | undefined;
+  private refreshPromise: Promise<Result<AuthToken, DgiiError>> | undefined;
 
   constructor(
     credentials: P12ReaderData,
@@ -77,6 +97,8 @@ export class ECF {
   ) {
     this.credentials = credentials;
     this.environment = environment;
+    this.tokenRefreshSkewMs = options.tokenRefreshSkewMs ?? 5 * 60 * 1000;
+    this.now = options.now ?? Date.now;
     this.idempotency =
       options.idempotencyStore ?? new InMemoryIdempotencyStore();
     this.http = new HttpClient({
@@ -91,6 +113,10 @@ export class ECF {
       ...(options.fetchImpl !== undefined
         ? { fetchImpl: options.fetchImpl }
         : {}),
+      beforeRequest: async () => {
+        await this.ensureToken();
+      },
+      onUnauthorized: () => this.reauthenticate(),
     });
   }
 
@@ -157,6 +183,43 @@ export class ECF {
     }
   }
 
+  /**
+   * Refresh the token when it is missing or about to expire.
+   *
+   * A pre-supplied `token` has no known expiry, so it is never refreshed
+   * proactively — only a 401 triggers a re-authentication for it.
+   */
+  private async ensureToken(): Promise<Result<void, DgiiError>> {
+    if (this.tokenExpiresAt === undefined) {
+      return ok(undefined);
+    }
+    if (this.now() < this.tokenExpiresAt - this.tokenRefreshSkewMs) {
+      return ok(undefined);
+    }
+    const refreshed = await this.refreshToken();
+    return refreshed.isOk() ? ok(undefined) : err(refreshed.error);
+  }
+
+  /** Authenticate, coalescing concurrent refreshes into a single round-trip. */
+  private refreshToken(): Promise<Result<AuthToken, DgiiError>> {
+    if (this.refreshPromise !== undefined) {
+      return this.refreshPromise;
+    }
+    const promise = this.authenticate().finally(() => {
+      this.refreshPromise = undefined;
+    });
+    this.refreshPromise = promise;
+    return promise;
+  }
+
+  /** Drop the rejected token and authenticate once. Returns `true` on success. */
+  private async reauthenticate(): Promise<boolean> {
+    this.http.clearToken();
+    this.tokenExpiresAt = undefined;
+    const refreshed = await this.refreshToken();
+    return refreshed.isOk();
+  }
+
   /** Authenticate against DGII (or a buyer host) and store the bearer token. */
   async authenticate(
     buyerHost?: string,
@@ -190,6 +253,7 @@ export class ECF {
       return err(token.error);
     }
     this.http.setToken(token.value.token);
+    this.tokenExpiresAt = parseExpiry(token.value.expira);
     return ok(token.value);
   }
 
@@ -202,12 +266,14 @@ export class ECF {
       return this.http.get<string>(url, undefined, {
         absoluteUrl: true,
         resource: SenderReceiverEndpoint.Seed,
+        skipAuthHooks: true,
       });
     }
     const url = buildUrl(this.environment, Endpoint.Seed);
     return this.http.get<string>(url, undefined, {
       absoluteUrl: true,
       resource: Endpoint.Seed,
+      skipAuthHooks: true,
     });
   }
 
@@ -221,6 +287,7 @@ export class ECF {
     return this.http.postMultipart<AuthToken>(url, 'signed.xml', signedSeed, {
       absoluteUrl: true,
       resource: Endpoint.ValidateSeed,
+      skipAuthHooks: true,
     });
   }
 
