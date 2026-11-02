@@ -140,10 +140,17 @@ class HttpClient:
         """Drop the bearer token used on subsequent requests."""
         self._token = None
 
-    def _headers(self) -> dict[str, str]:
+    def _headers(
+        self,
+        extra: Mapping[str, str] | None = None,
+        *,
+        omit_auth: bool = False,
+    ) -> dict[str, str]:
         headers = {"Accept": "application/json"}
-        if self._token:
+        if self._token and not omit_auth:
             headers["Authorization"] = f"Bearer {self._token}"
+        if extra:
+            headers.update(extra)
         return headers
 
     def _parse(self, response: httpx2.Response) -> DgiiResult[JsonValue]:
@@ -180,13 +187,22 @@ class HttpClient:
         *,
         params: Mapping[str, str | int | None] | None = None,
         files: Mapping[str, tuple[str, bytes, str]] | None = None,
+        headers: Mapping[str, str] | None = None,
         skip_auth_hooks: bool = False,
+        omit_auth: bool = False,
     ) -> DgiiResult[JsonValue]:
         """Perform a request and normalize the outcome into a ``Result``."""
         if not skip_auth_hooks and self._before_request is not None:
             self._before_request()
 
-        first = self._execute(method, url, params=params, files=files)
+        first = self._execute(
+            method,
+            url,
+            params=params,
+            files=files,
+            extra_headers=headers,
+            omit_auth=omit_auth,
+        )
         if (
             not skip_auth_hooks
             and first.is_err()
@@ -194,7 +210,14 @@ class HttpClient:
             and self._on_unauthorized is not None
             and self._on_unauthorized()
         ):
-            return self._execute(method, url, params=params, files=files)
+            return self._execute(
+                method,
+                url,
+                params=params,
+                files=files,
+                extra_headers=headers,
+                omit_auth=omit_auth,
+            )
         return first
 
     def _execute(
@@ -204,6 +227,8 @@ class HttpClient:
         *,
         params: Mapping[str, str | int | None] | None = None,
         files: Mapping[str, tuple[str, bytes, str]] | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+        omit_auth: bool = False,
     ) -> DgiiResult[JsonValue]:
         clean_params = _clean_params(params)
 
@@ -213,7 +238,7 @@ class HttpClient:
                 url,
                 params=clean_params,
                 files=files,
-                headers=self._headers(),
+                headers=self._headers(extra_headers, omit_auth=omit_auth),
             )
             return self._parse(response)
 
@@ -243,10 +268,19 @@ class HttpClient:
         url: str,
         params: Mapping[str, str | int | None] | None = None,
         *,
+        headers: Mapping[str, str] | None = None,
         skip_auth_hooks: bool = False,
+        omit_auth: bool = False,
     ) -> DgiiResult[JsonValue]:
         """HTTP GET."""
-        return self.request("GET", url, params=params, skip_auth_hooks=skip_auth_hooks)
+        return self.request(
+            "GET",
+            url,
+            params=params,
+            headers=headers,
+            skip_auth_hooks=skip_auth_hooks,
+            omit_auth=omit_auth,
+        )
 
     def post_multipart(
         self,

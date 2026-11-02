@@ -6,7 +6,10 @@ import {
   Endpoint,
   Environment,
   SenderReceiverEndpoint,
+  StatusEndpoint,
+  StatusEnvironment,
   buildSenderReceiverUrl,
+  buildStatusUrl,
   buildUrl,
 } from './environment.js';
 import {
@@ -26,7 +29,10 @@ import type {
   InquiryStatusResponse,
   InvoiceResponse,
   InvoiceSummaryResponse,
+  MaintenanceWindow,
+  ServiceAvailabilityResponse,
   ServiceDirectoryResponse,
+  ServiceStatusEntry,
   SummaryTrackingStatusResponse,
   TrackingStatusResponse,
   VoidNCFResponse,
@@ -48,6 +54,8 @@ export interface EcfOptions {
   tokenRefreshSkewMs?: number;
   /** Injectable clock (epoch milliseconds); useful for tests. */
   now?: () => number;
+  /** API key for the `statusecf` service (`Authorization: Apikey …`). */
+  statusApiKey?: string;
 }
 
 interface PendingSubmission {
@@ -87,6 +95,7 @@ export class ECF {
   >();
   private readonly tokenRefreshSkewMs: number;
   private readonly now: () => number;
+  private readonly statusApiKey: string | undefined;
   private tokenExpiresAt: number | undefined;
   private refreshPromise: Promise<Result<AuthToken, DgiiError>> | undefined;
 
@@ -99,6 +108,7 @@ export class ECF {
     this.environment = environment;
     this.tokenRefreshSkewMs = options.tokenRefreshSkewMs ?? 5 * 60 * 1000;
     this.now = options.now ?? Date.now;
+    this.statusApiKey = options.statusApiKey;
     this.idempotency =
       options.idempotencyStore ?? new InMemoryIdempotencyStore();
     this.http = new HttpClient({
@@ -255,6 +265,73 @@ export class ECF {
     this.http.setToken(token.value.token);
     this.tokenExpiresAt = parseExpiry(token.value.expira);
     return ok(token.value);
+  }
+
+  /**
+   * Query the operational status of every DGII service.
+   *
+   * The status host takes an API key instead of a bearer token, so this call
+   * neither needs `authenticate()` nor triggers a token refresh.
+   */
+  async getServiceStatus(): Promise<Result<ServiceStatusEntry[], DgiiError>> {
+    const result = await this.statusRequest<
+      ServiceStatusEntry[] | ServiceStatusEntry
+    >(StatusEndpoint.Services);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+    const data = result.value;
+    if (data === undefined || data === null) {
+      return ok([]);
+    }
+    return ok(Array.isArray(data) ? data : [data]);
+  }
+
+  /** Scheduled maintenance windows, one entry per environment. */
+  async getMaintenanceWindows(): Promise<
+    Result<MaintenanceWindow[], DgiiError>
+  > {
+    const result = await this.statusRequest<
+      { ventanaMantenimientos?: MaintenanceWindow[] } | MaintenanceWindow[]
+    >(StatusEndpoint.MaintenanceWindows);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+    const data = result.value;
+    if (Array.isArray(data)) {
+      return ok(data);
+    }
+    return ok(data?.ventanaMantenimientos ?? []);
+  }
+
+  /** Whether an environment is currently inside a maintenance window. */
+  checkServiceAvailability(
+    ambiente: StatusEnvironment,
+  ): Promise<Result<ServiceAvailabilityResponse, DgiiError>> {
+    return this.statusRequest<ServiceAvailabilityResponse>(
+      StatusEndpoint.Check,
+      { ambiente },
+    );
+  }
+
+  private statusRequest<T>(
+    endpoint: StatusEndpoint,
+    query?: Record<string, string | number | undefined>,
+  ): Promise<Result<T, DgiiError>> {
+    const headers: Record<string, string> =
+      this.statusApiKey === undefined
+        ? {}
+        : { Authorization: `Apikey ${this.statusApiKey}` };
+    return this.http.request<T>({
+      method: 'GET',
+      path: buildStatusUrl(endpoint),
+      absoluteUrl: true,
+      resource: `status:${endpoint}`,
+      headers,
+      ...(query !== undefined ? { query } : {}),
+      skipAuthHooks: true,
+      omitAuth: true,
+    });
   }
 
   private getSeed(buyerHost?: string): Promise<Result<string, DgiiError>> {

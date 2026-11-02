@@ -421,3 +421,50 @@ class VoidNCFResponse:
             nombre=_as_str(data.get("nombre"), "nombre"),
             mensajes=_parse_strings(data.get("mensajes"), "mensajes"),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceStatusEntry:
+    """One entry of ``get_service_status`` (``estatusservicios``)."""
+
+    servicio: str
+    estatus: str
+    ambiente: str
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> ServiceStatusEntry:
+        return cls(
+            servicio=_as_str(data.get("servicio"), "servicio"),
+            estatus=_as_str(data.get("estatus"), "estatus"),
+            ambiente=_as_str(data.get("ambiente"), "ambiente"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class MaintenanceWindow:
+    """One maintenance window of ``get_maintenance_windows``."""
+
+    ambiente: str
+    hora_inicio: str
+    hora_fin: str
+    dias: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> MaintenanceWindow:
+        return cls(
+            ambiente=_as_str(data.get("ambiente"), "ambiente"),
+            hora_inicio=_as_str(data.get("horaInicio"), "horaInicio"),
+            hora_fin=_as_str(data.get("horaFin"), "horaFin"),
+            dias=_parse_strings(data.get("dias"), "dias"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceAvailabilityResponse:
+    """Result of ``check_service_availability`` (``verificarestado``)."""
+
+    estado: str
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, object]) -> ServiceAvailabilityResponse:
+        return cls(estado=_as_str(data.get("estado"), "estado"))

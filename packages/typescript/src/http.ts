@@ -117,6 +117,8 @@ export interface RequestOptions {
   resource?: string;
   /** Skip the auth hooks (used by the authentication round-trip itself). */
   skipAuthHooks?: boolean;
+  /** Do not attach the bearer token (used by the status service). */
+  omitAuth?: boolean;
 }
 
 interface RequestContext {
@@ -186,9 +188,12 @@ export class HttpClient {
     return url;
   }
 
-  private authHeaders(extra?: Record<string, string>): Record<string, string> {
+  private authHeaders(
+    extra?: Record<string, string>,
+    omitAuth = false,
+  ): Record<string, string> {
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (this.token) {
+    if (!omitAuth && this.token) {
       headers.Authorization = `Bearer ${this.token}`;
     }
     return { ...headers, ...extra };
@@ -264,7 +269,7 @@ export class HttpClient {
   ): Promise<Result<T, DgiiError>> {
     const url = this.buildUrl(options.path, options.absoluteUrl, options.query);
     const method = options.method ?? 'GET';
-    const headers = this.authHeaders(options.headers);
+    const headers = this.authHeaders(options.headers, options.omitAuth);
     const ctx: RequestContext = {
       method,
       resource: options.resource ?? options.path,

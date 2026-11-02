@@ -46,6 +46,22 @@ class SenderReceiverEndpoint(enum.StrEnum):
     COMMERCIAL_APPROVAL = "fe/aprobacioncomercial/api/ecf"
 
 
+class StatusEndpoint(enum.StrEnum):
+    """Service-status endpoints (no environment segment)."""
+
+    SERVICES = "api/estatusservicios/obtenerestatus"
+    MAINTENANCE_WINDOWS = "api/estatusservicios/obtenerventanasmantenimiento"
+    CHECK = "api/estatusservicios/verificarestado"
+
+
+class StatusEnvironment(enum.IntEnum):
+    """Numeric ``ambiente`` codes accepted by the status service."""
+
+    PRE_CERTIFICATION = 1
+    PRODUCTION = 2
+    CERTIFICATION = 3
+
+
 def build_url(
     environment: Environment,
     endpoint: Endpoint,
@@ -53,6 +69,14 @@ def build_url(
 ) -> str:
     """Build ``{base_url}/{environment}/{endpoint}``."""
     return f"{base_url.rstrip('/')}/{environment.value}/{endpoint.value}"
+
+
+def build_status_url(
+    endpoint: StatusEndpoint,
+    base_url: str = BaseUrl.STATUS.value,
+) -> str:
+    """Build ``{base_url}/{endpoint}`` for the status service (no environment)."""
+    return f"{base_url.rstrip('/')}/{endpoint.value}"
 
 
 def build_sender_receiver_url(host: str, endpoint: SenderReceiverEndpoint) -> str:

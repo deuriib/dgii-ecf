@@ -108,3 +108,26 @@ export interface VoidNCFResponse {
   nombre: string;
   mensajes: string[];
 }
+
+/** Operational state reported by the DGII status service. */
+export type ServiceAvailability = 'Disponible' | 'No Disponible';
+
+/** One entry of `getServiceStatus` (`estatusservicios/obtenerestatus`). */
+export interface ServiceStatusEntry {
+  servicio: string;
+  estatus: ServiceAvailability;
+  ambiente: string;
+}
+
+/** One maintenance window of `getMaintenanceWindows`. */
+export interface MaintenanceWindow {
+  ambiente: string;
+  horaInicio: string;
+  horaFin: string;
+  dias: string[];
+}
+
+/** Result of `checkServiceAvailability` (`estatusservicios/verificarestado`). */
+export interface ServiceAvailabilityResponse {
+  estado: ServiceAvailability;
+}
