@@ -41,6 +41,12 @@ dependencies = [
   "typer>=0.15",
 ]
 
+[project.urls]
+Homepage = "https://deuriib.github.io/dgii-ecf/"
+Documentation = "https://deuriib.github.io/dgii-ecf/python/"
+Repository = "https://github.com/deuriib/dgii-ecf"
+Changelog = "https://github.com/deuriib/dgii-ecf/blob/main/packages/python/CHANGELOG.md"
+
 [dependency-groups]
 dev = [
   "ruff>=0.9",
