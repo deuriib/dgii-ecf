@@ -33,7 +33,12 @@ jobs:
       - uses: astral-sh/setup-uv@v7
 
       - name: Build site
-        run: uvx --from mkdocs-material mkdocs build --strict
+        run: uvx --from mkdocs --with mkdocs-material --with "mkdocs-static-i18n>=1.0,<2" mkdocs build --strict
+
+      - name: Check en/es translation parity
+        run: |
+          diff <(cd docs/en && find . -name '*.md' | sort) <(cd docs/es && find . -name '*.md' | sort)
+          test -f site/es/index.html
 
       - uses: actions/configure-pages@v5
 
