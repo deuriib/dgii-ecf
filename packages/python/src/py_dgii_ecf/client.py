@@ -58,6 +58,7 @@ from .types import (
     VoidNCFResponse,
     _ModelT,
 )
+from .validation import format_violations, validate_document
 
 _PENDING_MARKER: JsonObject = {"__pending__": True}
 
@@ -160,6 +161,7 @@ class ECF:
         now: Callable[[], float] = time.time,
         status_api_key: str | None = None,
         enforce_b2b_rules: bool = True,
+        validate_before_send: bool = False,
     ) -> None:
         self._credentials = credentials
         self._environment = environment
@@ -168,6 +170,7 @@ class ECF:
         )
         self._status_api_key = status_api_key
         self._enforce_b2b_rules = enforce_b2b_rules
+        self._validate_before_send = validate_before_send
         self._token_refresh_skew_s = token_refresh_skew_s
         self._now = now
         self._token_expires_at: float | None = None
@@ -380,6 +383,23 @@ class ECF:
             applicable = check_b2b_applicability(signed_xml)
             if applicable.is_err():
                 return Err(applicable.unwrap_err())
+        if self._validate_before_send:
+            validation = validate_document(signed_xml)
+            if validation.is_err():
+                return Err(validation.unwrap_err())
+            violations = validation.unwrap()
+            if violations:
+                return Err(
+                    DgiiError(
+                        "Document does not match the DGII XML Schema: "
+                        + format_violations(violations),
+                        code=DgiiErrorCode.VALIDATION,
+                        data=[
+                            {"path": violation.path, "message": violation.message}
+                            for violation in violations
+                        ],
+                    )
+                )
         url = (
             build_sender_receiver_url(buyer_host, SenderReceiverEndpoint.SEND_INVOICE)
             if buyer_host

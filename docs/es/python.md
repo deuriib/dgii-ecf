@@ -127,6 +127,34 @@ if (ack.isOk() && !ack.value.accepted) {
 }
 ```
 
+### Validación por esquema
+
+`validate_document` verifica un documento contra el XML Schema oficial de la
+DGII y reporta cada violación con la ruta del elemento. Los esquemas vienen
+empaquetados, así que la validación funciona sin red.
+
+```python
+from py_dgii_ecf import validate_document
+
+result = validate_document(signed_xml)
+if result.is_ok():
+    for violation in result.unwrap():
+        print(violation.path, violation.message)
+```
+
+`validate_before_send=True` ejecuta la misma verificación antes de un envío
+**general de e-CF** y falla con `VALIDATION` sin llamar a la DGII:
+
+```python
+ecf = ECF(credentials, Environment.PROD, validate_before_send=True)
+```
+
+Se empaquetan doce esquemas: `e-CF` 32, 33, 34, 41, 43, 44, 45, 46, 47, `ANECF`,
+`ARECF` y `Semilla`. Tres esquemas publicados no compilan — `e-CF 31`,
+`RFCE 32` y `ACECF` — así que esos tipos se reportan como _esquema no
+disponible_ en vez de pasar en silencio. Ver
+`examples/fixtures/schemas/README.md` para las razones exactas.
+
 ### Redondeo monetario
 
 `Transformer.json_to_xml(..., round_monetary=True)` redondea los valores

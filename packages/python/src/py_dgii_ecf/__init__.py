@@ -84,6 +84,11 @@ from .utils import (
     get_current_formatted_datetime,
     get_xml_from_body_response,
 )
+from .validation import (
+    SchemaViolation,
+    format_violations,
+    validate_document,
+)
 
 __version__ = "0.6.1"
 
@@ -130,6 +135,7 @@ __all__ = [
     "ResponseModel",
     "ResponseShapeError",
     "Result",
+    "SchemaViolation",
     "SenderReceiverEndpoint",
     "ServiceAvailabilityResponse",
     "ServiceDirectoryResponse",
@@ -151,6 +157,7 @@ __all__ = [
     "compare_decimal",
     "convert_ecf32_to_rfce",
     "extract_dgii_error_message",
+    "format_violations",
     "generate_ecf_qr_code_url",
     "generate_fc_qr_code_url",
     "get_code_six_digit_from_signature",
@@ -162,5 +169,6 @@ __all__ = [
     "is_retryable_status",
     "resolve_reception_route",
     "to_dgii_error",
+    "validate_document",
     "validate_xml_certificate",
 ]
