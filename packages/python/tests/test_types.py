@@ -164,7 +164,21 @@ def test_void_response() -> None:
             "mensajes": ["Anulado"],
         }
     )
-    assert response.mensajes == ("Anulado",)
+    assert response.mensajes[0].valor == "Anulado"
+
+
+def test_void_response_accepts_object_messages() -> None:
+    response = VoidNCFResponse.from_dict(
+        {
+            "rnc": "130862346",
+            "codigo": "1",
+            "nombre": "Deuri",
+            "mensajes": [{"codigo": 0, "valor": "Las secuencias fueron anuladas"}],
+        }
+    )
+
+    assert response.mensajes[0].valor == "Las secuencias fueron anuladas"
+    assert response.mensajes[0].codigo == 0
 
 
 def test_missing_required_field_raises() -> None:

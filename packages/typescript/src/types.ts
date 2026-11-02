@@ -36,7 +36,13 @@ export interface TrackingStatusResponse {
 
 export type InquiryStatusCode = 0 | 1 | 2;
 
-export type InquiryStatus = 'No encontrado' | 'Aceptado' | 'Rechazado';
+/**
+ * eNCF inquiry states. "Aceptado Condicional" is observable for an E32 below
+ * RD$250,000 even though the tracking service reports it with a different
+ * code, so it belongs in the union.
+ */
+export type InquiryStatus =
+  'No encontrado' | 'Aceptado' | 'Rechazado' | 'Aceptado Condicional';
 
 export interface InquiryStatusResponse {
   codigo: InquiryStatusCode;
@@ -70,9 +76,19 @@ export interface InvoiceResponse {
   mensajes?: Mensaje[];
 }
 
+/**
+ * Documented states of an RFCE reception. DGII is not consistent about casing
+ * between services (the tracking service reports "Aceptado Condicional"), so
+ * `estado` stays a `string` and these constants are the documented values.
+ */
+export const SUMMARY_ACCEPTED = 'Aceptado';
+export const SUMMARY_CONDITIONAL_ACCEPTED = 'Aceptado condicional';
+export const SUMMARY_REJECTED = 'Rechazado';
+
 export interface InvoiceSummaryResponse {
   codigo: number;
-  estado: 'Aceptado' | 'Rechazado' | 'Aceptado Condicional';
+  /** One of the `SUMMARY_*` constants, compared case-insensitively. */
+  estado: string;
   mensajes?: Mensaje[];
   encf: string;
   secuenciaUtilizada: boolean;
@@ -106,7 +122,8 @@ export interface VoidNCFResponse {
   rnc: string;
   codigo: string;
   nombre: string;
-  mensajes: string[];
+  /** DGII returns objects on some services and bare strings on others. */
+  mensajes: Mensaje[];
 }
 
 /** Operational state reported by the DGII status service. */

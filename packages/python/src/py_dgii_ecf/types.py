@@ -21,6 +21,12 @@ COMMERCIAL_APPROVAL_REJECTED_CODE = "2"
 COMMERCIAL_APPROVAL_ACCEPTED_STATE = "Aprobación comercial aprobada"
 COMMERCIAL_APPROVAL_REJECTED_STATE = "Aprobación comercial rechazada"
 
+# Documented states of an RFCE reception. DGII is not consistent about casing
+# between services, so `estado` stays a plain string.
+SUMMARY_ACCEPTED = "Aceptado"
+SUMMARY_CONDITIONAL_ACCEPTED = "Aceptado condicional"
+SUMMARY_REJECTED = "Rechazado"
+
 
 @dataclass(frozen=True, slots=True)
 class Mensaje:
@@ -411,7 +417,8 @@ class VoidNCFResponse:
     rnc: str
     codigo: str
     nombre: str
-    mensajes: tuple[str, ...] = ()
+    #: DGII returns objects on some services and bare strings on others.
+    mensajes: tuple[Mensaje, ...] = ()
 
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> VoidNCFResponse:
@@ -419,7 +426,7 @@ class VoidNCFResponse:
             rnc=_as_str(data.get("rnc"), "rnc"),
             codigo=_as_str(data.get("codigo"), "codigo"),
             nombre=_as_str(data.get("nombre"), "nombre"),
-            mensajes=_parse_strings(data.get("mensajes"), "mensajes"),
+            mensajes=_parse_mensajes(data.get("mensajes")),
         )
 
 
