@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "packages/typescript": {
+      "release-type": "node",
+      "package-name": "@deuriib/dgii-ecf",
+      "component": "typescript",
+      "changelog-path": "CHANGELOG.md"
+    },
+    "packages/python": {
+      "release-type": "python",
+      "package-name": "py-dgii-ecf",
+      "component": "python",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}

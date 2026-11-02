@@ -1,0 +1,83 @@
+# GitHub labels for the dgii-ecf monorepo.
+# Synced automatically by `.github/workflows/labels.yml` via
+# crazy-max/ghaction-github-labeler.
+
+- name: bug
+  color: d73a4a
+  description: Something isn't working as expected
+
+- name: feature
+  color: a2eeef
+  description: New functionality or enhancement
+
+- name: enhancement
+  color: 84b6eb
+  description: Improvement to existing behavior
+
+- name: documentation
+  color: 0075ca
+  description: Improvements or additions to docs
+
+- name: chore
+  color: c5def5
+  description: Maintenance that does not affect user-facing code
+
+- name: dependencies
+  color: 0366d6
+  description: Pull requests that update a dependency file
+
+- name: security
+  color: b60205
+  description: Security-related issue or fix
+
+- name: performance
+  color: 3d9f56
+  description: Performance improvements
+
+- name: tests
+  color: 1d76db
+  description: Test additions or corrections
+
+- name: ci
+  color: 0e8a16
+  description: Continuous integration / automation changes
+
+- name: typescript
+  color: 3178c6
+  description: Affects the @deuriib/dgii-ecf TypeScript package
+
+- name: python
+  color: 3776ab
+  description: Affects the dgii-ecf Python package
+
+- name: breaking
+  color: d93f0b
+  description: Introduces a breaking change
+
+- name: good first issue
+  color: 7057ff
+  description: Good for newcomers
+
+- name: help wanted
+  color: 008672
+  description: Extra attention is needed
+
+- name: question
+  color: d876e3
+  description: Further information is requested
+
+- name: wontfix
+  color: ffffff
+  description: This will not be worked on
+
+- name: blocked
+  color: f9d0c4
+  description: Blocked by another issue or external dependency
+
+- name: duplicate
+  color: cfd3d7
+  description: This issue or pull request already exists
+
+- name: invalid
+  color: e4e669
+  description: This doesn't seem right

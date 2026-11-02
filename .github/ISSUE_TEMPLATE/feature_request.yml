@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a new feature or enhancement
+title: "feat: "
+labels: [feature, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature. Please describe the problem and the proposed solution clearly.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which package?
+      options:
+        - "@deuriib/dgii-ecf (TypeScript)"
+        - "dgii-ecf (Python)"
+        - "Both"
+        - "Monorepo / tooling"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How should it work? Include example API usage if relevant.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or alternatives you have explored.
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Links to DGII spec sections, XSD, or anything else relevant.
