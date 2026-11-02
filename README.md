@@ -3,6 +3,13 @@
 > Electronic invoicing (e-CF) SDKs for the Dominican Republic's **DGII** —
 > Dirección General de Impuestos Internos.
 
+[![npm](https://img.shields.io/npm/v/@deuriib/dgii-ecf.svg?label=npm)](https://www.npmjs.com/package/@deuriib/dgii-ecf)
+[![PyPI](https://img.shields.io/pypi/v/py-dgii-ecf.svg?label=pypi)](https://pypi.org/project/py-dgii-ecf/)
+[![TypeScript CI](https://github.com/deuriib/dgii-ecf/actions/workflows/typescript.yml/badge.svg)](https://github.com/deuriib/dgii-ecf/actions/workflows/typescript.yml)
+[![Python CI](https://github.com/deuriib/dgii-ecf/actions/workflows/python.yml/badge.svg)](https://github.com/deuriib/dgii-ecf/actions/workflows/python.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://www.conventionalcommits.org/)
+
 Professional, polyglot monorepo with two publishable, production-oriented SDKs
 for authenticating against DGII web services, signing electronic tax documents
 with **XMLDSig** (inclusive C14N + RSA-SHA256), and transmitting them reliably.
