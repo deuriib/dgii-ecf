@@ -38,6 +38,7 @@ reason.
 
 - The package ships its own copy at `packages/python/src/py_dgii_ecf/schemas/`;
   this mirror exists for examples and tests. Both are byte-identical.
-- `examples/fixtures/invoice-32.xml` does **not** validate against
-  `e-cf-32.xsd`: it uses an ISO date where DGII expects `dd-MM-yyyy` and its
-  element order differs. It predates the schema bundle.
+- `examples/fixtures/invoice-32.xml` validates against `e-cf-32.xsd` **once
+  signed**. The schema ends with an `xs:any` for the signature, so the unsigned
+  fixture is structurally incomplete by design — the test signs it first and
+  asserts the signed document validates.
