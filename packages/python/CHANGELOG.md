@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/deuriib/dgii-ecf/compare/python-v0.7.0...python-v0.7.1) (2026-11-03)
+
+
+### Documentation
+
+* sync the documentation with the implementation ([#122](https://github.com/deuriib/dgii-ecf/issues/122)) ([f15e9ed](https://github.com/deuriib/dgii-ecf/commit/f15e9edba413a0cfc43295331c606ef7abab48eb))
+
 ## [0.7.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.6.1...python-v0.7.0) (2026-11-03)
 
 
