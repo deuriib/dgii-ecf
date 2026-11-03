@@ -2,8 +2,13 @@
 
 > Companion to `project-specs/dgii-ecf-setup.md` (canonical requirements + Appendix A) and
 > `project-tasks/dgii-ecf-tasklist.md`. This document defines the contracts developers implement
-> against. Where the spec is silent, this document states an explicit resolution (see §12).
-> Nothing here introduces a dependency or feature absent from the spec.
+> against, and is kept in sync with what both packages actually export. Where the spec is silent,
+> this document states an explicit resolution (see §12). Nothing here introduces a dependency or
+> feature absent from the spec.
+>
+> When a signature here and the source disagree, the source wins: `packages/typescript/src/index.ts`
+> and `packages/python/src/py_dgii_ecf/__init__.py` are the authoritative public surface. Update
+> this file in the same change that alters a contract.
 
 ---
 
@@ -46,41 +51,50 @@ Both SDKs: authenticate against DGII web services, sign documents with **XMLDSig
 
 ### TypeScript (`packages/typescript/src/`)
 
-| Module           | Responsibility                                               |
-| ---------------- | ------------------------------------------------------------ |
-| `index.ts`       | Public re-exports (package surface)                          |
-| `environment.ts` | `Environment`, `BaseUrl`, `Endpoints`, path builder          |
-| `types.ts`       | Wire/response models (`AuthToken`, `InvoiceResponse`, …)     |
-| `errors.ts`      | `DgiiError`, `DgiiErrorCode`, `toDgiiError()`                |
-| `result.ts`      | `neverthrow` re-exports + `DgiiResult<T>`                    |
-| `resilience.ts`  | cockatiel policy factory + retry predicate                   |
-| `http.ts`        | `HttpClient`, `IdempotencyStore`, `InMemoryIdempotencyStore` |
-| `certificate.ts` | `P12Reader` (node-forge)                                     |
-| `signing.ts`     | `Signature`, custom `Digest`, `validateXMLCertificate`       |
-| `transformer.ts` | `Transformer` (xml-js json2xml/xml2json)                     |
-| `utils.ts`       | security code, QR URLs, date/time, RFCE, XML-body helpers    |
-| `client.ts`      | `ECFClient` (auth + all endpoints)                           |
+| Module              | Responsibility                                               |
+| ------------------- | ------------------------------------------------------------ |
+| `index.ts`          | Public re-exports (package surface)                          |
+| `environment.ts`    | `Environment`, `BaseUrl`, `Endpoint`, URL builders           |
+| `types.ts`          | Wire/response models (`AuthToken`, `InvoiceResponse`, …)     |
+| `errors.ts`         | `DgiiError`, `DgiiErrorCode`, `toDgiiError()`                |
+| `result.ts`         | `neverthrow` re-exports + `DgiiResult<T>`                    |
+| `resilience.ts`     | cockatiel policy factory + retry predicate                   |
+| `http.ts`           | `HttpClient`, `IdempotencyStore`, `InMemoryIdempotencyStore` |
+| `xml.ts`            | Strict parse, root/element extraction                        |
+| `certificate.ts`    | `P12Reader` (node-forge)                                     |
+| `signing.ts`        | `Signature`, `validateXMLCertificate`                        |
+| `transformer.ts`    | `Transformer` (xml-js json2xml/xml2json)                     |
+| `reception.ts`      | Reception routing + B2B applicability (A.2)                  |
+| `reconciliation.ts` | Pending-marker reconciliation, sequence reuse                |
+| `validation.ts`     | XSD validation via `xmllint` (ADR 0002)                      |
+| `utils.ts`          | security code, QR URLs, date/time, RFCE, XML-body helpers    |
+| `client.ts`         | `ECF` (auth + all endpoints)                                 |
 
 ### Python (`packages/python/src/py_dgii_ecf/`)
 
 Mirrors the TS map 1:1, with `cli.py` (Python-only) replacing `index.ts` as the "extra" module;
 `__init__.py` is the package surface (analogous to `index.ts`).
 
-| Module           | Responsibility                                               |
-| ---------------- | ------------------------------------------------------------ |
-| `__init__.py`    | Public re-exports                                            |
-| `environment.py` | `Environment`, `BaseUrl`, `Endpoints`, path builder          |
-| `types.py`       | Models (`AuthToken`, response types)                         |
-| `errors.py`      | `DgiiError`, `DgiiErrorCode`, `to_dgii_error()`              |
-| `result.py`      | `result` re-exports + `DgiiResult[T]`                        |
-| `resilience.py`  | tenacity + pybreaker wrapper + retry predicate               |
-| `http.py`        | `HttpClient`, `IdempotencyStore`, `InMemoryIdempotencyStore` |
-| `certificate.py` | `P12Reader` (cryptography)                                   |
-| `signing.py`     | `Signature`, `validate_xml_certificate`                      |
-| `transformer.py` | `Transformer` (internal `dict_to_xml`/`xml_to_dict`)         |
-| `utils.py`       | security code, QR URLs, date/time, RFCE, XML-body helpers    |
-| `client.py`      | `ECFClient` (auth + all endpoints)                           |
-| `cli.py`         | typer `app` → `py-dgii-ecf` entry point                      |
+| Module              | Responsibility                                               |
+| ------------------- | ------------------------------------------------------------ |
+| `__init__.py`       | Public re-exports                                            |
+| `environment.py`    | `Environment`, `BaseUrl`, `Endpoint`, URL builders           |
+| `types.py`          | Models (`AuthToken`, response types)                         |
+| `errors.py`         | `DgiiError`, `DgiiErrorCode`, `to_dgii_error()`              |
+| `result.py`         | `result` re-exports + `DgiiResult[T]`                        |
+| `resilience.py`     | tenacity + pybreaker wrapper + retry predicate               |
+| `http.py`           | `HttpClient`, `IdempotencyStore`, `InMemoryIdempotencyStore` |
+| `_xml.py`           | Strict parse, root/element extraction                        |
+| `_json.py`          | JSON value types used by the transformer                     |
+| `certificate.py`    | `P12Reader` (cryptography)                                   |
+| `signing.py`        | `Signature`, `validate_xml_certificate`                      |
+| `transformer.py`    | `Transformer` (internal `dict_to_xml`/`xml_to_dict`)         |
+| `reception.py`      | Reception routing + B2B applicability (A.2)                  |
+| `reconciliation.py` | Pending-marker reconciliation, sequence reuse                |
+| `validation.py`     | XSD validation via `lxml` (offline, bundled schemas)         |
+| `utils.py`          | security code, QR URLs, date/time, RFCE, XML-body helpers    |
+| `client.py`         | `ECF` (auth + all endpoints)                                 |
+| `cli.py`            | typer `app` → `py-dgii-ecf` entry point                      |
 
 ---
 
@@ -101,25 +115,38 @@ const BaseUrl = {
   STATUS: 'https://statusecf.dgii.gov.do',
 } as const;
 
-const Endpoints = {
-  SEED: 'Autenticacion/api/Autenticacion/Semilla',
-  VALIDATE_SEED: 'autenticacion/api/Autenticacion/ValidarSemilla',
-  SEND_INVOICE: 'recepcion/api/FacturasElectronicas',
-  SEND_SUMMARY: 'recepcionfc/api/recepcion/ecf', // base = BaseUrl.CF
-  INQUIRY_SUMMARY: 'consultarfce/api/Consultas/Consulta', // base = BaseUrl.CF, PROD only
-  COMMERCIAL_APPROVAL: 'aprobacionComercial/api/AprobacionComercial',
-  TRACK_RESULT_STATUS: 'consultaresultado/api/Consultas/Estado',
-  INQUIRY_STATUS: 'consultaestado/api/Consultas/Estado',
-  ALL_TRACKING_ECF: 'ConsultaTrackIds/api/TrackIds/Consulta',
-  DIRECTORY: 'consultadirectorio/api/consultas/obtenerdirectorioporrnc',
-  VOID: 'anulacionrangos/api/operaciones/anularrango',
-} as const;
+enum Endpoint {
+  Seed = 'Autenticacion/api/Autenticacion/Semilla',
+  ValidateSeed = 'autenticacion/api/Autenticacion/ValidarSemilla',
+  SendInvoice = 'recepcion/api/FacturasElectronicas',
+  SendSummary = 'recepcionfc/api/recepcion/ecf', // base = BaseUrl.CF
+  InquiryInvoiceSummary = 'consultarfce/api/Consultas/Consulta', // base = BaseUrl.CF, PROD only
+  CommercialApproval = 'aprobacionComercial/api/AprobacionComercial',
+  TrackResultStatus = 'consultaresultado/api/Consultas/Estado',
+  InquiryStatus = 'consultaestado/api/Consultas/Estado',
+  AllTrackingEcf = 'ConsultaTrackIds/api/TrackIds/Consulta',
+  Directory = 'consultadirectorio/api/consultas/obtenerdirectorioporrnc',
+  DirectoryList = 'consultadirectorio/api/consultas/listado',
+  Void = 'anulacionrangos/api/operaciones/anularrango',
+}
 
-function buildPath(env: Environment, endpoint: string): string; // `/${env}/${endpoint}`
+function buildUrl(
+  env: Environment,
+  endpoint: Endpoint,
+  baseUrl?: string,
+): string; // `${baseUrl}/${env}/${endpoint}`
+
+function buildSenderReceiverUrl(
+  host: string,
+  endpoint: SenderReceiverEndpoint,
+): string;
 ```
 
 Constants must match Appendix A.1/A.2 **byte-for-byte**. Sender↔Receiver (buyer-host) paths are
-prefixed `fe/...` and hit `buyerHost` directly (no `/env` prefix).
+prefixed `fe/...` and hit `buyerHost` directly (no `/env` prefix):
+`fe/autenticacion/api/semilla`, `fe/autenticacion/api/validacioncertificado`,
+`fe/recepcion/api/ecf`, `fe/aprobacioncomercial/api/ecf`. The service-status host uses
+`StatusEndpoint` (`api/estatusservicios/...`) and takes an `Apikey` header, not a bearer token.
 
 ### 4.2 `types.ts`
 
@@ -167,28 +194,29 @@ unions, not invented enums.
 ### 4.3 `errors.ts`
 
 ```ts
-enum DgiiErrorCode {
-  Network = 'network', // DNS/TCP/TLS, undici fetch failure
-  Timeout = 'timeout',
-  Http = 'http', // non-2xx after retries
-  Auth = 'auth', // 401/403, token rejected
-  Signing = 'signing',
-  Certificate = 'certificate',
-  Parse = 'parse', // XML/JSON malformed
-  Validation = 'validation',
-  Idempotency = 'idempotency',
-  Unknown = 'unknown',
-}
+type DgiiErrorCode =
+  | 'INVALID_XML' // XML well-formedness failure
+  | 'CERTIFICATE' // P12/key/certificate problem
+  | 'SIGNING' // XMLDSig failure
+  | 'HTTP' // non-2xx after retries
+  | 'AUTH' // 401/403, token rejected
+  | 'TIMEOUT'
+  | 'CIRCUIT_OPEN' // breaker rejected the call locally
+  | 'IDEMPOTENCY' // a submission marker is already pending
+  | 'VALIDATION'
+  | 'UNKNOWN';
 
 class DgiiError extends Error {
   readonly code: DgiiErrorCode;
   readonly status?: number; // HTTP status if any
   readonly resource?: string; // endpoint path attempted
   readonly data?: unknown; // raw response body
-  readonly mensajes?: string[]; // normalized DGII `mensajes` array (if any)
+  readonly mensajes?: Mensaje[]; // normalized DGII `mensajes` array (if any)
+  readonly retryable?: boolean;
 }
 
 function toDgiiError(error: unknown): DgiiError; // A.8 normalizer
+function isRetryableStatus(status: number | undefined): boolean; // 408/429/5xx
 ```
 
 `toDgiiError` reduces every Appendix A.8 shape to one `DgiiError`: bare string, `{ mensajes: [...] }`,
@@ -207,101 +235,128 @@ export type DgiiResult<T> = Result<T, DgiiError>;
 
 ```ts
 interface ResilienceOptions {
-  retry?: { maxAttempts?: number; baseDelayMs?: number; maxDelayMs?: number };
-  breaker?: { threshold?: number; halfOpenAfterMs?: number };
+  /** Maximum number of attempts, including the first. Default 3. */
+  maxRetries?: number;
+  /** Consecutive failures before the circuit opens. Default 5. */
+  breakerThreshold?: number;
+  /** Milliseconds the circuit stays open before half-opening. Default 30s. */
+  halfOpenAfterMs?: number;
+  /** Per-attempt timeout in milliseconds. Default 15s. */
   timeoutMs?: number;
-  bulkhead?: { limit?: number; queue?: number };
+  /** Initial retry backoff, in milliseconds. Default 100. */
+  retryInitialDelayMs?: number;
+  /** Maximum concurrent in-flight requests. Default 20. */
+  bulkheadLimit?: number;
+  /** Maximum queued requests while the bulkhead is saturated. Default 40. */
+  bulkheadQueue?: number;
 }
 
 function isRetryable(error: unknown): boolean; // network | 408 | 429 | 5xx
-function createHttpPolicy(opts?: ResilienceOptions): Policy; // cockatiel composed policy
+function createResiliencePolicies(opts?: ResilienceOptions): ResiliencePolicies;
 ```
 
-The composed policy wraps, innermost→outermost: `bulkhead → timeout → breaker → retry` (cockatiel
-`retryPolicy.wrap(breakerPolicy).wrap(timeoutPolicy).wrap(bulkheadPolicy)`), so retries re-enter the
-breaker and respect the overall timeout. See §8 for the retry predicate contract.
+The composed policy wraps, innermost→outermost: `bulkhead → timeout → breaker → retry`, so retries
+re-enter the breaker and respect the overall timeout. See §8 for the retry predicate contract.
 
 ### 4.6 `http.ts`
 
 ```ts
 interface IdempotencyStore {
-  get(key: string): Promise<string | undefined>;
-  set(key: string, value: string): Promise<void>;
+  get<T>(key: string): Promise<T | undefined>;
+  set<T>(key: string, value: T): Promise<void>;
   delete(key: string): Promise<void>;
 }
 
 class InMemoryIdempotencyStore implements IdempotencyStore {
-  /* Map<string, string> */
+  constructor(options?: { ttlMs?: number; now?: () => number });
+  /* process-local Map, 24h TTL, swept past 1,000 entries */
 }
 
-interface MultipartXmlOptions {
-  xml: string; // signed XML body
-  fileName: string; // `{RNC}{eNCF}.xml`
-  extraFields?: Record<string, string>;
+interface HttpClientOptions {
+  baseUrl: string;
+  token?: string;
+  resilience?: ResilienceOptions;
+  policies?: ResiliencePolicies;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+  beforeRequest?: () => Promise<void>; // token refresh hook
+  onUnauthorized?: () => Promise<boolean>; // 401 replay hook
 }
 
 class HttpClient {
-  constructor(config: {
-    baseUrl: string;
-    policy?: Policy; // from createHttpPolicy()
-    store?: IdempotencyStore; // default: InMemoryIdempotencyStore
-  });
+  constructor(options: HttpClientOptions);
   setToken(token: string): void;
-  get<T>(path: string): Promise<DgiiResult<T>>;
-  postMultipartXml<T>(
+  getToken(): string | undefined;
+  clearToken(): void;
+  request<T>(options: RequestOptions): Promise<DgiiResult<T>>;
+  get<T>(path: string, query?: Query): Promise<DgiiResult<T>>;
+  postMultipart<T>(
     path: string,
-    opts: MultipartXmlOptions,
+    fileName: string,
+    xml: string,
+    options?: RequestOptions,
   ): Promise<DgiiResult<T>>;
-  buildIdempotencyKey(rnc: string, encf: string, signedXml: string): string;
 }
 ```
 
 - Multipart is built with `FormData` + `Blob` (`formData.append('xml', new Blob([xml],
 { type: 'application/xml' }), fileName)`). **Never** hand-set `Content-Length` — native fetch
   computes it from the Blob.
-- `get`/`postMultipartXml` inject `Authorization: Bearer <token>` and `Accept: application/json`,
-  run through the composed policy, and map failures through `toDgiiError`.
-- `buildIdempotencyKey` implements `RNC + eNCF + SHA-256(signed XML)` (see §9).
+- `get`/`postMultipart` inject `Authorization: Bearer <token>` and `Accept: application/json`, run
+  through the composed policy, and map failures through `toDgiiError`.
+- The idempotency key is derived by the client (`ECF#buildIdempotencyKey`), not by `HttpClient`:
+  `RNC + eNCF + SHA-256(signed XML)` (see §9).
 
 ### 4.7 `certificate.ts`
 
 ```ts
-interface P12Payload {
-  certificatePem: string;
-  privateKeyPem: string;
+interface P12ReaderData {
+  key?: string; // private key PEM
+  cert?: string; // certificate PEM
+  publicKey?: string; // public key PEM
+}
+
+interface CertificateInfo {
+  subject: string;
+  issuer: string;
+  validFrom: Date;
+  validTo: Date;
+  serialNumber: string;
 }
 
 class P12Reader {
-  static read(data: Uint8Array, passphrase: string): DgiiResult<P12Payload>;
+  constructor(passphrase: string);
+  getKeyFromFile(fileName: string): Result<P12ReaderData, DgiiError>;
+  getKeyFromStringBase64(base64: string): Result<P12ReaderData, DgiiError>;
+  getCertificateInfo(fileName: string): Result<CertificateInfo, DgiiError>;
+  getCertificateInfoFromBase64(
+    base64: string,
+  ): Result<CertificateInfo, DgiiError>;
 }
 ```
 
 Per A.6: `forge.pkcs12.pkcs12FromAsn1(asn1, false, passphrase)`, pull the `certBag` (→ PEM cert)
-and `pkcs8ShroudedKeyBag` (→ PEM private key). `read` returns `Err(DgiiError)` on bad passphrase
-or malformed P12.
+and the `pkcs8ShroudedKeyBag` — falling back to a plain `keyBag` for unencrypted bundles. A
+`certBag` never holds a private key, so it must not be used as a fallback. Every method returns
+`Err(DgiiError)` on a bad passphrase or a malformed P12.
 
 ### 4.8 `signing.ts`
 
 ```ts
-class Digest {
-  getHash(xml: string): string; // SHA-256 base64 of xmlns-sorted doc
-  getAlgorithmName(): string; // 'http://www.w3.org/2001/04/xmlenc#sha256'
-}
-
 class Signature {
-  static signXml(
+  constructor(privateKeyPem: string, certificatePem: string);
+  signXml(
     xml: string,
-    rootName: string,
-    keyPem: string,
-    certPem: string,
-  ): DgiiResult<string>;
+    rootElName?: DgiiDocumentType,
+  ): Result<string, DgiiError>;
 }
 
-function validateXMLCertificate(certPem: string): boolean;
+function validateXMLCertificate(xml: string): XmlCertificateValidation;
 ```
 
-The custom `Digest` is registered as `sig.HashAlgorithms['http://myDigestAlgorithm'] = Digest` and
-used as the reference digest algorithm (Appendix A.5). Full algorithm in §10.
+The reference digest is xml-crypto's built-in SHA-256, over the node-set it has already
+canonicalized with inclusive C14N 1.0 (Appendix A.5). `rootElName` defaults to the parsed root
+element, so callers rarely pass it. Full algorithm in §10.
 
 ### 4.9 `transformer.ts`
 
@@ -352,16 +407,30 @@ lone `ImpuestoAdicional`→list wrap).
 ### 4.11 `client.ts`
 
 ```ts
-class ECFClient {
-  constructor(config: {
-    environment: Environment;
-    certificate?: { certificatePem: string; privateKeyPem: string }; // for authenticate
-    token?: string;
-    http?: HttpClient; // default: constructed from BaseUrl.ECF
-    store?: IdempotencyStore; // default: InMemoryIdempotencyStore
-  });
+interface EcfOptions {
+  token?: string; // pre-existing bearer token
+  idempotencyStore?: IdempotencyStore; // default: InMemoryIdempotencyStore
+  resilience?: ResilienceOptions;
+  timeoutMs?: number;
+  fetchImpl?: typeof fetch;
+  tokenRefreshSkewMs?: number; // default 5 minutes
+  now?: () => number;
+  statusApiKey?: string; // `Apikey` header for the status host
+  enforceB2BRules?: boolean; // default true
+  validateBeforeSend?: boolean; // default false, requires xmllint
+  xmllintBin?: string;
+}
+
+class ECF {
+  constructor(
+    credentials: P12ReaderData,
+    environment?: Environment, // default Environment.Dev
+    options?: EcfOptions,
+  );
 
   authenticate(buyerHost?: string): Promise<DgiiResult<AuthToken>>;
+
+  // Submissions — idempotent, persist-before-transmit.
   sendElectronicDocument(
     signedXml: string,
     fileName: string,
@@ -371,10 +440,30 @@ class ECFClient {
     signedXml: string,
     fileName: string,
   ): Promise<DgiiResult<InvoiceSummaryResponse>>;
+  sendDocument(
+    signedXml: string,
+    fileName: string,
+    buyerHost?: string,
+  ): Promise<DgiiResult<InvoiceResponse | InvoiceSummaryResponse>>;
+  sendCommercialApproval(
+    signedXml: string,
+    fileName: string,
+  ): Promise<DgiiResult<CommercialApprovalResponse>>;
+  sendCommercialApproval(
+    signedXml: string,
+    fileName: string,
+    buyerHost: string,
+  ): Promise<DgiiResult<B2BCommercialApprovalResponse>>;
+  voidENCF(
+    signedXml: string,
+    fileName: string,
+  ): Promise<DgiiResult<VoidNCFResponse>>;
+
+  // Queries — never idempotency-keyed.
   statusTrackId(trackId: string): Promise<DgiiResult<TrackingStatusResponse>>;
   inquiryStatus(
     rncEmisor: string,
-    ncf: string,
+    ncfElectronico: string,
     rncComprador?: string,
     codigoSeguridad?: string,
   ): Promise<DgiiResult<InquiryStatusResponse>>;
@@ -384,36 +473,46 @@ class ECFClient {
   ): Promise<DgiiResult<SummaryTrackingStatusResponse[]>>;
   getCustomerDirectory(
     rnc: string,
-  ): Promise<DgiiResult<ServiceDirectoryResponse[]>>;
+  ): Promise<DgiiResult<ServiceDirectoryResponse[] | undefined>>;
+  getDirectoryListing(): Promise<DgiiResult<ServiceDirectoryResponse[]>>;
   getSummaryInvoiceInquiry(
     rnc: string,
     encf: string,
     codSeguridad: string,
   ): Promise<DgiiResult<InquiryInvoiceSummary>>;
-  sendCommercialApproval(
+  reconcileSubmission(
     signedXml: string,
-    fileName: string,
-  ): Promise<DgiiResult<CommercialApprovalResponse>>;
-  voidENCF(
-    signedXml: string,
-    fileName: string,
-  ): Promise<DgiiResult<VoidNCFResponse>>;
+  ): Promise<DgiiResult<ReconciliationResult>>;
+
+  // Service status (Apikey, no environment segment, no bearer token).
+  getServiceStatus(): Promise<DgiiResult<ServiceStatusEntry[]>>;
+  getMaintenanceWindows(): Promise<DgiiResult<MaintenanceWindow[]>>;
+  checkServiceAvailability(
+    ambiente: StatusEnvironment,
+  ): Promise<DgiiResult<ServiceAvailabilityResponse>>;
 }
 ```
 
-Endpoint wiring (Appendix A.2): `authenticate` → `SEED` then `VALIDATE_SEED`; `sendElectronicDocument`
-→ `SEND_INVOICE`; `sendSummary` → `SEND_SUMMARY` (BaseUrl.CF); `statusTrackId` →
-`TRACK_RESULT_STATUS`; `inquiryStatus` → `INQUIRY_STATUS`; `trackStatuses` → `ALL_TRACKING_ECF`;
-`getCustomerDirectory` → `DIRECTORY`; `getSummaryInvoiceInquiry` → `INQUIRY_SUMMARY` (BaseUrl.CF,
-**PROD-only**); `sendCommercialApproval` → `COMMERCIAL_APPROVAL`; `voidENCF` → `VOID`.
+Endpoint wiring (Appendix A.2): `authenticate` → `Seed` then `ValidateSeed`; `sendElectronicDocument`
+→ `SendInvoice`; `sendSummary` → `SendSummary` (BaseUrl.CF); `sendDocument` → routing decided by
+`resolveReceptionRoute`; `statusTrackId` → `TrackResultStatus`; `inquiryStatus` → `InquiryStatus`;
+`trackStatuses` → `AllTrackingEcf`; `getCustomerDirectory` → `Directory`; `getDirectoryListing` →
+`DirectoryList`; `getSummaryInvoiceInquiry` → `InquiryInvoiceSummary` (BaseUrl.CF, **PROD-only**);
+`sendCommercialApproval` → `CommercialApproval`; `voidENCF` → `Void`.
+
+`sendDocument` rejects an E32 below RD$250,000 (the caller must build the RFCE first) and rejects a
+`buyerHost` for an RFCE summary. `sendElectronicDocument` additionally enforces the B2B
+applicability rules and, when enabled, XSD validation before any network call.
 
 ### 4.12 `index.ts`
 
-Re-exports every §4.4 symbol: `ECFClient`, `P12Reader`, `Signature`, `Transformer`,
-`getCodeSixDigitfromSignature`, `generateFcQRCodeURL`, `generateEcfQRCodeURL`,
-`getCurrentFormattedDateTime`, `getXmlFromBodyResponse`, `convertECF32ToRFCE`,
-`validateXMLCertificate`, plus `Environment`, `BaseUrl`, `Endpoints`, `DgiiError`,
-`DgiiErrorCode`, `DgiiResult`.
+Re-exports the whole package surface: `ECF`, `P12Reader`, `Signature`, `Transformer`,
+`validateDocument`, `formatViolations`, `resolveReceptionRoute`, `checkB2BApplicability`,
+`canReuseSequence`, `getCodeSixDigitfromSignature`, `generateFcQRCodeURL`,
+`generateEcfQRCodeURL`, `getCurrentFormattedDateTime`, `getXmlFromBodyResponse`,
+`convertECF32ToRFCE`, `validateXMLCertificate`, plus `Environment`, `BaseUrl`, `Endpoint`,
+`SenderReceiverEndpoint`, `StatusEndpoint`, `StatusEnvironment`, `DgiiError`, `DgiiErrorCode`,
+`DgiiResult`, `HttpClient`, `IdempotencyStore`.
 
 ---
 
@@ -425,15 +524,24 @@ Mirror of §4 with snake_case naming, `DgiiResult[T] = Result[T, DgiiError]`, an
 ### 5.1 `environment.py`
 
 ```python
-class Environment(str, Enum):
+class Environment(StrEnum):
     DEV = "TesteCF"
     CERT = "CerteCF"
     PROD = "eCF"
 
-BASE_URL = {"ECF": "...", "CF": "...", "STATUS": "..."}   # same A.1 values
-ENDPOINTS = {...}                                          # same A.2 keys/values
+class BaseUrl(StrEnum):        # same A.1 values
+    ECF = "https://ecf.dgii.gov.do"
+    CF = "https://fc.dgii.gov.do"
+    STATUS = "https://statusecf.dgii.gov.do"
 
-def build_path(env: Environment, endpoint: str) -> str: ...
+class Endpoint(StrEnum): ...           # same A.2 keys/values as TS
+class SenderReceiverEndpoint(StrEnum): ...
+class StatusEndpoint(StrEnum): ...
+class StatusEnvironment(IntEnum): ...  # ambiente: 1 | 2 | 3
+
+def build_url(env: Environment, endpoint: Endpoint, base_url: BaseUrl = BaseUrl.ECF) -> str: ...
+def build_sender_receiver_url(host: str, endpoint: SenderReceiverEndpoint) -> str: ...
+def build_status_url(endpoint: StatusEndpoint) -> str: ...
 ```
 
 ### 5.2 `types.py`
@@ -453,22 +561,38 @@ Use dataclasses or Pydantic models; mypy-strict clean. Monetary fields are `Deci
 ### 5.3 `errors.py`
 
 ```python
-class DgiiErrorCode(str, Enum):
-    NETWORK = "network"; TIMEOUT = "timeout"; HTTP = "http"; AUTH = "auth"
-    SIGNING = "signing"; CERTIFICATE = "certificate"; PARSE = "parse"
-    VALIDATION = "validation"; IDEMPOTENCY = "idempotency"; UNKNOWN = "unknown"
+class DgiiErrorCode(StrEnum):
+    INVALID_XML = "INVALID_XML"
+    CERTIFICATE = "CERTIFICATE"
+    SIGNING = "SIGNING"
+    HTTP = "HTTP"
+    AUTH = "AUTH"
+    TIMEOUT = "TIMEOUT"
+    CIRCUIT_OPEN = "CIRCUIT_OPEN"
+    IDEMPOTENCY = "IDEMPOTENCY"
+    VALIDATION = "VALIDATION"
+    UNKNOWN = "UNKNOWN"
 
 @dataclass
 class DgiiError(Exception):
-    code: DgiiErrorCode
     message: str
+    code: DgiiErrorCode = DgiiErrorCode.UNKNOWN  # keyword-only
     status: int | None = None
+    status_text: str | None = None
     resource: str | None = None
-    data: Any = None
-    mensajes: list[str] | None = None
+    method: str | None = None
+    base_url: str | None = None
+    data: object = None
+    mensajes: list[Mensaje] | None = None
+    retryable: bool | None = None
+    cause: object = None
 
 def to_dgii_error(error: object) -> DgiiError: ...
+def is_retryable_status(status: int | None) -> bool: ...
 ```
+
+Only `message` is positional; every other field is keyword-only. Raw payloads are typed as
+`JsonValue` (`_json.py`) on the parsing path, because mypy runs with `disallow_any_explicit`.
 
 ### 5.4 `result.py`
 
@@ -482,14 +606,13 @@ DgiiResult = Result  # used as Result[T, DgiiError]
 ```python
 @dataclass
 class ResilienceOptions:
-    retry_max_attempts: int = 3
-    retry_base_seconds: float = 0.5
-    breaker_fail_max: int = 5
-    breaker_reset_timeout: float = 60.0
-    timeout_seconds: float = 30.0
+    max_retries: int = 3
+    breaker_threshold: int = 5
+    reset_timeout_s: float = 30.0
+    timeout_s: float = 15.0
 
-def is_retryable(error: BaseException) -> bool: ...   # network | 408 | 429 | 5xx
-class HttpCall:                                        # tenacity + pybreaker wrapper
+def is_retryable_error(error: BaseException) -> bool: ...   # network | 408 | 429 | 5xx
+class ResiliencePolicy:                                     # tenacity + pybreaker wrapper
     def execute(self, fn: Callable[[], T]) -> Result[T, DgiiError]: ...
 ```
 
@@ -500,25 +623,34 @@ tenacity + pybreaker; this is an intentional, documented parity difference (see 
 ### 5.6 `http.py`
 
 ```python
-class IdempotencyStore(ABC):
-    @abstractmethod
-    def get(self, key: str) -> str | None: ...
-    @abstractmethod
-    def set(self, key: str, value: str) -> None: ...
-    @abstractmethod
+class IdempotencyStore(Protocol):
+    def get(self, key: str) -> JsonObject | None: ...
+    def set(self, key: str, value: JsonObject) -> None: ...
     def delete(self, key: str) -> None: ...
 
-class InMemoryIdempotencyStore(IdempotencyStore): ...
+class InMemoryIdempotencyStore(IdempotencyStore): ...   # 24h TTL, swept past 1,000 entries
+
+@dataclass
+class HttpClientOptions:
+    base_url: str
+    token: str | None = None
+    resilience: ResilienceOptions | None = None
+    timeout_s: float = 15.0
+    before_request: Callable[[], None] | None = None   # token refresh hook
+    on_unauthorized: Callable[[], bool] | None = None  # 401 replay hook
 
 class HttpClient:
-    def __init__(self, base_url: str, policy: HttpCall | None = None,
-                 store: IdempotencyStore | None = None) -> None: ...
+    def __init__(self, options: HttpClientOptions,
+                 *, client: httpx2.Client | None = None) -> None: ...
     def set_token(self, token: str) -> None: ...
-    def get(self, path: str) -> Result[T, DgiiError]: ...
-    def post_multipart_xml(self, path: str, xml: str, file_name: str,
-                           extra_fields: dict[str, str] | None = None) -> Result[T, DgiiError]: ...
-    @staticmethod
-    def build_idempotency_key(rnc: str, encf: str, signed_xml: str) -> str: ...
+    def clear_token(self) -> None: ...
+    def request(self, method: str, url: str, ...) -> DgiiResult[JsonValue]: ...
+    def get(self, url: str, params: Mapping[str, object] | None = None, *,
+            headers: Mapping[str, str] | None = None,
+            skip_auth_hooks: bool = False,
+            omit_auth: bool = False) -> DgiiResult[JsonValue]: ...
+    def post_multipart(self, url: str, file_name: str, xml: str, *,
+                       headers: Mapping[str, str] | None = None) -> DgiiResult[JsonValue]: ...
 ```
 
 Multipart via `httpx2` `files={"xml": (file_name, xml_bytes, "application/xml")}` — the client
@@ -528,14 +660,20 @@ sync). Do **not** set `Content-Length` by hand.
 ### 5.7 `certificate.py`
 
 ```python
-@dataclass
-class P12Payload:
-    certificate_pem: str
-    private_key_pem: str
+@dataclass(frozen=True)
+class P12ReaderData:
+    key: str | None
+    cert: str | None
+    public_key: str | None
 
 class P12Reader:
-    @staticmethod
-    def read(data: bytes, passphrase: str) -> Result[P12Payload, DgiiError]: ...
+    def __init__(self, passphrase: str) -> None: ...
+    def get_key_from_file(self, file_name: str | Path) -> DgiiResult[P12ReaderData]: ...
+    def get_key_from_base64(self, base64_data: str) -> DgiiResult[P12ReaderData]: ...
+    def get_key_from_bytes(self, data: bytes) -> DgiiResult[P12ReaderData]: ...
+    def get_certificate_info(self, file_name: str | Path) -> DgiiResult[CertificateInfo]: ...
+    def get_certificate_info_from_base64(self, base64_data: str) -> DgiiResult[CertificateInfo]: ...
+    def get_certificate_info_from_bytes(self, data: bytes) -> DgiiResult[CertificateInfo]: ...
 ```
 
 Per A.6: `cryptography.hazmat.primitives.serialization.pkcs12.load_key_and_certificates`.
@@ -544,10 +682,12 @@ Per A.6: `cryptography.hazmat.primitives.serialization.pkcs12.load_key_and_certi
 
 ```python
 class Signature:
-    @staticmethod
-    def sign_xml(xml: str, root_name: str, key_pem: str, cert_pem: str) -> Result[str, DgiiError]: ...
+    def __init__(self, private_key_pem: str, certificate_pem: str) -> None: ...
+    @classmethod
+    def try_from_p12(cls, p12_path: str | Path, passphrase: str) -> DgiiResult[Signature]: ...
+    def sign_xml(self, xml: str, root_name: str | None = None) -> DgiiResult[str]: ...
 
-def validate_xml_certificate(cert_pem: str) -> bool: ...
+def validate_xml_certificate(xml: str) -> XmlCertificateValidation: ...
 ```
 
 No custom digest — uses `etree.tostring(node, method="c14n", exclusive=False, with_comments=False)`
@@ -558,9 +698,9 @@ No custom digest — uses `etree.tostring(node, method="c14n", exclusive=False, 
 ```python
 class Transformer:
     @staticmethod
-    def json2xml(data: Any) -> str: ...
+    def json_to_xml(data: Mapping[str, object], round_monetary: bool = False) -> str: ...
     @staticmethod
-    def xml2json(xml: str) -> Any: ...
+    def xml_to_json(xml: str) -> DgiiResult[dict[str, object]]: ...
 ```
 
 Implemented with `lxml` + a small internal `dict_to_xml`/`xml_to_dict` mirroring xml-js **compact**
@@ -582,23 +722,47 @@ def convert_ecf32_to_rfce(ecf32_xml: str) -> dict[str, str]: ...  # {"xml": ...,
 ### 5.11 `client.py`
 
 ```python
-class ECFClient:
-    def __init__(self, environment: Environment, *, certificate: P12Payload | None = None,
-                 token: str | None = None, http: HttpClient | None = None,
-                 store: IdempotencyStore | None = None) -> None: ...
+class ECF:
+    def __init__(
+        self,
+        credentials: P12ReaderData,
+        environment: Environment = Environment.DEV,
+        *,
+        token: str | None = None,
+        idempotency_store: IdempotencyStore | None = None,
+        resilience: ResilienceOptions | None = None,
+        timeout_s: float = 15.0,
+        http_client: httpx2.Client | None = None,
+        token_refresh_skew_s: float = 5 * 60,
+        now: Callable[[], float] = time.time,
+        status_api_key: str | None = None,
+        enforce_b2b_rules: bool = True,
+        validate_before_send: bool = False,
+    ) -> None: ...
 
-    def authenticate(self, buyer_host: str | None = None) -> Result[AuthToken, DgiiError]: ...
+    def authenticate(self, buyer_host: str | None = None) -> DgiiResult[AuthToken]: ...
     def send_electronic_document(self, signed_xml: str, file_name: str,
-                                 buyer_host: str | None = None) -> Result[InvoiceResponse, DgiiError]: ...
-    def send_summary(self, signed_xml: str, file_name: str) -> Result[InvoiceSummaryResponse, DgiiError]: ...
-    def status_track_id(self, track_id: str) -> Result[TrackingStatusResponse, DgiiError]: ...
-    def inquiry_status(self, rnc_emisor: str, ncf: str, rnc_comprador: str | None = None,
-                       codigo_seguridad: str | None = None) -> Result[InquiryStatusResponse, DgiiError]: ...
-    def track_statuses(self, rnc_emisor: str, encf: str) -> Result[list[SummaryTrackingStatusResponse], DgiiError]: ...
-    def get_customer_directory(self, rnc: str) -> Result[list[ServiceDirectoryResponse], DgiiError]: ...
-    def get_summary_invoice_inquiry(self, rnc: str, encf: str, cod_seguridad: str) -> Result[InquiryInvoiceSummary, DgiiError]: ...
-    def send_commercial_approval(self, signed_xml: str, file_name: str) -> Result[CommercialApprovalResponse, DgiiError]: ...
-    def void_encf(self, signed_xml: str, file_name: str) -> Result[VoidNCFResponse, DgiiError]: ...
+                                 buyer_host: str | None = None) -> DgiiResult[InvoiceResponse]: ...
+    def send_summary(self, signed_xml: str, file_name: str) -> DgiiResult[InvoiceSummaryResponse]: ...
+    def send_document(self, signed_xml: str, file_name: str,
+                      buyer_host: str | None = None) -> DgiiResult[InvoiceResponse | InvoiceSummaryResponse]: ...
+    def send_commercial_approval(self, signed_xml: str, file_name: str,
+                                 buyer_host: str | None = None) -> DgiiResult[
+        CommercialApprovalResponse | B2BCommercialApprovalResponse]: ...
+    def void_encf(self, signed_xml: str, file_name: str) -> DgiiResult[VoidNCFResponse]: ...
+    def status_track_id(self, track_id: str) -> DgiiResult[TrackingStatusResponse]: ...
+    def inquiry_status(self, rnc_emisor: str, ncf_electronico: str,
+                       rnc_comprador: str | None = None,
+                       codigo_seguridad: str | None = None) -> DgiiResult[InquiryStatusResponse]: ...
+    def track_statuses(self, rnc_emisor: str, encf: str) -> DgiiResult[list[SummaryTrackingStatusResponse]]: ...
+    def get_customer_directory(self, rnc: str) -> DgiiResult[list[ServiceDirectoryResponse] | None]: ...
+    def get_directory_listing(self) -> DgiiResult[list[ServiceDirectoryResponse]]: ...
+    def get_summary_invoice_inquiry(self, rnc: str, encf: str,
+                                    cod_seguridad: str) -> DgiiResult[InquiryInvoiceSummary]: ...
+    def reconcile_submission(self, signed_xml: str) -> DgiiResult[ReconciliationResult]: ...
+    def get_service_status(self) -> DgiiResult[list[ServiceStatusEntry]]: ...
+    def get_maintenance_windows(self) -> DgiiResult[list[MaintenanceWindow]]: ...
+    def check_service_availability(self, ambiente: StatusEnvironment) -> DgiiResult[ServiceAvailabilityResponse]: ...
 ```
 
 Endpoint wiring identical to §4.11. `get_summary_invoice_inquiry` raises/returns a validation
@@ -608,21 +772,27 @@ Endpoint wiring identical to §4.11. `get_summary_invoice_inquiry` raises/return
 
 ```python
 import typer
-app = typer.Typer(name="py-dgii-ecf", no_args_is_help=True)
+app = typer.Typer(no_args_is_help=True)   # entry point: `py-dgii-ecf`
 
 @app.command()
-def sign(xml: str, key: str, cert: str, root: str = "ECF") -> None: ...
+def sign(xml_file: Path, p12: Path, password: str, output: Path | None = None) -> None: ...
 @app.command()
-def authenticate(env: str, p12: str, password: str) -> None: ...
+def authenticate(p12: Path, password: str, environment: str = "CerteCF") -> None: ...
 @app.command()
-def status(track_id: str) -> None: ...
+def status(track_id: str, p12: Path, password: str, environment: str = "CerteCF") -> None: ...
 ```
 
-Entry point (pyproject `[project.scripts] py-dgii-ecf = "py_dgii_ecf.cli:app"`). Minimal surface — see §12.3.
+`password` is a required `--password` option with `prompt=True, hide_input=True`, so the CLI asks
+for it when omitted. `--environment` accepts the DGII values or the aliases
+`test`/`dev`, `cert`, `prod`. Entry point (`pyproject`):
+`py-dgii-ecf = "py_dgii_ecf.cli:app"`. Minimal surface — see §12.3.
 
 ### 5.13 `__init__.py`
 
-Re-exports the full public surface (mirror of TS `index.ts`, plus `app` from `cli`).
+Re-exports the full public surface (mirror of TS `index.ts`): the client `ECF`, `P12Reader`,
+`Signature`, `Transformer`, `validate_document`, `format_violations`, `resolve_reception_route`,
+`check_b2b_applicability`, `can_reuse_sequence`, `InMemoryIdempotencyStore`, the URL builders, the
+environment/endpoint enums, `DgiiError`, `DgiiErrorCode`, `DgiiResult`, and the response models.
 
 ---
 
@@ -651,21 +821,25 @@ Rules:
 
 ## 7. Error model
 
-`DgiiErrorCode` (identical in both languages): `network`, `timeout`, `http`, `auth`, `signing`,
-`certificate`, `parse`, `validation`, `idempotency`, `unknown`.
+`DgiiErrorCode` (identical in both languages): `INVALID_XML`, `CERTIFICATE`, `SIGNING`, `HTTP`,
+`AUTH`, `TIMEOUT`, `CIRCUIT_OPEN`, `IDEMPOTENCY`, `VALIDATION`, `UNKNOWN`.
 
-`DgiiError` carries: `code`, `message`, and optional `status`, `resource`, `data`, `mensajes`.
+`DgiiError` carries: `code`, `message`, and optional `status`, `resource`, `data`, `mensajes`,
+`retryable`.
 
 `toDgiiError`/`to_dgii_error` normalization table (Appendix A.8):
 
-| Input shape                     | Result                                                       |
-| ------------------------------- | ------------------------------------------------------------ |
-| bare string body                | `message = body`                                             |
-| `{ mensajes: [...] }`           | `message = joined mensajes`; `mensajes = [...]`              |
-| ProblemDetails                  | `message` from `title`/`detail`; preserve `status`           |
-| HTML body                       | `message = stripped text` (or generic fallback)              |
-| network/undici/httpx2 exception | `code = network` (or `timeout` if timeout)                   |
-| non-2xx                         | `code = auth` if 401/403, else `http`; keep `status`, `data` |
+| Input shape                     | Result                                                          |
+| ------------------------------- | --------------------------------------------------------------- |
+| bare string body                | `message = body`                                                |
+| `{ mensajes: [...] }`           | `message = joined mensajes`; `mensajes = [...]`                 |
+| ProblemDetails                  | `message` from `title`/`detail`; preserve `status`              |
+| HTML body                       | `message = stripped text` (or generic fallback)                 |
+| network/undici/httpx2 exception | `code = UNKNOWN`; the retry decision inspects the raw exception |
+| non-2xx                         | `code = AUTH` if 401/403, else `HTTP`; keep `status`, `data`    |
+
+`TIMEOUT` and `CIRCUIT_OPEN` are part of the enum for callers that classify their own failures; the
+SDK does not currently emit them — a timeout arrives as `UNKNOWN` with a retryable cause.
 
 **401 special case (A.9):** keep DGII's body message verbatim — it explains the rejection reason.
 
@@ -738,14 +912,17 @@ Applied in `sendElectronicDocument`/`sendSummary` (and `send_commercial_approval
 are also submissions) — **persist-before-transmit**:
 
 1. Compute `key`.
-2. `store.get(key)` → if present, return the stored response (`Ok`), **no re-transmit**.
-3. `store.set(key, "pending")` **before** transmitting (hard rule).
-4. Transmit via `HttpClient.postMultipartXml`.
+2. `store.get(key)` → if present, return the stored response (`Ok`), **no re-transmit**. A stored
+   `"pending"` marker surfaces as `IDEMPOTENCY`; `reconcileSubmission` clears it only when DGII has
+   no record of the document.
+3. `store.set(key, pending)` **before** transmitting (hard rule).
+4. Transmit via `HttpClient.postMultipart` / `HttpClient.post_multipart`.
 5. On success → `store.set(key, serializedResponse)`; on failure → `store.delete(key)` so a future
    call may retry.
 
 Query methods (`statusTrackId`, `inquiryStatus`, `trackStatuses`, `getCustomerDirectory`,
-`getSummaryInvoiceInquiry`, `authenticate`) are **not** idempotency-keyed.
+`getDirectoryListing`, `getSummaryInvoiceInquiry`, `getServiceStatus`, `getMaintenanceWindows`,
+`checkServiceAvailability`, `authenticate`) are **not** idempotency-keyed.
 
 ---
 
@@ -761,23 +938,30 @@ Identical algorithm both languages; must verify byte-for-byte against the refere
 
 ### TypeScript (xml-crypto)
 
-Register a **custom digest** (because xml-crypto's built-in sha256 sorts the root `xmlns`
-attributes differently from the DGII .NET stack):
+No custom digest is registered. xml-crypto canonicalizes the referenced node-set with inclusive
+C14N 1.0 before hashing, so the built-in SHA-256 produces the bytes DGII expects and emits the
+standard `DigestMethod` URI:
 
 ```ts
-getHash(xml) {
-  const doc = new DOMParser().parseFromString(xml);
-  const attrs = doc.childNodes[0].attributes;
-  const sorted = Array.from(attrs).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
-  Object.assign(doc.childNodes[0].attributes, sorted); // reorder xmlns:xsd/xmlns:xsi
-  return createHash('sha256').update(doc.toString(), 'utf8').digest('base64');
-}
-getAlgorithmName() { return 'http://www.w3.org/2001/04/xmlenc#sha256'; }
+const sig = new SignedXml({
+  privateKey,
+  publicCert,
+  signatureAlgorithm: RSA_SHA256,
+  canonicalizationAlgorithm: C14N_INCLUSIVE,
+});
+sig.addReference({
+  xpath: `//*[local-name(.)='${elementName}']`,
+  transforms: [ENVELOPED],
+  digestAlgorithm: SHA256,
+  isEmptyUri: true,
+});
+cleanNodes(doc); // strip whitespace-only text nodes + comments
+sig.computeSignature(doc.toString());
 ```
 
-Registered as `sig.HashAlgorithms['http://myDigestAlgorithm'] = Digest`, used with
-`digestAlgorithm: 'http://myDigestAlgorithm'`, `xpath: //*[local-name(.)='<root>']`,
-`isEmptyUri: true`, enveloped-signature transform.
+An earlier revision registered a hand-sorted digest because the built-in SHA-256 was assumed to
+order root `xmlns` attributes differently; that assumption was wrong, and the custom digest was
+removed. Do not reintroduce it — the libxmlsec1 gate would fail.
 
 ### Python (lxml + cryptography)
 
@@ -787,8 +971,18 @@ inclusive C14N. Digest the canonicalized root **before** appending `<Signature>`
 
 ### Verification gate
 
-Both packages' test suites verify signed output with **`xmlsec1 --verify`** against the certificate,
-and assert the digest matches a hardcoded fixture value (guards byte-for-byte fidelity of A.5).
+The unit suites pin the digest (Python also verifies the RSA signature with `cryptography`), but
+they recompute the same code path. The independent gate is the pair of scripts below, which sign
+real fixtures and verify them with **libxmlsec1** — the library DGII's `.NET` stack uses — and run
+in CI on every push:
+
+```bash
+mise run verify-signing-typescript                                  # bun run scripts/verify-signing.ts
+cd packages/python && uv run --with xmlsec python scripts/verify_signing.py
+```
+
+The TypeScript script signs a second, deliberately C14N-sensitive document (attributes out of C14N
+order) because `invoice-31.xml` has no attributes and would not catch a raw-serialization regression.
 
 ---
 
@@ -835,7 +1029,8 @@ Money round-trips as `string` (TS) / `Decimal`→`str` (Python); no numeric coer
 2. **Python transformer — no extra dependency.** Implement a small internal `dict_to_xml`/`xml_to_dict`
    over `lxml` that mirrors xml-js compact semantics (§11). No `xmltodict`/`dicttoxml` added.
 3. **CLI surface (minimal, concrete).** typer `app`, entry point `py-dgii-ecf`, `no_args_is_help=True`.
-   Commands: `sign` (xml/key/cert/root), `authenticate` (env/p12/password), `status <track_id>`.
+   Commands: `sign <xml> <p12>`, `authenticate <p12>`, `status <track_id> <p12>`, each taking a
+   prompted `--password` and, where relevant, `--environment` (DGII value or alias) and `--output`.
    Plus `--help` on every command. No invented features beyond these three.
 4. **Endpoint mapping confirmed:** `statusTrackId` → `TRACK_RESULT_STATUS`
    (`consultaresultado/api/Consultas/Estado`); `inquiryStatus` → `INQUIRY_STATUS`

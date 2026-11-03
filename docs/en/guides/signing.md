@@ -65,3 +65,7 @@ authority on acceptance.
 !!! tip "Fixture tests"
 The test suites verify the digest and the RSA signature cryptographically
 (Python) and check the emitted algorithm URIs and structure (TypeScript).
+Neither is enough on its own: the repository's independent gate signs real
+fixtures with libxmlsec1 — `mise run verify-signing-typescript` and
+`uv run --with xmlsec python scripts/verify_signing.py` — and runs on every CI
+push.

@@ -68,13 +68,51 @@ if (result.isOk()) {
 | `authenticate(buyerHost?)`                          | `Result<AuthToken>`                                                   |
 | `sendElectronicDocument(xml, fileName, buyerHost?)` | `Result<InvoiceResponse>`                                             |
 | `sendSummary(xml, fileName)`                        | `Result<InvoiceSummaryResponse>`                                      |
+| `sendDocument(xml, fileName, buyerHost?)`           | `Result<InvoiceResponse \| InvoiceSummaryResponse>`                   |
 | `statusTrackId(trackId)`                            | `Result<TrackingStatusResponse>`                                      |
 | `inquiryStatus(rnc, ncf, comprador?, codigo?)`      | `Result<InquiryStatusResponse>`                                       |
 | `trackStatuses(rnc, encf)`                          | `Result<SummaryTrackingStatusResponse[]>`                             |
 | `getCustomerDirectory(rnc)`                         | `Result<ServiceDirectoryResponse[] \| undefined>`                     |
+| `getDirectoryListing()`                             | `Result<ServiceDirectoryResponse[]>`                                  |
 | `getSummaryInvoiceInquiry(rnc, encf, codigo)`       | `Result<InquiryInvoiceSummary>`                                       |
 | `sendCommercialApproval(xml, fileName, buyerHost?)` | `Result<CommercialApprovalResponse \| B2BCommercialApprovalResponse>` |
 | `voidENCF(xml, fileName)`                           | `Result<VoidNCFResponse>`                                             |
+| `reconcileSubmission(xml)`                          | `Result<ReconciliationResult>`                                        |
+| `getServiceStatus()`                                | `Result<ServiceStatusEntry[]>`                                        |
+| `getMaintenanceWindows()`                           | `Result<MaintenanceWindow[]>`                                         |
+| `checkServiceAvailability(ambiente)`                | `Result<ServiceAvailabilityResponse>`                                 |
+
+### Enrutamiento con `sendDocument`
+
+`sendDocument` lee el elemento raíz, `TipoeCF` y `MontoTotal` del XML **firmado**
+y elige el endpoint por ti: un `RFCE` va a la recepción de resúmenes, un `ECF` a
+la recepción general. Una E32 menor a RD$250,000 se rechaza con `VALIDATION`
+—construye primero el RFCE— y un RFCE no puede entregarse directo a un
+`buyerHost`.
+
+Usa `resolveReceptionRoute(signedXml)` cuando necesites la decisión sin enviar
+el documento.
+
+### Estado de los servicios
+
+`getServiceStatus`, `getMaintenanceWindows` y `checkServiceAvailability` hablan
+con el host `statusecf.dgii.gov.do`. Se autentica con una **API key**, no con el
+token bearer, así que pasa `statusApiKey` al constructor y omite
+`authenticate()`:
+
+```ts
+const ecf = new ECF(credentials.value, Environment.Prod, {
+  statusApiKey: process.env.DGII_STATUS_API_KEY,
+});
+const availability = await ecf.checkServiceAvailability(
+  StatusEnvironment.Production,
+);
+if (availability.isOk() && availability.value.estado === 'No Disponible') {
+  // Ventana de mantenimiento: aplaza el lote.
+}
+```
+
+### Aplicabilidad B2B
 
 ### Aplicabilidad B2B
 
@@ -142,7 +180,7 @@ if (result.isOk()) {
 **general de e-CF** y falla con `VALIDATION` sin llamar a la DGII:
 
 ```ts
-const ecf = new ECF(credentials, Environment.Prod, {
+const ecf = new ECF(credentials.value, Environment.Prod, {
   validateBeforeSend: true,
 });
 ```

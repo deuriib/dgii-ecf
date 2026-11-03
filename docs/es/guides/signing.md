@@ -66,4 +66,8 @@ sigue siendo la autoridad sobre la aceptación.
 !!! tip "Pruebas con fixtures"
 Las suites de pruebas verifican el digest y la firma RSA criptográficamente
 (Python), y comprueban los URIs de algoritmo emitidos y la estructura
-(TypeScript).
+(TypeScript). Ninguna de las dos basta por sí sola: la verificación
+independiente del repositorio firma fixtures reales con libxmlsec1 —
+`mise run verify-signing-typescript` y
+`uv run --with xmlsec python scripts/verify_signing.py` — y corre en cada push
+de CI.

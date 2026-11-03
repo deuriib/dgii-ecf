@@ -63,18 +63,53 @@ if (result.isOk()) {
 
 ## API
 
+Every method returns a `Result`; `buyerHost` / `ambiente` are optional unless noted.
+
 | Method                                              | Returns                                                               |
 | --------------------------------------------------- | --------------------------------------------------------------------- |
 | `authenticate(buyerHost?)`                          | `Result<AuthToken>`                                                   |
 | `sendElectronicDocument(xml, fileName, buyerHost?)` | `Result<InvoiceResponse>`                                             |
 | `sendSummary(xml, fileName)`                        | `Result<InvoiceSummaryResponse>`                                      |
+| `sendDocument(xml, fileName, buyerHost?)`           | `Result<InvoiceResponse \| InvoiceSummaryResponse>`                   |
 | `statusTrackId(trackId)`                            | `Result<TrackingStatusResponse>`                                      |
 | `inquiryStatus(rnc, ncf, comprador?, codigo?)`      | `Result<InquiryStatusResponse>`                                       |
 | `trackStatuses(rnc, encf)`                          | `Result<SummaryTrackingStatusResponse[]>`                             |
 | `getCustomerDirectory(rnc)`                         | `Result<ServiceDirectoryResponse[] \| undefined>`                     |
+| `getDirectoryListing()`                             | `Result<ServiceDirectoryResponse[]>`                                  |
 | `getSummaryInvoiceInquiry(rnc, encf, codigo)`       | `Result<InquiryInvoiceSummary>`                                       |
 | `sendCommercialApproval(xml, fileName, buyerHost?)` | `Result<CommercialApprovalResponse \| B2BCommercialApprovalResponse>` |
 | `voidENCF(xml, fileName)`                           | `Result<VoidNCFResponse>`                                             |
+| `reconcileSubmission(xml)`                          | `Result<ReconciliationResult>`                                        |
+| `getServiceStatus()`                                | `Result<ServiceStatusEntry[]>`                                        |
+| `getMaintenanceWindows()`                           | `Result<MaintenanceWindow[]>`                                         |
+| `checkServiceAvailability(ambiente)`                | `Result<ServiceAvailabilityResponse>`                                 |
+
+### Routing with `sendDocument`
+
+`sendDocument` reads the root element, `TipoeCF` and `MontoTotal` from the **signed** XML and picks
+the endpoint for you: an `RFCE` goes to the summary reception, an `ECF` to the general reception. An
+E32 below RD$250,000 is rejected with `VALIDATION` — build the RFCE first — and an RFCE cannot be
+delivered directly to a `buyerHost`.
+
+Use `resolveReceptionRoute(signedXml)` when you need the decision without sending it.
+
+### Service status
+
+`getServiceStatus`, `getMaintenanceWindows` and `checkServiceAvailability` talk to the
+`statusecf.dgii.gov.do` host. It authenticates with an **API key**, not the bearer token, so pass
+`statusApiKey` to the constructor and skip `authenticate()`:
+
+```ts
+const ecf = new ECF(credentials.value, Environment.Prod, {
+  statusApiKey: process.env.DGII_STATUS_API_KEY,
+});
+const availability = await ecf.checkServiceAvailability(
+  StatusEnvironment.Production,
+);
+if (availability.isOk() && availability.value.estado === 'No Disponible') {
+  // Inside a maintenance window — defer the batch.
+}
+```
 
 ### B2B applicability
 
@@ -142,7 +177,7 @@ if (result.isOk()) {
 submission and fails with `VALIDATION` without calling DGII:
 
 ```ts
-const ecf = new ECF(credentials, Environment.Prod, {
+const ecf = new ECF(credentials.value, Environment.Prod, {
   validateBeforeSend: true,
 });
 ```

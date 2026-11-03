@@ -75,13 +75,46 @@ Cada método devuelve un modelo tipado, no un `dict`.
 | `authenticate(buyer_host=None)`                             | `Result[AuthToken]`                                                   |
 | `send_electronic_document(xml, file_name, buyer_host=None)` | `Result[InvoiceResponse]`                                             |
 | `send_summary(xml, file_name)`                              | `Result[InvoiceSummaryResponse]`                                      |
+| `send_document(xml, file_name, buyer_host=None)`            | `Result[InvoiceResponse \| InvoiceSummaryResponse]`                   |
 | `status_track_id(track_id)`                                 | `Result[TrackingStatusResponse]`                                      |
 | `inquiry_status(rnc, ncf, comprador=None, codigo=None)`     | `Result[InquiryStatusResponse]`                                       |
 | `track_statuses(rnc, encf)`                                 | `Result[list[SummaryTrackingStatusResponse]]`                         |
 | `get_customer_directory(rnc)`                               | `Result[list[ServiceDirectoryResponse] \| None]`                      |
+| `get_directory_listing()`                                   | `Result[list[ServiceDirectoryResponse]]`                              |
 | `get_summary_invoice_inquiry(rnc, encf, codigo)`            | `Result[InquiryInvoiceSummary]`                                       |
 | `send_commercial_approval(xml, file_name, buyer_host=None)` | `Result[CommercialApprovalResponse \| B2BCommercialApprovalResponse]` |
 | `void_encf(xml, file_name)`                                 | `Result[VoidNCFResponse]`                                             |
+| `reconcile_submission(xml)`                                 | `Result[ReconciliationResult]`                                        |
+| `get_service_status()`                                      | `Result[list[ServiceStatusEntry]]`                                    |
+| `get_maintenance_windows()`                                 | `Result[list[MaintenanceWindow]]`                                     |
+| `check_service_availability(ambiente)`                      | `Result[ServiceAvailabilityResponse]`                                 |
+
+### Enrutamiento con `send_document`
+
+`send_document` lee el elemento raíz, `TipoeCF` y `MontoTotal` del XML **firmado**
+y elige el endpoint por ti: un `RFCE` va a la recepción de resúmenes, un `ECF` a
+la recepción general. Una E32 menor a RD$250,000 se rechaza con `VALIDATION`
+—construye primero el RFCE— y un RFCE no puede entregarse directo a un
+`buyer_host`.
+
+Usa `resolve_reception_route(signed_xml)` cuando necesites la decisión sin
+enviar el documento.
+
+### Estado de los servicios
+
+`get_service_status`, `get_maintenance_windows` y `check_service_availability`
+hablan con el host `statusecf.dgii.gov.do`. Se autentica con una **API key**, no
+con el token bearer, así que pasa `status_api_key` al constructor y omite
+`authenticate()`:
+
+```python
+import os
+
+ecf = ECF(credentials.unwrap(), Environment.PROD, status_api_key=os.environ["DGII_STATUS_API_KEY"])
+availability = ecf.check_service_availability(StatusEnvironment.PRODUCTION)
+if availability.is_ok() and availability.unwrap().estado == "No Disponible":
+    ...  # Ventana de mantenimiento: aplaza el lote.
+```
 
 ### Aplicabilidad B2B
 
@@ -92,14 +125,13 @@ igual o mayor al umbral sí pueden entregarse entre pares.
 
 El cliente lo verifica antes de emitir la solicitud y falla con `VALIDATION` sin
 llamar al host del comprador. Desactiva la validación con
-`enforceB2BRules: false` (TypeScript) o `enforce_b2b_rules=False` (Python)
-cuando necesites reproducir un escenario de certificación:
+`enforce_b2b_rules=False` cuando necesites reproducir un escenario de
+certificación:
 
-```ts
-const result = await ecf.sendElectronicDocument(xml, 'f.xml', buyerHost);
-if (result.isErr() && result.error.code === 'VALIDATION') {
-  // El tipo o el monto no son elegibles para envío directo.
-}
+```python
+result = ecf.send_electronic_document(signed_xml, "f.xml", buyer_host)
+if result.is_err() and result.unwrap_err().code is DgiiErrorCode.VALIDATION:
+    ...  # El tipo o el monto no son elegibles para envío directo.
 ```
 
 ### Endpoints exclusivos de producción
@@ -120,11 +152,10 @@ del comprador y devuelve `B2BCommercialApprovalResponse` en lugar del payload
 y **HTTP 400** como insatisfactorio, así que un 400 se reporta como
 `accepted: false` y no como un fallo de transporte:
 
-```ts
-const ack = await ecf.sendCommercialApproval(acecf, 'acecf.xml', buyerHost);
-if (ack.isOk() && !ack.value.accepted) {
-  // El receptor rechazó la aprobación; el emisor debe responder con una E34.
-}
+```python
+ack = ecf.send_commercial_approval(acecf, "acecf.xml", buyer_host)
+if ack.is_ok() and not ack.unwrap().accepted:
+    ...  # El receptor rechazó la aprobación; el emisor debe responder con una E34.
 ```
 
 ### Validación por esquema
@@ -146,7 +177,7 @@ if result.is_ok():
 **general de e-CF** y falla con `VALIDATION` sin llamar a la DGII:
 
 ```python
-ecf = ECF(credentials, Environment.PROD, validate_before_send=True)
+ecf = ECF(credentials.unwrap(), Environment.PROD, validate_before_send=True)
 ```
 
 Se empaquetan doce esquemas: `e-CF` 32, 33, 34, 41, 43, 44, 45, 46, 47, `ANECF`,
@@ -169,6 +200,10 @@ py-dgii-ecf sign invoice.xml identity.p12 --output signed.xml
 py-dgii-ecf authenticate identity.p12 --environment CerteCF
 py-dgii-ecf status <track-id> identity.p12 --environment CerteCF
 ```
+
+Cada comando pide la contraseña del `.p12` (`--password`, entrada oculta).
+`--environment` acepta `TesteCF` / `CerteCF` / `eCF`, o los alias `dev`, `cert` y
+`prod`.
 
 Consulta [Firma](guides/signing.md), [Resiliencia](guides/resilience.md) y el
 [README del paquete](https://github.com/deuriib/dgii-ecf/tree/main/packages/python).

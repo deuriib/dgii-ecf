@@ -37,8 +37,11 @@ Both SDKs share the same design contract:
 - **Correct XMLDSig** — inclusive C14N 1.0, enveloped signature, RSA-SHA256,
   byte-for-byte compatible with DGII's `.NET` stack.
 - **Full API surface** — authentication (SEED), document submission, summary
-  invoices (RFCE), status/track-id queries, customer directory, commercial
-  approval, and e-NCF voiding.
+  invoices (RFCE), status/track-id queries, service status, customer and general
+  directories, commercial approval, e-NCF voiding, and reconciliation of a
+  pending submission.
+- **Pre-flight checks** — bundled-schema validation (TypeScript shells out to
+  `xmllint`, Python uses `lxml`) and a maintenance-window check before a batch.
 - **Money as `Decimal`** — floating-point rounding can never corrupt a digest.
 
 ## 📦 Layout

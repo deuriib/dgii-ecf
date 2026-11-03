@@ -80,7 +80,8 @@ const ecf = new ECF(credentials, Environment.Prod, {
 ## Modules
 
 `environment`, `types`, `errors`, `result`, `resilience`, `http`, `certificate`,
-`signing`, `transformer`, `utils`, `client`.
+`signing`, `transformer`, `reception`, `reconciliation`, `validation`, `utils`,
+`client`.
 
 ## License
 
