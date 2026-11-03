@@ -21,14 +21,14 @@ repos:
       - id: detect-private-key
       - id: end-of-file-fixer
         # Signed XML fixtures are byte-sensitive; see .prettierignore.
-        exclude: ^examples/fixtures/
+        exclude: ^(examples/fixtures/|packages/python/src/py_dgii_ecf/schemas/)
       - id: mixed-line-ending
         args: [--fix=lf]
-        exclude: ^examples/fixtures/
+        exclude: ^(examples/fixtures/|packages/python/src/py_dgii_ecf/schemas/)
       - id: no-commit-to-branch
         args: [--branch, main]
       - id: trailing-whitespace
-        exclude: ^examples/fixtures/
+        exclude: ^(examples/fixtures/|packages/python/src/py_dgii_ecf/schemas/)
 
   # Everything below runs the repository's own pinned toolchain rather than a
   # copy vendored by a hook repository. Two of these were already diverging:

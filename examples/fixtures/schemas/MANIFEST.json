@@ -1,0 +1,122 @@
+{
+  "version": "1.0",
+  "retrieved": "2026-11-02",
+  "source_base": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/",
+  "schemas": [
+    {
+      "file": "e-cf-32.xsd",
+      "name": "e-CF 32",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2032%20v.1.0.xsd",
+      "sha256": "151676df03c61335b4ac1eca97f99395488d57ea92793b49353602871e651f3c",
+      "bytes": 122998,
+      "status": "compiles"
+    },
+    {
+      "file": "e-cf-33.xsd",
+      "name": "e-CF 33",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2033%20v.1.0.xsd",
+      "sha256": "087cd71beba11c19cf548e22b96363cb4aa210dc6f5c3c8a62122a42c88d2866",
+      "bytes": 124484,
+      "status": "compiles"
+    },
+    {
+      "file": "e-cf-34.xsd",
+      "name": "e-CF 34",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2034%20v.1.0.xsd",
+      "sha256": "6c62ebabdea9a6f6d62ae85d9e1c2eb788f44f3f0b61945fe116700c4eaac2da",
+      "bytes": 122024,
+      "status": "compiles"
+    },
+    {
+      "file": "e-cf-41.xsd",
+      "name": "e-CF 41",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2041%20v.1.0.xsd",
+      "sha256": "eae1993c637375bc1cbe80932411d87f5680cd54e77e4d1b2752d72a6c8b2ab3",
+      "bytes": 111171,
+      "status": "compiles"
+    },
+    {
+      "file": "e-cf-43.xsd",
+      "name": "e-CF 43",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2043%20v.1.0.xsd",
+      "sha256": "776f030980c2c50cf0221e9263c55f367c8631727adff00ab45e2c7c1abafc52",
+      "bytes": 96111,
+      "status": "compiles"
+    },
+    {
+      "file": "e-cf-44.xsd",
+      "name": "e-CF 44",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2044%20v.1.0.xsd",
+      "sha256": "19834f37a9f0e2db40f00c80d07c2bf92f9019f23474480f32cef1ba06af4e67",
+      "bytes": 114302,
+      "status": "compiles"
+    },
+    {
+      "file": "e-cf-45.xsd",
+      "name": "e-CF 45",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2045%20v.1.0.xsd",
+      "sha256": "030492cc8ef7d1a09a89b16b241f8e5c4920dfd09c0b629b1db8e68406ecd6ca",
+      "bytes": 121785,
+      "status": "compiles"
+    },
+    {
+      "file": "e-cf-46.xsd",
+      "name": "e-CF 46",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2046%20v.1.0.xsd",
+      "sha256": "e7f8613ade25c7efb88e84d34d7c0ad330d1b22238ad9ef90c80aed01911d67b",
+      "bytes": 115951,
+      "status": "compiles"
+    },
+    {
+      "file": "e-cf-47.xsd",
+      "name": "e-CF 47",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2047%20v.1.0.xsd",
+      "sha256": "14daf18f52f63dd80e439a18fb60a102d74e71243ee90ee253367f61ce8e1994",
+      "bytes": 101382,
+      "status": "compiles"
+    },
+    {
+      "file": "anecf.xsd",
+      "name": "ANECF",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/ANECF%20v.1.0.xsd",
+      "sha256": "af2e6a16c2900dfa55264d6ebec58ccbbbb25c1eb9821ee18ccc44fc142d0e78",
+      "bytes": 5160,
+      "status": "compiles"
+    },
+    {
+      "file": "arecf.xsd",
+      "name": "ARECF",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/ARECF%20v1.0.xsd",
+      "sha256": "c6d186167159110959eb3f54706ecc7462ad9128fc2c3e03440c8352b1c66f10",
+      "bytes": 2871,
+      "status": "compiles"
+    },
+    {
+      "file": "semilla.xsd",
+      "name": "Semilla",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/Semilla%20v.1.0.xsd",
+      "sha256": "bebef2033c930a30c8cef45b513db00403423125a7f3f48e100a73e3e355f67e",
+      "bytes": 487,
+      "status": "compiles"
+    }
+  ],
+  "excluded": [
+    {
+      "name": "e-CF 31",
+      "reason": "The published schema references `IndicadorServicioTodoIncluidoType`, which does not resolve; lxml refuses to compile it.",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/e-CF%2031%20v.1.0.xsd"
+    },
+    {
+      "name": "RFCE 32",
+      "reason": "The published schema contains an invalid pattern facet: `[$0-9]` and the `\\-` escape are not valid XML Schema regex.",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/RFCE%2032%20v.1.0.xsd"
+    },
+    {
+      "name": "ACECF",
+      "reason": "The published schema contains an invalid pattern facet: the `\\-` escape is not valid XML Schema regex.",
+      "source_url": "https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/ACECF%20v.1.0.xsd"
+    }
+  ],
+  "mirror": "examples/fixtures/schemas",
+  "mirror_note": "Identical copies for examples and tests. The package copy is what ships; this mirror is the reference used by the repository fixtures."
+}

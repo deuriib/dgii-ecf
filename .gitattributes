@@ -7,6 +7,9 @@
 *.pfx binary
 *.key binary
 
+# DGII XML Schemas are provenance-checked by sha256; store them verbatim.
+*.xsd -text
+
 # Lockfiles are text (diffable, mergeable).
 *.lock text eol=lf
 

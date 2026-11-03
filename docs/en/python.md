@@ -128,6 +128,34 @@ if (ack.isOk() && !ack.value.accepted) {
 }
 ```
 
+### Schema validation
+
+`validate_document` checks a document against the official DGII XML Schema and
+reports each violation with its element path. The schemas are bundled, so
+validation works offline.
+
+```python
+from py_dgii_ecf import validate_document
+
+result = validate_document(signed_xml)
+if result.is_ok():
+    for violation in result.unwrap():
+        print(violation.path, violation.message)
+```
+
+`validate_before_send=True` runs the same check before a **general e-CF**
+submission and fails with `VALIDATION` without calling DGII:
+
+```python
+ecf = ECF(credentials, Environment.PROD, validate_before_send=True)
+```
+
+Twelve schemas are bundled: `e-CF` 32, 33, 34, 41, 43, 44, 45, 46, 47, `ANECF`,
+`ARECF` and `Semilla`. Three published schemas do not compile — `e-CF 31`,
+`RFCE 32` and `ACECF` — so those document types are reported as _schema
+unavailable_ rather than passing silently. See
+`examples/fixtures/schemas/README.md` for the exact reasons.
+
 ### Monetary rounding
 
 `Transformer.json_to_xml(..., round_monetary=True)` rounds decimal values to two
