@@ -25,6 +25,7 @@ import {
   type ReconciliationResult,
 } from './reconciliation.js';
 import { Signature } from './signing.js';
+import { formatViolations, validateDocument } from './validation.js';
 import { extractElementText } from './xml.js';
 import type { P12ReaderData } from './certificate.js';
 import type {
@@ -67,6 +68,13 @@ export interface EcfOptions {
    * (E32 below RD$250,000, E41, E43, E45, E46, E47). Defaults to `true`.
    */
   enforceB2BRules?: boolean;
+  /**
+   * Validate a general e-CF against its bundled XML Schema before sending.
+   * Requires `xmllint` (or `DGII_XMLLINT_BIN`). Defaults to `false`.
+   */
+  validateBeforeSend?: boolean;
+  /** `xmllint` binary used by `validateBeforeSend`. */
+  xmllintBin?: string;
 }
 
 interface PendingSubmission {
@@ -108,6 +116,8 @@ export class ECF {
   private readonly now: () => number;
   private readonly statusApiKey: string | undefined;
   private readonly enforceB2BRules: boolean;
+  private readonly validateBeforeSend: boolean;
+  private readonly xmllintBin: string | undefined;
   private tokenExpiresAt: number | undefined;
   private refreshPromise: Promise<Result<AuthToken, DgiiError>> | undefined;
 
@@ -122,6 +132,8 @@ export class ECF {
     this.now = options.now ?? Date.now;
     this.statusApiKey = options.statusApiKey;
     this.enforceB2BRules = options.enforceB2BRules ?? true;
+    this.validateBeforeSend = options.validateBeforeSend ?? false;
+    this.xmllintBin = options.xmllintBin;
     this.idempotency =
       options.idempotencyStore ?? new InMemoryIdempotencyStore();
     this.http = new HttpClient({
@@ -440,6 +452,23 @@ export class ECF {
       const applicable = checkB2BApplicability(signedXml);
       if (applicable.isErr()) {
         return err(applicable.error);
+      }
+    }
+    if (this.validateBeforeSend) {
+      const validation = validateDocument(
+        signedXml,
+        this.xmllintBin !== undefined ? { bin: this.xmllintBin } : {},
+      );
+      if (validation.isErr()) {
+        return err(validation.error);
+      }
+      if (validation.value.length > 0) {
+        return err(
+          new DgiiError(
+            `Document does not match the DGII XML Schema: ${formatViolations(validation.value)}`,
+            { code: 'VALIDATION', data: validation.value },
+          ),
+        );
       }
     }
     const key = this.buildIdempotencyKey(signedXml);
