@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Illustrative e-CF type 32 (Factura de Consumo Electrónica).
+
+  Validates against `e-CF 32 v.1.0` (see examples/fixtures/schemas/). Dates use
+  the DGII `dd-MM-yyyy` format, and `Encabezado` follows the schema sequence:
+  Version, IdDoc, Emisor, Comprador, Totales.
+
+  The document is unsigned on purpose — `FechaHoraFirma` is set, and the SDK
+  adds `<Signature>` when signing.
+-->
 <ECF>
   <Encabezado>
     <Version>1.0</Version>
@@ -7,16 +17,21 @@
       <eNCF>E320000000001</eNCF>
       <TipoIngresos>01</TipoIngresos>
       <TipoPago>1</TipoPago>
-      <FechaLimitePago>2026-12-31</FechaLimitePago>
+      <FechaLimitePago>31-12-2026</FechaLimitePago>
     </IdDoc>
     <Emisor>
       <RNCEmisor>130862346</RNCEmisor>
       <RazonSocialEmisor>Example SRL</RazonSocialEmisor>
+      <DireccionEmisor>Av. Ejemplo 123</DireccionEmisor>
       <FechaEmision>01-01-2026</FechaEmision>
     </Emisor>
+    <Comprador>
+      <RazonSocialComprador>Consumidor Final</RazonSocialComprador>
+    </Comprador>
     <Totales>
       <MontoGravadoTotal>1000.00</MontoGravadoTotal>
       <MontoGravadoI1>1000.00</MontoGravadoI1>
+      <ITBIS1>18</ITBIS1>
       <TotalITBIS>180.00</TotalITBIS>
       <TotalITBIS1>180.00</TotalITBIS1>
       <MontoTotal>1180.00</MontoTotal>
@@ -34,4 +49,5 @@
       <MontoItem>1000.00</MontoItem>
     </Item>
   </DetallesItems>
+  <FechaHoraFirma>01-01-2026 10:00:00</FechaHoraFirma>
 </ECF>

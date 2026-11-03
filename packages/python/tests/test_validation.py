@@ -11,6 +11,7 @@ from lxml import etree
 from py_dgii_ecf.certificate import P12ReaderData
 from py_dgii_ecf.client import ECF
 from py_dgii_ecf.environment import Environment
+from py_dgii_ecf.signing import Signature
 from py_dgii_ecf.validation import (
     SCHEMA_DIR,
     UNAVAILABLE_SCHEMAS,
@@ -19,6 +20,8 @@ from py_dgii_ecf.validation import (
 )
 
 CREDENTIALS = P12ReaderData(key="unused", cert="unused")
+
+FIXTURES = Path(__file__).resolve().parents[3] / "examples" / "fixtures"
 
 # The Semilla schema requires `valor`, `fecha` and one extra element (the
 # signature the issuer adds before sending).
@@ -153,3 +156,27 @@ def test_fixture_mirror_is_byte_identical() -> None:
 
     for path in SCHEMA_DIR.glob("*.xsd"):
         assert (mirror / path.name).read_bytes() == path.read_bytes(), path.name
+
+
+def test_invoice_32_fixture_validates_once_signed(self_signed) -> None:
+    key_pem, cert_pem, _ = self_signed
+    xml = (FIXTURES / "invoice-32.xml").read_text(encoding="utf-8")
+
+    signed = Signature(key_pem, cert_pem).sign_xml(xml, "ECF")
+    assert signed.is_ok()
+
+    result = validate_document(signed.unwrap())
+
+    assert result.is_ok()
+    assert result.unwrap() == ()
+
+
+def test_unsigned_invoice_32_fixture_is_not_submittable() -> None:
+    xml = (FIXTURES / "invoice-32.xml").read_text(encoding="utf-8")
+
+    result = validate_document(xml)
+
+    assert result.is_ok()
+    # The schema ends with an `xs:any` for the signature, so an unsigned
+    # document is structurally incomplete — which is the point of the fixture.
+    assert result.unwrap()
