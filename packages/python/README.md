@@ -73,10 +73,13 @@ py-dgii-ecf authenticate identity.p12 --environment CerteCF
 py-dgii-ecf status <track-id> identity.p12 --environment CerteCF
 ```
 
+Each command prompts for the `.p12` password (`--password`, hidden input).
+
 ## Modules
 
 `environment`, `types`, `errors`, `result`, `resilience`, `http`, `certificate`,
-`signing`, `transformer`, `utils`, `client`, `cli`.
+`signing`, `transformer`, `reception`, `reconciliation`, `validation`, `utils`,
+`client`, `cli`.
 
 ## License
 

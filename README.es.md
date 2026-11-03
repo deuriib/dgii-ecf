@@ -40,8 +40,12 @@ Ambos SDKs comparten el mismo contrato de diseño:
 - **XMLDSig correcto** — C14N 1.0 inclusivo, firma enveloped, RSA-SHA256,
   compatible byte a byte con el stack `.NET` de la DGII.
 - **Superficie de API completa** — autenticación (SEED), envío de documentos,
-  facturas de resumen (RFCE), consultas de estado/track id, directorio de
-  clientes, aprobación comercial y anulación de e-NCF.
+  facturas de resumen (RFCE), consultas de estado/track id, estado de los
+  servicios, directorio de clientes y listado general, aprobación comercial,
+  anulación de e-NCF y reconciliación de un envío pendiente.
+- **Verificaciones previas** — validación contra los esquemas empaquetados
+  (TypeScript usa `xmllint`, Python usa `lxml`) y chequeo de ventana de
+  mantenimiento antes de un lote.
 - **Dinero como `Decimal`** — el redondeo de punto flotante nunca puede
   corromper un digest.
 
