@@ -6,6 +6,7 @@ export default defineConfig({
   dts: true,
   sourcemap: true,
   clean: true,
+  publicDir: 'schemas',
   splitting: false,
   target: 'node20',
   outExtension({ format }) {

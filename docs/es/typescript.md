@@ -121,6 +121,41 @@ if (ack.isOk() && !ack.value.accepted) {
 }
 ```
 
+### Validación por esquema
+
+`validateDocument` verifica un documento contra el XML Schema oficial de la
+DGII y reporta cada violación con la ruta del elemento. Usa **`xmllint`** por
+subprocess, así que no hay motor empaquetado ni dependencia nativa:
+
+```ts
+import { validateDocument } from '@deuriib/dgii-ecf';
+
+const result = validateDocument(signedXml);
+if (result.isOk()) {
+  for (const violation of result.value) {
+    console.log(violation.path, violation.message);
+  }
+}
+```
+
+`validateBeforeSend: true` ejecuta la misma verificación antes de un envío
+**general de e-CF** y falla con `VALIDATION` sin llamar a la DGII:
+
+```ts
+const ecf = new ECF(credentials, Environment.Prod, {
+  validateBeforeSend: true,
+});
+```
+
+El binario se busca en `PATH`; usa `DGII_XMLLINT_BIN` (o la opción `xmllintBin`
+del cliente) para apuntarlo. **Si falta el binario es un error, nunca un pase
+silencioso.**
+
+Se empaquetan doce esquemas: `e-CF` 32, 33, 34, 41, 43, 44, 45, 46, 47, `ANECF`,
+`ARECF` y `Semilla`. Tres esquemas publicados no compilan — `e-CF 31`,
+`RFCE 32` y `ACECF` — así que esos tipos se reportan como _esquema no
+disponible_. Ver `examples/fixtures/schemas/README.md` para las razones.
+
 ### Redondeo monetario
 
 `Transformer.json2xml(data, true)` redondea los valores decimales a dos

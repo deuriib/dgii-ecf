@@ -9,5 +9,6 @@ export * from './signing.js';
 export * from './transformer.js';
 export * from './reception.js';
 export * from './reconciliation.js';
+export * from './validation.js';
 export * from './utils.js';
 export * from './client.js';

@@ -121,6 +121,41 @@ if (ack.isOk() && !ack.value.accepted) {
 }
 ```
 
+### Schema validation
+
+`validateDocument` checks a document against the official DGII XML Schema and
+reports each violation with its element path. It shells out to **`xmllint`**, so
+there is no bundled engine and no native dependency:
+
+```ts
+import { validateDocument } from '@deuriib/dgii-ecf';
+
+const result = validateDocument(signedXml);
+if (result.isOk()) {
+  for (const violation of result.value) {
+    console.log(violation.path, violation.message);
+  }
+}
+```
+
+`validateBeforeSend: true` runs the same check before a **general e-CF**
+submission and fails with `VALIDATION` without calling DGII:
+
+```ts
+const ecf = new ECF(credentials, Environment.Prod, {
+  validateBeforeSend: true,
+});
+```
+
+The binary is looked up on `PATH`; set `DGII_XMLLINT_BIN` (or the `xmllintBin`
+client option) to point at it. **A missing binary is an error, never a silent
+pass.**
+
+Twelve schemas are bundled: `e-CF` 32, 33, 34, 41, 43, 44, 45, 46, 47, `ANECF`,
+`ARECF` and `Semilla`. Three published schemas do not compile — `e-CF 31`,
+`RFCE 32` and `ACECF` — so those types are reported as _schema unavailable_.
+See `examples/fixtures/schemas/README.md` for the reasons.
+
 ### Monetary rounding
 
 `Transformer.json2xml(data, true)` rounds decimal values to two places with
