@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.6.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.5.1...typescript-v0.6.0) (2026-11-03)
+
+
+### Features
+
+* **client:** add submission reconciliation and reuse helpers ([#113](https://github.com/deuriib/dgii-ecf/issues/113)) ([74d1d4f](https://github.com/deuriib/dgii-ecf/commit/74d1d4fa5d0861a8dd65365a9937087b2e810ac2))
+* **client:** enforce the B2B applicability rules ([#108](https://github.com/deuriib/dgii-ecf/issues/108)) ([d4d0fcd](https://github.com/deuriib/dgii-ecf/commit/d4d0fcde9d8396053429637a428ea8ad104d58ac))
+* **commercial-approval:** support direct B2B delivery ([#109](https://github.com/deuriib/dgii-ecf/issues/109)) ([98749d7](https://github.com/deuriib/dgii-ecf/commit/98749d707abd281ed80d1afc2fad06fef358fab0))
+* **directory:** add the general directory listing endpoint ([#107](https://github.com/deuriib/dgii-ecf/issues/107)) ([33968cb](https://github.com/deuriib/dgii-ecf/commit/33968cb3485875a660f63b1d91179fac67b8aa45))
+* **status:** add the DGII service status endpoints ([#106](https://github.com/deuriib/dgii-ecf/issues/106)) ([8a1e88b](https://github.com/deuriib/dgii-ecf/commit/8a1e88b7400771b951c5a84343d563e12eb3d7b6))
+* **typescript:** validate documents against the bundled schemas ([#119](https://github.com/deuriib/dgii-ecf/issues/119)) ([fdef389](https://github.com/deuriib/dgii-ecf/commit/fdef3891c13c4e47a1777859e278ed2da82e6422))
+
+
+### Bug Fixes
+
+* **client:** key the ANECF idempotency on the schema elements ([#111](https://github.com/deuriib/dgii-ecf/issues/111)) ([da9702f](https://github.com/deuriib/dgii-ecf/commit/da9702fc0c3e7f35b45024c50e2b780d599f448c))
+* **fixtures:** reshape the ACECF and ANECF examples ([#112](https://github.com/deuriib/dgii-ecf/issues/112)) ([966b5b8](https://github.com/deuriib/dgii-ecf/commit/966b5b8699040b2850035ae10ff296f76602d202))
+* **transformer:** omit empty tags instead of emitting them ([#104](https://github.com/deuriib/dgii-ecf/issues/104)) ([e5d6828](https://github.com/deuriib/dgii-ecf/commit/e5d68288e52d231686b676abea4b0b97589072de))
+* **types:** align the remaining response contracts ([#110](https://github.com/deuriib/dgii-ecf/issues/110)) ([2cf1d55](https://github.com/deuriib/dgii-ecf/commit/2cf1d557aa6ee961b26d44c2fb5ac871989b4c76))
+
 ## [0.5.1](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.5.0...typescript-v0.5.1) (2026-11-02)
 
 
