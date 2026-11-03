@@ -18,6 +18,9 @@ repos:
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml
+        # MkDocs needs the `!!python/name:` tag for the Mermaid fence;
+        # `--unsafe` keeps validation while allowing custom tags.
+        args: [--unsafe]
       - id: detect-private-key
       - id: end-of-file-fixer
         # Signed XML fixtures are byte-sensitive; see .prettierignore.
