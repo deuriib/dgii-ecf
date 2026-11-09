@@ -3,8 +3,17 @@
 La referencia de API lista qué hace cada método. Esta página muestra **el orden
 en que hay que llamarlos** — la parte fácil de equivocar y cara de depurar.
 
-Cada paso coincide con los documentos oficiales de la DGII; la referencia
-normativa es [`project-docs/dgii-ground-truth.md`](https://github.com/deuriib/dgii-ecf/blob/main/project-docs/dgii-ground-truth.md).
+Cada paso de abajo coincide con los documentos oficiales de la DGII, y cada
+uno nombra el documento que lo rige.
+[Referencias oficiales de la DGII](../reference/dgii-official.md) los lista
+todos, con un enlace por documento.
+
+!!! note "Verificación de enlaces"
+
+    Los enlaces oficiales de esta página se verificaron el 2026-11-09. La DGII
+    republica los archivos en la misma ubicación, así que vuelve a comprobar el
+    documento antes de confiar en una referencia a una sección. Ver
+    [Referencias oficiales de la DGII](../reference/dgii-official.md).
 
 ## El flujo principal
 
@@ -38,6 +47,8 @@ flowchart TD
 
 La DGII emite una semilla, la firmas con el certificado y la canjeas por un
 token bearer.
+
+**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Autenticación_: descargar la semilla, devolverla firmada y la validez de una hora del token (actualizado en el sitio 2026-05-29) · [Semilla v.1.0](<https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/Semilla%20v.1.0.xsd>) — `SemillaModel`, el documento de semilla cuyo espacio de extensión lleva la firma enveloped (v1.0; actualizado en el sitio 2020-11-12).
 
 === "TypeScript"
 
@@ -77,6 +88,8 @@ Antes de un lote, pregunta si los servicios están arriba y si el ambiente está
 dentro de una ventana de mantenimiento. Requiere la API key de status, no el
 token.
 
+**Fuente oficial:** [FE Estatus Servicios API](https://statusecf.dgii.gov.do/api-docs/v1/definition.json) — las tres operaciones de estado y sus códigos enteros de ambiente (v1) · [Estándares de Comportamiento Esperado en la Integración con el Sistema](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Estandares%20de%20Comportamiento%20Esperado%20en%20la%20Integracion.pdf) — §5.1: el portal de disponibilidad es la primera comprobación antes de reintentar o escalar (actualizado en el sitio 2026-11-06).
+
 === "TypeScript"
 
     ```ts
@@ -103,6 +116,8 @@ El cliente necesita `statusApiKey` / `status_api_key` para esta llamada.
 ## 3. Enrutar por tipo de documento y monto
 
 Esta es la decisión que más se equivoca.
+
+**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Recepción de e-CF_ para el umbral de RD$250,000 y _Recepción de resumen factura de consumo electrónica (RFCE)_ para la ruta por debajo (actualizado en el sitio 2026-05-29) · [Informe Técnico Comprobante Fiscal Electrónico](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Informe%20T%C3%A9cnico%20e-CF%20v1.0.pdf) — §6.1 y §9 para el catálogo de tipos y el umbral, §7 para el e-NCF de 13 posiciones y su vigencia (v1.0; actualizado en el sitio 2026-10-16).
 
 | Documento                                   | Endpoint      | Host              | Respuesta          |
 | ------------------------------------------- | ------------- | ----------------- | ------------------ |
@@ -145,6 +160,8 @@ el umbral en vez de enrutarlo mal.
 Firma **al final**, y nunca reformatees el documento después — la firma cubre
 los bytes exactos.
 
+**Fuente oficial:** [Firmado Comprobantes Fiscales Electrónicos (e-CF)](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Firmado%20de%20e-CF.pdf) — el conjunto de algoritmos que hay que emitir: C14N inclusiva, RSA-SHA256, digest SHA-256, `URI=""`, `KeyInfo` X509 (actualizado en el sitio 2023-11-22) · [Descripción Técnica Servicios Emisores Electrónicos](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Emisores%20Electronicos.pdf) — _Firmado de XML_: protocolo SHA-256, el `SN` del certificado que coincide con el RNC/cédula/pasaporte del titular, y la regla de que un XML firmado nunca se altera (actualizado en el sitio 2026-05-29).
+
 === "TypeScript"
 
     ```ts
@@ -167,6 +184,8 @@ los bytes exactos.
     ```
 
 ## 5. Enviar
+
+**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — los dos servicios de recepción: endpoint, autenticación bearer, el campo multipart `xml` y la forma de la respuesta de cada uno (actualizado en el sitio 2026-05-29) · [Descripción Técnica Servicios Emisores Electrónicos](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Emisores%20Electronicos.pdf) — _Nombre de los Archivos XML_: el nombre de archivo es `RNCEmisor` + el e-NCF, 13 caracteres, como muestra la tabla de esa misma sección (actualizado en el sitio 2026-05-29).
 
 === "TypeScript"
 
@@ -193,6 +212,8 @@ documento.
 
 Un e-CF general se acusa con un `trackId`; el veredicto fiscal llega de forma
 asíncrona.
+
+**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de resultado e-CF_: los cinco códigos de resultado y `secuenciaUtilizada` en la misma respuesta del trackId (actualizado en el sitio 2026-05-29).
 
 === "TypeScript"
 
@@ -232,6 +253,8 @@ Si el proceso muere a mitad del envío, el marcador de idempotencia queda
 **pendiente** y el siguiente intento devuelve `IDEMPOTENCY` en vez de reenviar.
 Resuélvelo antes de reintentar:
 
+**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de trackId e-CF_, donde un estado "No encontrado" significa que la DGII no tiene registro de ese e-NCF (actualizado en el sitio 2026-05-29) · [Estándares de Comportamiento Esperado en la Integración con el Sistema](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Estandares%20de%20Comportamiento%20Esperado%20en%20la%20Integracion.pdf) — §5.2–5.3: la cola local contra la que se concilia un envío interrumpido (actualizado en el sitio 2026-11-06).
+
 === "TypeScript"
 
     ```ts
@@ -255,6 +278,8 @@ reintentes.
 
 ## Flujos auxiliares
 
+**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Recepción de aprobación comercial_, _Anulación de e-NCF_ y _Consulta Directorio de Servicios_: endpoints y respuestas de los tres flujos auxiliares (actualizado en el sitio 2026-05-29) · [Formato Anulación de e-NCF v1.0](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Formatos%20XML/Formato%20Anulaci%C3%B3n%20de%20e-NCF%20v1.0.pdf) — solo pueden anularse secuencias nunca enviadas a la DGII ni entregadas al comprador (v1.0, rev. 2022-05-24).
+
 ```mermaid
 flowchart LR
     A["Aprobación comercial (ACECF)"] --> B{"Destino"}
@@ -275,11 +300,11 @@ flowchart LR
 
 ## Errores comunes
 
-| Error                                                  | Consecuencia                                              |
-| ------------------------------------------------------ | --------------------------------------------------------- |
-| Enviar un E32 bajo RD$250,000 al endpoint general      | Rechazado — debe ir como resumen RFCE                     |
-| Firmar y luego reformatear o reindentar el XML         | Firma inválida                                            |
-| Reutilizar un e-NCF consumido                          | Rechazado — revisar `secuenciaUtilizada`                  |
-| Reintentar un envío pendiente sin reconciliar          | `IDEMPOTENCY`, o duplicado si se salta el store           |
-| Tratar `Ok(...)` como "aceptado"                       | Un 200 puede traer `error`; el veredicto está en `estado` |
-| Entregar un E41/E43/E45/E46/E47 directo a un comprador | La DGII excluye esos tipos del flujo B2B                  |
+| Error                                                  | Consecuencia                                                                               |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Enviar un E32 bajo RD$250,000 al endpoint general      | Rechazado — debe ir como resumen RFCE                                                      |
+| Firmar y luego reformatear o reindentar el XML         | Firma inválida                                                                             |
+| Reutilizar un e-NCF consumido                          | Rechazado — revisar `secuenciaUtilizada`                                                   |
+| Reintentar un envío pendiente sin reconciliar          | `IDEMPOTENCY`, o duplicado si se salta el store                                            |
+| Tratar `Ok(...)` como "aceptado"                       | Un 200 puede traer `error`; el veredicto está en `estado`                                  |
+| Entregar un E41/E43/E45/E46/E47 directo a un comprador | El SDK lo rechaza (`enforceB2BRules`); los documentos de la DGII no enuncian tal exclusión |
