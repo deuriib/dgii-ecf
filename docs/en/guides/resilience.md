@@ -2,6 +2,12 @@
 
 Every external call is protected by retry, a circuit breaker and a timeout.
 
+!!! note "Link verification"
+
+    Official links on this page were verified on 2026-11-09. DGII republishes
+    files in place, so re-check a document before relying on a section
+    reference. See [Official DGII references](../reference/dgii-official.md).
+
 ## Retry policy
 
 Only **transient** failures are retried:
@@ -10,6 +16,9 @@ Only **transient** failures are retried:
 - HTTP `408`, `429`, `5xx`
 
 A rejected e-CF (e.g. `400`, `401`) is **never** blindly re-sent.
+
+When a transmission fails and you fall back to contingency, this governs it:
+**Official source:** [Informe Técnico Comprobante Fiscal Electrónico](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Informe%20T%C3%A9cnico%20e-CF%20v1.0.pdf) — §19: contingency operation, the clocks it sets for transmitting what was generated offline, and the identifiers that mark a replacement receipt (v1.0; site-updated 2026-10-16) · [Instructivo de Contingencia de Facturación Electrónica](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Instructivo%20de%20Contingencia%20de%20FE.pdf) — the operational manual for working in contingency (site-updated 2026-10-15).
 
 | Option              | Default                |
 | ------------------- | ---------------------- |
@@ -60,6 +69,8 @@ Provide a persistent store (Redis/Postgres) in production:
 !!! info "Persist before transmit"
 Store the signed XML, its hash and the idempotency key before the network
 call, so an interrupted send can be reconciled instead of re-issued.
+
+**Official source:** [Estándares de Comportamiento Esperado en la Integración con el Sistema](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Estandares%20de%20Comportamiento%20Esperado%20en%20la%20Integracion.pdf) — §5.2–5.3: sign and store the e-CF locally with its timestamp before transmitting it, and verify the first documents before draining the queue (site-updated 2026-11-06). The keying scheme is the SDK's design.
 
 ## In-memory store lifetime
 
@@ -129,3 +140,5 @@ rejection: whether the e-NCF may be used again. DGII sets
 (invalid certificate or signature, invalid XML, non-delegated signer,
 unauthorized or expired e-NCF, non-electronic issuer, unknown or inactive RNC).
 An absent flag is treated as **not** reusable.
+
+**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de trackId e-CF_ (the `No encontrado` state), _Consulta de resultado e-CF_ and _Consulta de Resumen (RFCE)_ (the `secuenciaUtilizada` flag, keyed by `trackId` or by RNC + e-NCF + security code) (site-updated 2026-05-29).

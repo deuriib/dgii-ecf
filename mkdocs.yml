@@ -39,6 +39,8 @@ nav:
       - Signing (XMLDSig): guides/signing.md
       - Resilience & idempotency: guides/resilience.md
       - Releases & publishing: guides/releases.md
+  - Reference:
+      - Official DGII references: reference/dgii-official.md
   - Examples: examples.md
   - FAQ: faq.md
 
@@ -81,6 +83,8 @@ plugins:
             Signing (XMLDSig): Firma (XMLDSig)
             Resilience & idempotency: Resiliencia e idempotencia
             Releases & publishing: Lanzamientos y publicación
+            Reference: Referencia
+            Official DGII references: Referencias oficiales de la DGII
             Examples: Ejemplos
             FAQ: Preguntas frecuentes
         - locale: en

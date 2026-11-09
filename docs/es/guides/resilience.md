@@ -3,6 +3,13 @@
 Cada llamada externa está protegida por reintentos, un circuit breaker y un
 timeout.
 
+!!! note "Verificación de enlaces"
+
+    Los enlaces oficiales de esta página se verificaron el 2026-11-09. La DGII
+    republica los archivos en la misma ubicación, así que vuelve a comprobar el
+    documento antes de confiar en una referencia a una sección. Ver
+    [Referencias oficiales de la DGII](../reference/dgii-official.md).
+
 ## Política de reintentos
 
 Solo se reintentan las fallas **transitorias**:
@@ -11,6 +18,9 @@ Solo se reintentan las fallas **transitorias**:
 - HTTP `408`, `429`, `5xx`
 
 Un e-CF rechazado (por ejemplo `400`, `401`) **nunca** se reenvía a ciegas.
+
+Cuando una transmisión falla y recurres a contingencia, esto es lo que la rige:
+**Fuente oficial:** [Informe Técnico Comprobante Fiscal Electrónico](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Informe%20T%C3%A9cnico%20e-CF%20v1.0.pdf) — §19: operación en contingencia, los plazos que fija para transmitir lo generado sin conexión y los identificadores que marcan un comprobante de reemplazo (v1.0; actualizado en el sitio 2026-10-16) · [Instructivo de Contingencia de Facturación Electrónica](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Instructivo%20de%20Contingencia%20de%20FE.pdf) — el manual operativo para trabajar en contingencia (actualizado en el sitio 2026-10-15).
 
 | Opción                 | Valor por defecto     |
 | ---------------------- | --------------------- |
@@ -62,6 +72,8 @@ Usa un almacén persistente (Redis/Postgres) en producción:
 Guarda el XML firmado, su hash y la clave de idempotencia antes de la
 llamada de red, para que un envío interrumpido se pueda conciliar en lugar
 de reemitirse.
+
+**Fuente oficial:** [Estándares de Comportamiento Esperado en la Integración con el Sistema](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Estandares%20de%20Comportamiento%20Esperado%20en%20la%20Integracion.pdf) — §5.2–5.3: firmar y guardar el e-CF localmente con su marca de tiempo antes de transmitirlo, y verificar los primeros documentos antes de vaciar la cola (actualizado en el sitio 2026-11-06). El esquema de claves es diseño del SDK.
 
 ## Vida útil del almacén en memoria
 
@@ -131,3 +143,5 @@ rechazo: si la secuencia del e-NCF puede volver a usarse. La DGII pone
 (certificado o firma inválida, XML inválido, firmante no delegado, e-NCF no
 autorizado o vencido, emisor no electrónico, RNC inexistente o inactivo). Un
 flag ausente se trata como **no** reutilizable.
+
+**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de trackId e-CF_ (el estado `No encontrado`), _Consulta de resultado e-CF_ y _Consulta de Resumen (RFCE)_ (la bandera `secuenciaUtilizada`, indexada por `trackId` o por RNC + e-NCF + código de seguridad) (actualizado en el sitio 2026-05-29).

@@ -10,6 +10,15 @@ enveloped** con:
 - **Reference**: `URI=""` con la transformada enveloped-signature
 - `<Signature>` se agrega como último hijo del elemento raíz.
 
+- **Fuente oficial:** [Firmado Comprobantes Fiscales Electrónicos (e-CF)](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Firmado%20de%20e-CF.pdf) — el perfil de firma de la propia DGII a modo de ejemplo: URI de C14N, RSA-SHA256, digest SHA-256, `URI=""`, `KeyInfo` X509 (actualizado en el sitio 2023-11-22) · [Descripción Técnica Servicios Emisores Electrónicos](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Emisores%20Electronicos.pdf) — _Firmado de XML_: protocolo SHA-256, `preservewhitespace = false`, y la regla de que un XML firmado nunca se altera (actualizado en el sitio 2026-05-29).
+
+!!! note "Verificación de enlaces"
+
+    Los enlaces oficiales de esta página se verificaron el 2026-11-09. La DGII
+    republica los archivos en la misma ubicación, así que vuelve a comprobar el
+    documento antes de confiar en una referencia a una sección. Ver
+    [Referencias oficiales de la DGII](../reference/dgii-official.md).
+
 ## Por qué importa una implementación real de canonicalización
 
 `ElementTree.tostring()`, `minidom.toxml()` y serializadores similares **no**
