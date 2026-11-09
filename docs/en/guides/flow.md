@@ -3,8 +3,16 @@
 The API reference lists what each method does. This page shows **the order to
 call them in** — the part that is easy to get wrong and expensive to debug.
 
-Every step below matches the official DGII documents; the normative reference
-is [`project-docs/dgii-ground-truth.md`](https://github.com/deuriib/dgii-ecf/blob/main/project-docs/dgii-ground-truth.md).
+Every step below matches the official DGII documents, and each one names the
+document that governs it. [Official DGII references](../reference/dgii-official.md)
+lists all of them, with a link per
+document.
+
+!!! note "Link verification"
+
+    Official links on this page were verified on 2026-11-09. DGII republishes
+    files in place, so re-check a document before relying on a section
+    reference. See [Official DGII references](../reference/dgii-official.md).
 
 ## The main flow
 
@@ -38,6 +46,8 @@ flowchart TD
 
 DGII issues a seed, you sign it with the certificate, and exchange it for a
 bearer token.
+
+**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Autenticación_: downloading the seed, posting it back signed, and the token's one-hour validity (site-updated 2026-05-29) · [Semilla v.1.0](<https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Documentaci%C3%B3n%20T%C3%A9cnica%20(XSD)/Semilla%20v.1.0.xsd>) — `SemillaModel`, the seed document whose extension slot carries the enveloped signature (v1.0; site-updated 2020-11-12).
 
 === "TypeScript"
 
@@ -76,6 +86,8 @@ need to manage it.
 Before a batch, ask whether the services are up and whether the environment is
 inside a maintenance window. This needs the status API key, not the token.
 
+**Official source:** [FE Estatus Servicios API](https://statusecf.dgii.gov.do/api-docs/v1/definition.json) — the three status operations and their integer ambiente codes (v1) · [Estándares de Comportamiento Esperado en la Integración con el Sistema](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Estandares%20de%20Comportamiento%20Esperado%20en%20la%20Integracion.pdf) — §5.1: the availability portal is the first check before retrying or escalating (site-updated 2026-11-06).
+
 === "TypeScript"
 
     ```ts
@@ -102,6 +114,8 @@ The client needs `statusApiKey` / `status_api_key` for this call.
 ## 3. Route by document type and amount
 
 This is the decision most integrators get wrong.
+
+**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Recepción de e-CF_ for the RD$250,000 threshold and _Recepción de resumen factura de consumo electrónica (RFCE)_ for the path below it (site-updated 2026-05-29) · [Informe Técnico Comprobante Fiscal Electrónico](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Informe%20T%C3%A9cnico%20e-CF%20v1.0.pdf) — §6.1 and §9 for the type catalogue and the threshold, §7 for the 13-position e-NCF and its validity (v1.0; site-updated 2026-10-16).
 
 | Document                                    | Endpoint      | Host              | Response           |
 | ------------------------------------------- | ------------- | ----------------- | ------------------ |
@@ -145,6 +159,8 @@ E32 below the threshold instead of misrouting it.
 Sign **last**, and never reformat the document afterwards — the signature covers
 the exact bytes.
 
+**Official source:** [Firmado Comprobantes Fiscales Electrónicos (e-CF)](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Firmado%20de%20e-CF.pdf) — the algorithm set to emit: inclusive C14N, RSA-SHA256, SHA-256 digest, `URI=""`, X509 `KeyInfo` (site-updated 2023-11-22) · [Descripción Técnica Servicios Emisores Electrónicos](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Emisores%20Electronicos.pdf) — _Firmado de XML_: SHA-256 protocol, the certificate `SN` matching the holder's RNC/cédula/pasaporte, and the rule that a signed XML is never altered (site-updated 2026-05-29).
+
 === "TypeScript"
 
     ```ts
@@ -167,6 +183,8 @@ the exact bytes.
     ```
 
 ## 5. Submit
+
+**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — the two reception services: endpoint, bearer auth, the multipart `xml` field and the response shape of each (site-updated 2026-05-29) · [Descripción Técnica Servicios Emisores Electrónicos](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Emisores%20Electronicos.pdf) — _Nombre de los Archivos XML_: the file name is `RNCEmisor` + the e-NCF, 13 characters, as that section's own table shows (site-updated 2026-05-29).
 
 === "TypeScript"
 
@@ -192,6 +210,8 @@ A repeated call returns the cached result instead of issuing a second document.
 
 A general e-CF is acknowledged with a `trackId`; the fiscal verdict arrives
 asynchronously.
+
+**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de resultado e-CF_: the five result codes and `secuenciaUtilizada` in the same trackId response (site-updated 2026-05-29).
 
 === "TypeScript"
 
@@ -231,6 +251,8 @@ If the process dies mid-send, the idempotency marker stays **pending** and the
 next attempt returns `IDEMPOTENCY` rather than re-sending. Resolve it before
 retrying:
 
+**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de trackId e-CF_, where a "No encontrado" state means DGII holds no record of that e-NCF (site-updated 2026-05-29) · [Estándares de Comportamiento Esperado en la Integración con el Sistema](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Estandares%20de%20Comportamiento%20Esperado%20en%20la%20Integracion.pdf) — §5.2–5.3: the local queue an interrupted send is reconciled against (site-updated 2026-11-06).
+
 === "TypeScript"
 
     ```ts
@@ -253,6 +275,8 @@ document, the marker stays and `delivered` is `true` — do not retry.
 
 ## Auxiliary flows
 
+**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Recepción de aprobación comercial_, _Anulación de e-NCF_ and _Consulta Directorio de Servicios_: endpoints and responses for the three auxiliary flows (site-updated 2026-05-29) · [Formato Anulación de e-NCF v1.0](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Formatos%20XML/Formato%20Anulaci%C3%B3n%20de%20e-NCF%20v1.0.pdf) — only sequences never sent to DGII nor delivered to the buyer may be voided (v1.0, rev. 2022-05-24).
+
 ```mermaid
 flowchart LR
     A["Commercial approval (ACECF)"] --> B{"Destination"}
@@ -272,11 +296,11 @@ flowchart LR
 
 ## Common mistakes
 
-| Mistake                                                 | Consequence                                                   |
-| ------------------------------------------------------- | ------------------------------------------------------------- |
-| Sending an E32 below RD$250,000 to the general endpoint | Rejected — it must go as an RFCE summary                      |
-| Signing, then reformatting or re-indenting the XML      | Invalid signature                                             |
-| Reusing a consumed e-NCF                                | Rejected — check `secuenciaUtilizada`                         |
-| Retrying a pending submission without reconciling       | `IDEMPOTENCY`, or a duplicate if the store is bypassed        |
-| Treating `Ok(...)` as "accepted"                        | A 200 can carry `error` populated; the verdict is in `estado` |
-| Delivering an E41/E43/E45/E46/E47 straight to a buyer   | DGII excludes those types from the B2B flow                   |
+| Mistake                                                 | Consequence                                                                      |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Sending an E32 below RD$250,000 to the general endpoint | Rejected — it must go as an RFCE summary                                         |
+| Signing, then reformatting or re-indenting the XML      | Invalid signature                                                                |
+| Reusing a consumed e-NCF                                | Rejected — check `secuenciaUtilizada`                                            |
+| Retrying a pending submission without reconciling       | `IDEMPOTENCY`, or a duplicate if the store is bypassed                           |
+| Treating `Ok(...)` as "accepted"                        | A 200 can carry `error` populated; the verdict is in `estado`                    |
+| Delivering an E41/E43/E45/E46/E47 straight to a buyer   | The SDK refuses it (`enforceB2BRules`); DGII's documents state no such exclusion |

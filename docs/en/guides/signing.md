@@ -9,6 +9,13 @@ enveloped** with:
   (`http://www.w3.org/2001/04/xmldsig-more#rsa-sha256`)
 - **Reference**: `URI=""` with the enveloped-signature transform
 - `<Signature>` is appended as the last child of the root element.
+- **Official source:** [Firmado Comprobantes Fiscales Electrónicos (e-CF)](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Firmado%20de%20e-CF.pdf) — DGII's own signature profile by example: C14N URI, RSA-SHA256, SHA-256 digest, `URI=""`, X509 `KeyInfo` (site-updated 2023-11-22) · [Descripción Técnica Servicios Emisores Electrónicos](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Emisores%20Electronicos.pdf) — _Firmado de XML_: SHA-256 protocol, `preservewhitespace = false`, and the rule that a signed XML is never altered (site-updated 2026-05-29).
+
+!!! note "Link verification"
+
+    Official links on this page were verified on 2026-11-09. DGII republishes
+    files in place, so re-check a document before relying on a section
+    reference. See [Official DGII references](../reference/dgii-official.md).
 
 ## Why a real canonicalization implementation matters
 
