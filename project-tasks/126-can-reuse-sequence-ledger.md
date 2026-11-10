@@ -86,19 +86,27 @@ No cycles.
 
 ### Task board
 
-| #   | Pipeline | Task                                | Producer               | Validator              | Evidence that counts                                                                            | Attempts | Status                       |
-| --- | -------- | ----------------------------------- | ---------------------- | ---------------------- | ----------------------------------------------------------------------------------------------- | -------- | ---------------------------- |
-| T0  | —        | Task list quoting #126 + close rule | Senior Project Manager | Orchestrator vs ledger | `project-tasks/126-tasklist.md` quotes the issue verbatim, maps every constraint                | —        | DONE                         |
-| T1  | P1       | Contract design                     | DGII e-CF Expert       | Refuter Reviewer       | Every endpoint claim traceable to the register's verified rows; no invented contract            | 2        | DONE (frozen)                |
-| T2  | P1       | DGII accuracy of the design         | —                      | Refuter Reviewer       | The chosen consult is the one DGII publishes the flag on, per document type                     | 2        | PASS                         |
-| T3  | P1       | Failure modes & ordering            | —                      | Reliability Reviewer   | Marker deletion still happens only on `No encontrado`; added calls cannot cause a double-issue  | 2        | PASS                         |
-| T4  | P2       | TypeScript fix + tests              | Senior Developer       | Code Reviewer          | `bunx vitest run`, types clean under `strict`                                                   | —        | DONE                         |
-| T5  | P3       | Python fix + tests                  | Senior Developer       | Code Reviewer          | `uv run pytest`, `mypy --strict` clean                                                          | —        | DONE                         |
-| T6  | P2⇄P3    | Cross-package review + parity       | —                      | Code Reviewer          | Same chain, same order, same fallbacks, same error codes in both                                | 3        | PASS                         |
-| T7  | —        | Failing-first proof + CI gates      | —                      | Evidence Collector     | The new test **fails** with `src` at `main` and **passes** with the fix; `mise run ci` green    | 1        | PASS                         |
-| T8  | P4       | `architecture.md` + `docs/{en,es}`  | Technical Writer       | Evidence Collector     | Contract doc matches code; `mkdocs build --strict` + locale parity green                        | 2        | PASS                         |
-| T9  | —        | Final integration gate              | —                      | Reality Checker        | Close rule satisfied, both packages identical, no creep into signing/retry/idempotency ordering | 1        | PASS                         |
-| T10 | —        | Commits + PR                        | Git Workflow Master    | Orchestrator           | Conventional Commits (`fix(typescript)`, `fix(python)`), evidence in PR body                    | —        | DONE (PR #N, see close note) |
+| #   | Pipeline | Task                                | Producer               | Validator              | Evidence that counts                                                                            | Attempts | Status             |
+| --- | -------- | ----------------------------------- | ---------------------- | ---------------------- | ----------------------------------------------------------------------------------------------- | -------- | ------------------ |
+| T0  | —        | Task list quoting #126 + close rule | Senior Project Manager | Orchestrator vs ledger | `project-tasks/126-tasklist.md` quotes the issue verbatim, maps every constraint                | —        | DONE               |
+| T1  | P1       | Contract design                     | DGII e-CF Expert       | Refuter Reviewer       | Every endpoint claim traceable to the register's verified rows; no invented contract            | 2        | DONE (frozen)      |
+| T2  | P1       | DGII accuracy of the design         | —                      | Refuter Reviewer       | The chosen consult is the one DGII publishes the flag on, per document type                     | 2        | PASS               |
+| T3  | P1       | Failure modes & ordering            | —                      | Reliability Reviewer   | Marker deletion still happens only on `No encontrado`; added calls cannot cause a double-issue  | 2        | PASS               |
+| T4  | P2       | TypeScript fix + tests              | Senior Developer       | Code Reviewer          | `bunx vitest run`, types clean under `strict`                                                   | —        | DONE               |
+| T5  | P3       | Python fix + tests                  | Senior Developer       | Code Reviewer          | `uv run pytest`, `mypy --strict` clean                                                          | —        | DONE               |
+| T6  | P2⇄P3    | Cross-package review + parity       | —                      | Code Reviewer          | Same chain, same order, same fallbacks, same error codes in both                                | 3        | PASS               |
+| T7  | —        | Failing-first proof + CI gates      | —                      | Evidence Collector     | The new test **fails** with `src` at `main` and **passes** with the fix; `mise run ci` green    | 1        | PASS               |
+| T8  | P4       | `architecture.md` + `docs/{en,es}`  | Technical Writer       | Evidence Collector     | Contract doc matches code; `mkdocs build --strict` + locale parity green                        | 2        | PASS               |
+| T9  | —        | Final integration gate              | —                      | Reality Checker        | Close rule satisfied, both packages identical, no creep into signing/retry/idempotency ordering | 1        | PASS               |
+| T10 | —        | Commits + PR                        | Git Workflow Master    | Orchestrator           | Conventional Commits (`fix(typescript)`, `fix(python)`), evidence in PR body                    | —        | DONE — **PR #128** |
+
+### Close note
+
+**PR:** https://github.com/deuriib/dgii-ecf/pull/128 — opened 2026-11-10, base `main`, 5 Conventional Commits.
+PR body carries the failing-first link (`project-tasks/126-evidence/t7-failing-first.md`), the T6 parity
+verdict, the round-trip cost and the Decision-3 public-surface call-out. **Merge is the repo owner's**
+(deuriib); no self-merge. Release-please cuts the patch releases on merge; nothing version/tag/changelog
+related was touched.
 
 Attempt ceiling is 3 per task, then BLOCKED + escalation.
 
