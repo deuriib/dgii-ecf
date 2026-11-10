@@ -2,15 +2,19 @@
 
 Every client method returns one of these models instead of a plain ``dict``, so
 callers get autocomplete and type checking. The shapes mirror the TypeScript
-SDK 1:1; parsing is tolerant of the types DGII actually emits (for example,
-numbers encoded as strings) and raises :class:`ResponseShapeError` when a
-required field is missing or malformed.
+SDK 1:1, and so does the classification of a wire body: the fields that decide
+what a payload *means* (``estado`` on the status reads, ``trackId`` on a
+listing entry, ``secuenciaUtilizada``) are read exactly as DGII typed them,
+while a field that only corroborates is tolerated or dropped. Parsing is
+tolerant of the types DGII actually emits (for example, numbers encoded as
+strings) and raises :class:`ResponseShapeError` when a classifying field is
+missing or malformed.
 """
 
 from __future__ import annotations
 
 import enum
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol, Self, TypeVar
 
@@ -83,6 +87,51 @@ def _as_optional_str(value: object, key: str) -> str | None:
     return None if value is None else _as_str(value, key)
 
 
+def _as_str_strict(value: object, key: str) -> str:
+    """Read a string exactly as DGII typed it, without coercion.
+
+    For the fields that decide *classification* — a state that selects a branch
+    or a track id that is followed — a coerced number would put the payload in
+    a branch the TypeScript SDK never takes, so those reads stay strict.
+    """
+    if isinstance(value, str):
+        return value
+    raise _type_error(key, "a string", value)
+
+
+def _as_bool_strict(value: object, key: str) -> bool:
+    """Read a boolean exactly as DGII typed it.
+
+    ``secuenciaUtilizada`` is the one field the reuse answer is built on, and
+    only a literal ``false`` licenses reuse, so ``"false"`` and ``0`` are not
+    evidence and are never coerced into it.
+    """
+    if isinstance(value, bool):
+        return value
+    raise _type_error(key, "a boolean", value)
+
+
+_FieldT = TypeVar("_FieldT")
+
+
+def _as_optional_or_none(
+    read: Callable[[object, str], _FieldT], value: object, key: str
+) -> _FieldT | None:
+    """Read an optional field, answering ``None`` when it cannot be read.
+
+    Only for fields whose absence already has a meaning and whose value never
+    classifies a payload: DGII's document fixes their type, so a malformed one
+    is dropped rather than failing a read whose answer rests on ``estado``
+    alone (``None`` and "DGII omitted it" are the same observation here).
+    """
+    if value is None:
+        return None
+    try:
+        return read(value, key)
+    except ResponseShapeError:
+        return None
+
+
 def _as_int(value: object, key: str) -> int:
     if isinstance(value, bool):
         raise _type_error(key, "an integer", value)
@@ -98,10 +147,6 @@ def _as_int(value: object, key: str) -> int:
                 f"field {key!r} must be an integer, got {value!r}"
             ) from None
     raise _type_error(key, "an integer", value)
-
-
-def _as_optional_int(value: object, key: str) -> int | None:
-    return None if value is None else _as_int(value, key)
 
 
 def _as_optional_bool(value: object, key: str) -> bool | None:
@@ -147,10 +192,6 @@ def _as_float(value: object, key: str) -> float:
     raise _type_error(key, "a number", value)
 
 
-def _as_optional_float(value: object, key: str) -> float | None:
-    return None if value is None else _as_float(value, key)
-
-
 def _as_bool(value: object, key: str) -> bool:
     if isinstance(value, bool):
         return value
@@ -185,6 +226,14 @@ def _parse_mensajes(value: object) -> tuple[Mensaje, ...]:
     return tuple(mensajes)
 
 
+def _mensajes_or_empty(value: object) -> tuple[Mensaje, ...]:
+    """A malformed message list cannot fail a read whose answer is not in it."""
+    try:
+        return _parse_mensajes(value)
+    except ResponseShapeError:
+        return ()
+
+
 def _parse_strings(value: object, key: str) -> tuple[str, ...]:
     if value is None:
         return ()
@@ -210,7 +259,10 @@ class TrackingStatusResponse:
     """Result of ``statusTrackId`` (``consultaresultado/api/Consultas/Estado``).
 
     DGII omits the fiscal fields on a "No encontrado" answer, so everything
-    except ``codigo`` and ``estado`` is optional.
+    except ``codigo`` and ``estado`` is optional — and even those two are
+    tolerated as defaults, because on this read ``estado`` only corroborates a
+    flag that was already published: an absent or unreadable verdict can
+    withhold reuse, never fail the call.
     """
 
     codigo: int
@@ -224,19 +276,28 @@ class TrackingStatusResponse:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> TrackingStatusResponse:
+        # `codigo` only labels the answer and nothing on this path reads it, so
+        # neither an absent one nor one DGII typed differently is a reason to
+        # reject a readable payload.
+        codigo = _as_optional_or_none(_as_int, data.get("codigo"), "codigo") or 0
+        # The verdict corroborates a flag that was already read, so an absent or
+        # unreadable one cannot license `True`: it becomes the predicate's own
+        # ``""`` default instead of an error.
+        raw_estado = data.get("estado")
+        estado = raw_estado if isinstance(raw_estado, str) else ""
         return cls(
-            codigo=_as_int(data.get("codigo"), "codigo"),
-            estado=_as_str(data.get("estado"), "estado"),
-            track_id=_as_optional_str(data.get("trackId"), "trackId"),
-            rnc=_as_optional_str(data.get("rnc"), "rnc"),
-            encf=_as_optional_str(data.get("encf"), "encf"),
-            secuencia_utilizada=_as_optional_bool(
-                data.get("secuenciaUtilizada"), "secuenciaUtilizada"
+            codigo=codigo,
+            estado=estado,
+            track_id=_as_optional_or_none(_as_str, data.get("trackId"), "trackId"),
+            rnc=_as_optional_or_none(_as_str, data.get("rnc"), "rnc"),
+            encf=_as_optional_or_none(_as_str, data.get("encf"), "encf"),
+            secuencia_utilizada=_as_optional_or_none(
+                _as_bool_strict, data.get("secuenciaUtilizada"), "secuenciaUtilizada"
             ),
-            fecha_recepcion=_as_optional_str(
-                data.get("fechaRecepcion"), "fechaRecepcion"
+            fecha_recepcion=_as_optional_or_none(
+                _as_str, data.get("fechaRecepcion"), "fechaRecepcion"
             ),
-            mensajes=_parse_mensajes(data.get("mensajes")),
+            mensajes=_mensajes_or_empty(data.get("mensajes")),
         )
 
 
@@ -251,22 +312,39 @@ class SummaryTrackingStatusResponse:
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> SummaryTrackingStatusResponse:
         return cls(
-            estado=_as_str(data.get("estado"), "estado"),
-            track_id=_as_optional_str(data.get("trackId"), "trackId"),
-            fecha_recepcion=_as_optional_str(
-                data.get("fechaRecepcion"), "fechaRecepcion"
+            # `estado` decides whether this entry is usable, so it is read
+            # strictly: a coerced number would take a branch (and spend a
+            # `consultaresultado` call) that the TypeScript SDK never takes.
+            estado=_as_str_strict(data.get("estado"), "estado"),
+            # Only a string id can be followed; a number would invent a track.
+            track_id=_as_optional_or_none(
+                _as_str_strict, data.get("trackId"), "trackId"
+            ),
+            # The receipt date is not read on this path, so its shape cannot
+            # fail an entry whose `estado` is readable.
+            fecha_recepcion=_as_optional_or_none(
+                _as_str, data.get("fechaRecepcion"), "fechaRecepcion"
             ),
         )
 
 
 @dataclass(frozen=True, slots=True)
 class InquiryStatusResponse:
-    """Result of ``inquiryStatus`` (``consultaestado``)."""
+    """Result of ``inquiryStatus`` (``consultaestado``).
+
+    DGII publishes no ``secuenciaUtilizada`` here — the eleven documented output
+    parameters do not include it — so the reuse flag cannot be modelled on this
+    answer. Read it from :class:`TrackingStatusResponse` or
+    :class:`InquiryInvoiceSummary` instead.
+
+    Existence is decided by ``estado`` alone, so ``estado`` is the only field
+    whose shape can fail the parse: ``codigo`` defaults to ``0`` and an
+    unreadable optional field becomes ``None`` (its own "DGII omitted it"
+    value), because no consumer of this answer branches on either.
+    """
 
     codigo: int
     estado: str
-    #: ``True`` when the e-NCF sequence is already consumed.
-    secuencia_utilizada: bool | None = None
     rnc_emisor: str | None = None
     ncf_electronico: str | None = None
     monto_total: float | None = None
@@ -280,24 +358,35 @@ class InquiryStatusResponse:
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> InquiryStatusResponse:
         return cls(
-            codigo=_as_int(data.get("codigo"), "codigo"),
-            estado=_as_str(data.get("estado"), "estado"),
-            secuencia_utilizada=_as_optional_bool(
-                data.get("secuenciaUtilizada"), "secuenciaUtilizada"
+            codigo=_as_optional_or_none(_as_int, data.get("codigo"), "codigo") or 0,
+            estado=_as_str_strict(data.get("estado"), "estado"),
+            rnc_emisor=_as_optional_or_none(
+                _as_str, data.get("rncEmisor"), "rncEmisor"
             ),
-            rnc_emisor=_as_optional_str(data.get("rncEmisor"), "rncEmisor"),
-            ncf_electronico=_as_optional_str(
-                data.get("ncfElectronico"), "ncfElectronico"
+            ncf_electronico=_as_optional_or_none(
+                _as_str, data.get("ncfElectronico"), "ncfElectronico"
             ),
-            monto_total=_as_optional_float(data.get("montoTotal"), "montoTotal"),
-            total_itbis=_as_optional_float(data.get("totalITBIS"), "totalITBIS"),
-            fecha_emision=_as_optional_str(data.get("fechaEmision"), "fechaEmision"),
-            fecha_firma=_as_optional_str(data.get("fechaFirma"), "fechaFirma"),
-            rnc_comprador=_as_optional_str(data.get("rncComprador"), "rncComprador"),
-            codigo_seguridad=_as_optional_str(
-                data.get("codigoSeguridad"), "codigoSeguridad"
+            monto_total=_as_optional_or_none(
+                _as_float, data.get("montoTotal"), "montoTotal"
             ),
-            id_extranjero=_as_optional_str(data.get("idExtranjero"), "idExtranjero"),
+            total_itbis=_as_optional_or_none(
+                _as_float, data.get("totalITBIS"), "totalITBIS"
+            ),
+            fecha_emision=_as_optional_or_none(
+                _as_str, data.get("fechaEmision"), "fechaEmision"
+            ),
+            fecha_firma=_as_optional_or_none(
+                _as_str, data.get("fechaFirma"), "fechaFirma"
+            ),
+            rnc_comprador=_as_optional_or_none(
+                _as_str, data.get("rncComprador"), "rncComprador"
+            ),
+            codigo_seguridad=_as_optional_or_none(
+                _as_str, data.get("codigoSeguridad"), "codigoSeguridad"
+            ),
+            id_extranjero=_as_optional_or_none(
+                _as_str, data.get("idExtranjero"), "idExtranjero"
+            ),
         )
 
 
@@ -386,8 +475,8 @@ class InquiryInvoiceSummary:
             estado=_as_str(data.get("estado"), "estado"),
             rnc=_as_optional_str(data.get("rnc"), "rnc"),
             encf=_as_optional_str(data.get("encf"), "encf"),
-            secuencia_utilizada=_as_optional_bool(
-                data.get("secuenciaUtilizada"), "secuenciaUtilizada"
+            secuencia_utilizada=_as_optional_or_none(
+                _as_bool_strict, data.get("secuenciaUtilizada"), "secuenciaUtilizada"
             ),
             mensajes=_parse_mensajes(data.get("mensajes")),
         )

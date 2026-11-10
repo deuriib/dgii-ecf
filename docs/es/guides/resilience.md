@@ -24,7 +24,7 @@ Cuando una transmisión falla y recurres a contingencia, esto es lo que la rige:
 
 | Opción                 | Valor por defecto     |
 | ---------------------- | --------------------- |
-| Intentos máximos       | 3                     |
+| Intentos máximos       | 3 (4 en TypeScript)   |
 | Umbral del breaker     | 5 fallas consecutivas |
 | Semiabierto después de | 30 s                  |
 | Timeout por intento    | 15 s                  |
@@ -118,6 +118,9 @@ a la DGII qué sabe del e-NCF:
       } else if (outcome.value.cleared) {
         // La DGII no tiene registro; el marcador se limpió y reintentar es seguro.
       }
+    } else {
+      // No se pudo preguntar a la DGII: el marcador sigue intacto — reintenta la
+      // conciliación más tarde, nunca el envío.
     }
     ```
 
@@ -131,6 +134,8 @@ a la DGII qué sabe del e-NCF:
             ...  # la DGII ya lo tiene — no reintentar
         elif result.cleared:
             ...  # sin registro; reintentar es seguro
+    else:
+        ...  # no se pudo preguntar: el marcador sigue intacto — reintenta la conciliación, no el envío
     ```
 
 El marcador se limpia **solo** cuando la DGII responde `No encontrado`. Si la
@@ -138,10 +143,33 @@ DGII tiene registro, el marcador se mantiene — es el candado que impide un
 segundo envío — y `delivered` te dice que pares.
 
 `canReuseSequence` / `can_reuse_sequence` responde la pregunta siguiente ante un
-rechazo: si la secuencia del e-NCF puede volver a usarse. La DGII pone
-`secuenciaUtilizada: false` cuando el rechazo deja la secuencia reutilizable
-(certificado o firma inválida, XML inválido, firmante no delegado, e-NCF no
-autorizado o vencido, emisor no electrónico, RNC inexistente o inactivo). Un
-flag ausente se trata como **no** reutilizable.
+rechazo: si la secuencia del e-NCF puede volver a usarse. La DGII publica
+`secuenciaUtilizada` en la consulta de **resultado por track**, no en la de
+existencia, así que la bandera se alcanza por los track ids — y solo un e-CF
+general rechazado paga esas dos lecturas: `consultaestado`, luego
+`consultatrackids` y luego `consultaresultado` cuando hay exactamente un track
+utilizable. Cualquier otro desenlace termina en la primera lectura.
 
-**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de trackId e-CF_ (el estado `No encontrado`), _Consulta de resultado e-CF_ y _Consulta de Resumen (RFCE)_ (la bandera `secuenciaUtilizada`, indexada por `trackId` o por RNC + e-NCF + código de seguridad) (actualizado en el sitio 2026-05-29).
+`true` exige los dos hechos de parte de la DGII: `secuenciaUtilizada: false` **y**
+`estado: Rechazado`. Todo lo demás — sin registro, un veredicto que no es un
+rechazo, varios tracks, una entrada sin `trackId`, una bandera ausente o que no
+es booleana — responde `false`. Un campo malformado que no clasifica (`codigo`,
+`fechaRecepcion`, `mensajes`) tampoco falla la lectura: esos campos no deciden
+nada. Ese es el default conservador, y se mantiene: una bandera ausente se trata
+como **no** reutilizable.
+
+`canReuseSequence: false` no significa que la DGII consumió la secuencia;
+significa que el SDK no obtuvo una respuesta positiva de reutilización. Una
+bandera que **no se pudo leer** tampoco es un `false`: la llamada devuelve `Err`
+con el marcador pendiente intacto, así que reintenta la conciliación más tarde
+en lugar de reenviar. Y `canReuseSequence: true` siempre llega con
+`cleared: false`: vuelve a firmar el mismo e-NCF como documento nuevo, no
+reenvíes el que la DGII rechazó.
+
+Un documento rechazado cuesta entonces hasta tres lecturas y puede tardar
+minutos: dimensiona el lease de la cola por encima de ≈5 min (TypeScript) /
+≈3¾ min (Python), no contra la llamada única que era antes. Un `5xx` o un fallo
+de transporte difiere entre los dos SDKs solo en la contabilidad — Python reporta
+`HTTP` tras 3 intentos por lectura, TypeScript `HTTP`/`UNKNOWN` tras 4.
+
+**Fuente oficial:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de estado e-CF_ (el estado `No encontrado`), _Consulta de resultado e-CF_ y _Consulta de Resumen (RFCE)_ (la bandera `secuenciaUtilizada`, indexada por `trackId` o por RNC + e-NCF + código de seguridad) (actualizado en el sitio 2026-05-29).

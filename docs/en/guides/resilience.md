@@ -22,7 +22,7 @@ When a transmission fails and you fall back to contingency, this governs it:
 
 | Option              | Default                |
 | ------------------- | ---------------------- |
-| Max attempts        | 3                      |
+| Max attempts        | 3 (4 in TypeScript)    |
 | Breaker threshold   | 5 consecutive failures |
 | Half-open after     | 30 s                   |
 | Per-attempt timeout | 15 s                   |
@@ -115,6 +115,9 @@ DGII what it knows about the e-NCF:
       } else if (outcome.value.cleared) {
         // DGII has no record; the marker was cleared and a retry is safe.
       }
+    } else {
+      // Could not ask DGII: the marker is intact — retry the reconcile later,
+      // never the send.
     }
     ```
 
@@ -128,17 +131,41 @@ DGII what it knows about the e-NCF:
             ...  # DGII already has it — do not retry
         elif result.cleared:
             ...  # no record; retry is safe
+    else:
+        ...  # could not ask DGII: the marker is intact — retry the reconcile, not the send
     ```
 
 The marker is cleared **only** when DGII reports `No encontrado`. When DGII has
 a record the marker stays in place — it is the lock that prevents a second
 submission — and `delivered` tells you to stop.
 
-`canReuseSequence` / `can_reuse_sequence` answers the follow-up question for a
-rejection: whether the e-NCF may be used again. DGII sets
-`secuenciaUtilizada: false` for a rejection that leaves the sequence reusable
-(invalid certificate or signature, invalid XML, non-delegated signer,
-unauthorized or expired e-NCF, non-electronic issuer, unknown or inactive RNC).
-An absent flag is treated as **not** reusable.
+`canReuseSequence` / `can_reuse_sequence` answers the follow-up question after a
+rejection: whether the e-NCF may be used again. DGII publishes
+`secuenciaUtilizada` on the **track-result** consult, not on the existence one, so
+the flag is reached through the track ids — and only a rejected general e-CF pays
+for those two reads: `consultaestado`, then `consultatrackids`, then
+`consultaresultado` when exactly one usable track is listed. Every other outcome
+stops after the first read.
 
-**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de trackId e-CF_ (the `No encontrado` state), _Consulta de resultado e-CF_ and _Consulta de Resumen (RFCE)_ (the `secuenciaUtilizada` flag, keyed by `trackId` or by RNC + e-NCF + security code) (site-updated 2026-05-29).
+`true` needs both facts from DGII: `secuenciaUtilizada: false` **and**
+`estado: Rechazado`. Anything else — no record, a verdict that is not a rejection,
+several tracks, an entry without a `trackId`, an absent or non-boolean flag —
+answers `false`. A malformed non-classifying field (`codigo`, `fechaRecepcion`,
+`mensajes`) never fails the read either: those fields decide nothing. That is the
+conservative default, and it still holds: an absent flag is treated as **not**
+reusable.
+
+`canReuseSequence: false` does not mean DGII consumed the sequence; it means the
+SDK did not obtain a positive reusable answer. A flag that **could not be read**
+is not a `false` either — the call returns `Err` with the pending marker intact,
+so retry the reconcile later rather than re-sending. And `canReuseSequence: true`
+always arrives with `cleared: false`: re-sign the same e-NCF as a new document,
+do not re-send the one DGII rejected.
+
+A rejected document therefore costs up to three reads and can run for minutes:
+size the queue lease above ≈5 min (TypeScript) / ≈3¾ min (Python), not against the
+single call it used to be. A `5xx` or a transport failure differs between the two
+SDKs only in bookkeeping — Python reports `HTTP` after 3 attempts per read,
+TypeScript `HTTP`/`UNKNOWN` after 4.
+
+**Official source:** [Descripción Técnica Servicios DGII](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Servicios%20DGII.pdf) — _Consulta de estado e-CF_ (the `No encontrado` state), _Consulta de resultado e-CF_ and _Consulta de Resumen (RFCE)_ (the `secuenciaUtilizada` flag, keyed by `trackId` or by RNC + e-NCF + security code) (site-updated 2026-05-29).

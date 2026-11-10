@@ -26,7 +26,7 @@ import {
 } from './reconciliation.js';
 import { Signature } from './signing.js';
 import { formatViolations, validateDocument } from './validation.js';
-import { extractElementText } from './xml.js';
+import { extractElementText, extractRootElementName } from './xml.js';
 import type { P12ReaderData } from './certificate.js';
 import type {
   AuthToken,
@@ -76,6 +76,63 @@ export interface EcfOptions {
   /** `xmllint` binary used by `validateBeforeSend`. */
   xmllintBin?: string;
 }
+
+/**
+ * Message used when a decoded DGII body cannot be read as the model it should
+ * be. Reused verbatim from the Python package so both SDKs report the same
+ * `VALIDATION` failure for a non-object or absent body.
+ */
+const UNEXPECTED_PAYLOAD_MESSAGE = 'Unexpected DGII response payload';
+
+/** A JSON object, as opposed to an array, a scalar, `null` or `undefined`. */
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * A payload the SDK cannot read is never evidence, so it fails as
+ * `VALIDATION` — the same code and message the Python package produces — and
+ * names the read it came from.
+ */
+const unexpectedPayload = (resource: Endpoint, data: unknown): DgiiError =>
+  new DgiiError(UNEXPECTED_PAYLOAD_MESSAGE, {
+    code: 'VALIDATION',
+    resource,
+    method: 'GET',
+    data,
+  });
+
+/**
+ * A `consultatrackids` entry the method can classify: an object whose `estado`
+ * is a string. Everything else is unclassifiable, not "no record".
+ */
+const isSummaryTrackingEntry = (
+  value: unknown,
+): value is SummaryTrackingStatusResponse =>
+  isRecord(value) && typeof value.estado === 'string';
+
+/**
+ * The body of `consultaresultado` as the SDK reads it: it only has to be a JSON
+ * object. The fields it publishes are classified downstream by
+ * {@link canReuseSequence}, which is total, so this read adds no field rule of
+ * its own — but a body that is not an object at all is not a track result, and
+ * `statusTrackId` is the layer that owns parsing, so it is where that is
+ * decided.
+ */
+const isTrackingStatusResponse = (
+  value: unknown,
+): value is TrackingStatusResponse => isRecord(value);
+
+/**
+ * The body of `consultaestado` as the SDK reads it: an object whose `estado` is
+ * a string. `estado` is the field that decides existence, so it is the only one
+ * with a rule — `codigo` and the fiscal fields are published but read by no
+ * decision. An object without a classifiable state is not evidence of absence,
+ * so it fails the read instead of reaching a caller as delivered or cleared.
+ */
+const isInquiryStatusResponse = (
+  value: unknown,
+): value is InquiryStatusResponse =>
+  isRecord(value) && typeof value.estado === 'string';
 
 interface PendingSubmission {
   readonly pending: true;
@@ -369,6 +426,14 @@ export class ECF {
    * a record the marker stays in place — it is the lock that prevents a second
    * submission of a document that already exists — and `delivered` tells the
    * caller to stop retrying.
+   *
+   * `delivered` and `cleared` come from `inquiryStatus` (`consultaestado`),
+   * which is the only source that decides them. The sequence-reuse flag is
+   * published on the track services instead, so a rejection of a general e-CF
+   * pays two further reads — `trackStatuses` (`consultatrackids`) and
+   * `statusTrackId` (`consultaresultado`) — and only that path does. A flag
+   * read that fails is returned as `Err` with the marker untouched: a `false`
+   * there would be indistinguishable from DGII answering "not reusable".
    */
   async reconcileSubmission(
     signedXml: string,
@@ -386,21 +451,55 @@ export class ECF {
         }),
       );
     }
+    // `consultaresultado` covers documents sent through the general e-CF
+    // reception only, so no other root element has a reuse flag to read.
+    const isGeneralEcf = extractRootElementName(signedXml) === 'ECF';
 
     const inquiry = await this.inquiryStatus(rnc, encf);
     if (inquiry.isErr()) {
       return err(inquiry.error);
     }
 
-    const delivered = inquiry.value.estado !== 'No encontrado';
+    // `inquiryStatus` already refused a body it cannot classify, so this is
+    // DGII's answer — and absence is one of the answers it can give.
+    const value = inquiry.value;
+
+    // Raw equality, untrimmed: trimming here would let a padded `No encontrado`
+    // delete the lock. Trimming lives in the `Rechazado` gate below, where the
+    // only consequence is one more read that must still agree.
+    const delivered = value.estado !== 'No encontrado';
     const cleared = !delivered;
+
+    let canReuse = false;
+    if (isGeneralEcf && delivered && value.estado.trim() === 'Rechazado') {
+      const tracks = await this.trackStatuses(rnc, encf);
+      if (tracks.isErr()) {
+        return err(tracks.error);
+      }
+      // A listing entry saying `No encontrado` cannot un-deliver a document
+      // DGII already reported on, so it only means "no track to ask about".
+      const usable = tracks.value.filter(
+        (entry) => entry.estado !== 'No encontrado',
+      );
+      // Several tracks mean the same e-NCF reached DGII more than once, and
+      // DGII says nothing about aggregating their flags: decline to claim.
+      const trackId = usable.length === 1 ? usable[0].trackId : undefined;
+      if (typeof trackId === 'string' && trackId.length > 0) {
+        const status = await this.statusTrackId(trackId);
+        if (status.isErr()) {
+          return err(status.error);
+        }
+        canReuse = canReuseSequence(status.value);
+      }
+    }
+
     if (cleared) {
       await this.idempotency.delete(this.buildIdempotencyKey(signedXml));
     }
     return ok({
-      inquiry: inquiry.value,
+      inquiry: value,
       delivered,
-      canReuseSequence: canReuseSequence(inquiry.value),
+      canReuseSequence: canReuse,
       cleared,
     });
   }
@@ -532,41 +631,103 @@ export class ECF {
     return this.sendElectronicDocument(signedXml, fileName, buyerHost);
   }
 
-  statusTrackId(
+  /**
+   * DGII's per-track result (`consultaresultado`) — the read that publishes the
+   * sequence-reuse flag.
+   *
+   * This is the layer that owns parsing, so this is where the shape rule lives:
+   * a body that is not a JSON object — an empty body, `null`, an array, a bare
+   * scalar — is a `VALIDATION` failure, never an `Ok` carrying something no
+   * caller can read. `estado` and `secuenciaUtilizada` are not validated here:
+   * {@link canReuseSequence} classifies them and answers `false` for anything
+   * DGII does not spell out.
+   */
+  async statusTrackId(
     trackId: string,
   ): Promise<Result<TrackingStatusResponse, DgiiError>> {
     const url = buildUrl(this.environment, Endpoint.TrackResultStatus);
-    return this.http.get<TrackingStatusResponse>(
+    const result = await this.http.get<unknown>(
       url,
       { trackId },
       { absoluteUrl: true, resource: Endpoint.TrackResultStatus },
     );
+    if (result.isErr()) {
+      return err(result.error);
+    }
+    const payload = result.value;
+    if (!isTrackingStatusResponse(payload)) {
+      return err(unexpectedPayload(Endpoint.TrackResultStatus, payload));
+    }
+    return ok(payload);
   }
 
-  inquiryStatus(
+  /**
+   * DGII's existence read (`consultaestado`) — the only source that decides
+   * whether a document is delivered and whether the pending marker may clear.
+   *
+   * This is the layer that owns parsing, so the shape rule lives here: a body
+   * that is not a JSON object, or an object whose `estado` is not a string, is
+   * a `VALIDATION` failure. A body the SDK cannot classify is not evidence —
+   * not even evidence of absence — so it never reaches a caller as an `Ok` that
+   * would read as `No encontrado`. `codigo` and the fiscal fields are not
+   * validated: no decision on this path reads them.
+   */
+  async inquiryStatus(
     rncEmisor: string,
     ncfElectronico: string,
     rncComprador?: string,
     codigoSeguridad?: string,
   ): Promise<Result<InquiryStatusResponse, DgiiError>> {
     const url = buildUrl(this.environment, Endpoint.InquiryStatus);
-    return this.http.get<InquiryStatusResponse>(
+    const result = await this.http.get<unknown>(
       url,
       { rncEmisor, ncfElectronico, rncComprador, codigoSeguridad },
       { absoluteUrl: true, resource: Endpoint.InquiryStatus },
     );
+    if (result.isErr()) {
+      return err(result.error);
+    }
+    const payload = result.value;
+    if (!isInquiryStatusResponse(payload)) {
+      return err(unexpectedPayload(Endpoint.InquiryStatus, payload));
+    }
+    return ok(payload);
   }
 
-  trackStatuses(
+  /**
+   * Every tracking entry DGII associates with an e-NCF (`consultatrackids`).
+   *
+   * DGII's text calls this a listing while its sample is a single object, so
+   * both shapes are accepted and an explicit empty array is a valid answer (no
+   * track to ask about). A body the method cannot read — an empty body, `null`,
+   * or an entry without a string `estado` — is a `VALIDATION` failure: "no
+   * answer" must never reach a caller as "no records".
+   */
+  async trackStatuses(
     rncEmisor: string,
     encf: string,
   ): Promise<Result<SummaryTrackingStatusResponse[], DgiiError>> {
     const url = buildUrl(this.environment, Endpoint.AllTrackingEcf);
-    return this.http.get<SummaryTrackingStatusResponse[]>(
+    const result = await this.http.get<unknown>(
       url,
       { rncEmisor, encf },
       { absoluteUrl: true, resource: Endpoint.AllTrackingEcf },
     );
+    if (result.isErr()) {
+      return err(result.error);
+    }
+    const payload = result.value;
+    if (!isRecord(payload) && !Array.isArray(payload)) {
+      return err(unexpectedPayload(Endpoint.AllTrackingEcf, payload));
+    }
+    const entries: SummaryTrackingStatusResponse[] = [];
+    for (const entry of Array.isArray(payload) ? payload : [payload]) {
+      if (!isSummaryTrackingEntry(entry)) {
+        return err(unexpectedPayload(Endpoint.AllTrackingEcf, payload));
+      }
+      entries.push(entry);
+    }
+    return ok(entries);
   }
 
   /** Normalizes DGII's inconsistent (array | single object) directory payload. */

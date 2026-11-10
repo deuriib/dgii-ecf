@@ -191,6 +191,68 @@ Field shapes follow the DGII wire responses; monetary/amount fields are `string`
 enum values (`RECIBIDO`, `EN_PROCESO`, `RECHAZADO`, `ACEPTADO`, …) may be modeled as string-literal
 unions, not invented enums.
 
+The models the sequence-reuse question rests on are fixed (§9.4 states the behaviour):
+
+```ts
+// `consultaresultado` — the read that publishes the reuse flag for a general e-CF.
+interface TrackingStatusResponse {
+  codigo: TrackStatusCode;
+  estado: TrackStatusEnum;
+  trackId: string;
+  rnc: string;
+  encf: string;
+  /** Absent or `null` when DGII did not scope the answer to a rejection. */
+  secuenciaUtilizada?: boolean | null;
+  fechaRecepcion: string;
+  mensajes?: Mensaje[];
+}
+
+// `consultaestado` — existence only; DGII publishes no reuse flag on this response.
+interface InquiryStatusResponse {
+  codigo: InquiryStatusCode;
+  estado: InquiryStatus; // required: `estado` alone decides existence
+  // no `secuenciaUtilizada` — DGII does not publish it here; do not add it back
+  rncEmisor?: string;
+  ncfElectronico?: string;
+  /* …the remaining documented output parameters… */
+}
+
+// One `consultatrackids` entry: `estado` is required, `trackId` is not.
+interface SummaryTrackingStatusResponse {
+  trackId?: string;
+  estado: string;
+  fechaRecepcion: string;
+}
+
+export interface ReconciliationResult {
+  inquiry: InquiryStatusResponse; // always populated — the existence read never moves
+  delivered: boolean;
+  canReuseSequence: boolean; // see §9.4 for what `false` means
+  cleared: boolean;
+}
+```
+
+Three properties of that surface are contract, not style:
+
+- **`canReuseSequence` takes only a response that carries the flag:**
+  `TrackingStatusResponse | InquiryInvoiceSummary`. Passing an `InquiryStatusResponse` is a type
+  error in both languages. In TypeScript this **narrows** the parameter — the RFCE reception
+  response (`InvoiceSummaryResponse`), which the previous structural type accepted, no longer
+  matches; in Python it **widens** it, because `InquiryInvoiceSummary` is now accepted. The
+  asymmetry is deliberate: both packages accept exactly the two responses DGII publishes
+  `secuenciaUtilizada` on.
+- **`InquiryStatusResponse.secuenciaUtilizada` is removed in both packages.** DGII's eleven
+  documented output parameters for `consultaestado` do not include it (register `TEC-02`,
+  _Consulta de estado e-CF_ — `project-tasks/124-source-register.md` register §6), so a caller that
+  read it was reading `undefined`/`None` — which is the defect #126 reports.
+- **`estado` stays declared required on every status model**, while `trackId` on a listing entry and
+  `secuenciaUtilizada` on a track result are optional, because DGII may omit them: an entry without
+  a `trackId` is a state DGII's own text does not exclude, and an answer that is not a rejection
+  need not carry the flag. Where `estado` decides something it is also enforced at runtime — an
+  unreadable `estado` fails `inquiryStatus` and `trackStatuses` — and where it only corroborates
+  (`statusTrackId`) it is classified by the predicate and withholds reuse instead of failing the
+  read (§4.11). `fechaRecepcion` nullability is unchanged (§14).
+
 ### 4.3 `errors.ts`
 
 ```ts
@@ -235,7 +297,11 @@ export type DgiiResult<T> = Result<T, DgiiError>;
 
 ```ts
 interface ResilienceOptions {
-  /** Maximum number of attempts, including the first. Default 3. */
+  /**
+   * Retries after the first attempt, passed straight to cockatiel's
+   * `maxAttempts`. Default 3 — i.e. **4** transport attempts per logical call,
+   * where Python's `stop_after_attempt(3)` means 3 (§14, F-126-8).
+   */
   maxRetries?: number;
   /** Consecutive failures before the circuit opens. Default 5. */
   breakerThreshold?: number;
@@ -504,6 +570,39 @@ Endpoint wiring (Appendix A.2): `authenticate` → `Seed` then `ValidateSeed`; `
 `buyerHost` for an RFCE summary. `sendElectronicDocument` additionally enforces the B2B
 applicability rules and, when enabled, XSD validation before any network call.
 
+`reconcileSubmission` composes the query chain of §9.4 — it is not a single endpoint: `inquiryStatus`
+(`consultaestado`, existence) runs first and alone decides `delivered`/`cleared`; only for a rejected
+general `<ECF>` do `trackStatuses` (`consultatrackids`) and `statusTrackId` (`consultaresultado`)
+follow, and only they can set `canReuseSequence`.
+
+**Payload classification — the three query reads parse their own answer.** Each method decodes its
+body as `unknown` and refuses a payload it cannot classify with `VALIDATION` and the message
+`Unexpected DGII response payload` (Python's existing literal, reused verbatim). A body the SDK
+cannot read is never evidence, so none of these failures can produce a delivery, a clearance or a
+reuse answer:
+
+| Method → endpoint                     | Accepted                                                                                                                               | `Err(VALIDATION)`                                                  |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `inquiryStatus` → `consultaestado`    | a JSON object whose `estado` is a string                                                                                               | absent/`null`/non-object body, an object without a string `estado` |
+| `trackStatuses` → `consultatrackids`  | a JSON object (treated as a one-element list), an array (an empty one included), where every entry is an object with a string `estado` | absent/`null`/scalar body, or any entry without a string `estado`  |
+| `statusTrackId` → `consultaresultado` | any JSON object                                                                                                                        | absent/`null`/array/scalar body                                    |
+
+`estado` is the only field with a rule on these reads, because it is the only field a decision
+branches on. `codigo`, the fiscal fields, `trackId` on a result and `mensajes` are published but
+read by nothing that decides, so they are not validated; `estado` and `secuenciaUtilizada` on a
+track result are classified by `canReuseSequence` (§9.4) and never fail the read.
+
+**Two public behaviour changes** a caller can observe:
+
+- `statusTrackId` and `trackStatuses` used to hand back whatever the decode produced
+  (`Ok(undefined)` for an empty body, `Ok` for a body of the wrong shape). Both now answer
+  `Err(VALIDATION)` and name the endpoint in `error.resource`, so an `isOk()` branch written against
+  the old behaviour changes for those bodies. `inquiryStatus` gained the same guard: a body it
+  cannot classify is `Err(VALIDATION)` where it previously returned `Ok`.
+- TypeScript performs **no field-level validation** beyond that shape guard: a malformed
+  non-classifying value (`codigo: "abc"`, `montoTotal: "abc"`) reaches the caller verbatim, where
+  Python drops it (`null`/`0`). See §14.
+
 ### 4.12 `index.ts`
 
 Re-exports the whole package surface: `ECF`, `P12Reader`, `Signature`, `Transformer`,
@@ -558,6 +657,24 @@ class AuthToken:
 
 Use dataclasses or Pydantic models; mypy-strict clean. Monetary fields are `Decimal` per §3.4.
 
+The response models mirror §4.2 field for field, with one difference in how a payload is read:
+Python's models are typed, so parsing is where tolerance lives. The split follows the same rule as
+the TypeScript guard — **a field that decides something is read strictly; a field that only
+corroborates is tolerated** —
+
+| Model                           | Read without coercion (the fields a decision branches on)                                        | Tolerated (dropped, never an error)                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `TrackingStatusResponse`        | `secuenciaUtilizada` — only a literal `bool` counts; `"false"`/`0` ⇒ `None`                      | `codigo` ⇒ `0`; `estado` ⇒ `""`; `trackId`/`rnc`/`encf`/`fechaRecepcion` ⇒ `None`; `mensajes` ⇒ `()` |
+| `SummaryTrackingStatusResponse` | `estado` (a non-string is `VALIDATION`); `trackId`, when present, becomes `None` if not a string | `fechaRecepcion` ⇒ `None`                                                                            |
+| `InquiryStatusResponse`         | `estado` (a non-string is `VALIDATION`)                                                          | `codigo` ⇒ `0`; every optional fiscal field ⇒ `None`                                                 |
+| `InquiryInvoiceSummary`         | `estado`                                                                                         | `secuenciaUtilizada` ⇒ `None`                                                                        |
+
+The direction matters for callers: on these reads Python became **more** permissive — a payload
+with a malformed non-classifying field used to raise `ResponseShapeError` and now returns `Ok` —
+while a payload with a non-string `estado` is still refused. `InquiryStatusResponse` carries no
+`secuencia_utilizada` (§4.2). `TrackingStatusResponse.secuencia_utilizada` is already `bool | None`,
+which is the shape TypeScript now mirrors.
+
 ### 5.3 `errors.py`
 
 ```python
@@ -606,7 +723,7 @@ DgiiResult = Result  # used as Result[T, DgiiError]
 ```python
 @dataclass
 class ResilienceOptions:
-    max_retries: int = 3
+    max_retries: int = 3  # stop_after_attempt(3) -> 3 total attempts (TS: 4, §14 F-126-8)
     breaker_threshold: int = 5
     reset_timeout_s: float = 30.0
     timeout_s: float = 15.0
@@ -765,8 +882,34 @@ class ECF:
     def check_service_availability(self, ambiente: StatusEnvironment) -> DgiiResult[ServiceAvailabilityResponse]: ...
 ```
 
-Endpoint wiring identical to §4.11. `get_summary_invoice_inquiry` raises/returns a validation
+Endpoint wiring identical to §4.11, including `reconcile_submission`'s query chain (`inquiry_status`
+first and alone for `delivered`/`cleared`; `track_statuses` → `status_track_id` only for a rejected
+general `<ECF>`) — and synchronous throughout, like the rest of this package (`httpx2`, no `async`;
+§5.1). `get_summary_invoice_inquiry` raises/returns a validation
 `Err` when `environment is not Environment.PROD` (A.9).
+
+**Payload classification.** The same rule as §4.11, stated for this package: `inquiry_status`
+returns `Err(VALIDATION)` for a body that is not a JSON object or whose `estado` is not a string;
+`track_statuses` returns `Err(VALIDATION)` for an absent or `null` body **before** delegating to the
+shared `_parse_list` — that helper keeps mapping `None` to `Ok([])` for its other callers, and an
+absent body must not read as "no records" — and, through that helper, for a scalar body or for any
+entry it cannot classify (a non-object entry, or one whose `estado` is not a string);
+`status_track_id` returns `Err(VALIDATION)` only for a body that is not a JSON object. The error
+message for a non-object or absent body is `Unexpected DGII response payload` in both packages; a
+body whose `estado` is missing reports the same `VALIDATION` code with this package's field-level
+text (`field 'estado' must be a string, got NoneType`), so `code` matches and `message` does not
+(§14, F-126-7).
+
+**`status_track_id` tolerates a partial answer** — this is a public behaviour change. An absent or
+unreadable `codigo` becomes `0` and an absent or unreadable `estado` becomes `""`, so a caller that
+previously received `Err` for such a body now receives `Ok`. The reason is structural: on this read
+the verdict only corroborates a flag that DGII already published, so an unreadable one withholds
+reuse (`can_reuse_sequence` ⇒ `False`) instead of failing a read that did happen. A payload that is
+not an object at all is still `Err`.
+
+**No `resource` on the query path.** Unlike TypeScript, this package does not populate
+`DgiiError.resource` for these failures, so the only discriminator a Python caller gets is `Ok` vs
+`Err` (§9.4, §14, F-126-12).
 
 ### 5.12 `cli.py` (Python-only)
 
@@ -829,17 +972,19 @@ Rules:
 
 `toDgiiError`/`to_dgii_error` normalization table (Appendix A.8):
 
-| Input shape                     | Result                                                          |
-| ------------------------------- | --------------------------------------------------------------- |
-| bare string body                | `message = body`                                                |
-| `{ mensajes: [...] }`           | `message = joined mensajes`; `mensajes = [...]`                 |
-| ProblemDetails                  | `message` from `title`/`detail`; preserve `status`              |
-| HTML body                       | `message = stripped text` (or generic fallback)                 |
-| network/undici/httpx2 exception | `code = UNKNOWN`; the retry decision inspects the raw exception |
-| non-2xx                         | `code = AUTH` if 401/403, else `HTTP`; keep `status`, `data`    |
+| Input shape                     | Result                                                                                                           |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| bare string body                | `message = body`                                                                                                 |
+| `{ mensajes: [...] }`           | `message = joined mensajes`; `mensajes = [...]`                                                                  |
+| ProblemDetails                  | `message` from `title`/`detail`; preserve `status`                                                               |
+| HTML body                       | `message = stripped text` (or generic fallback)                                                                  |
+| transport exception             | TypeScript `code = UNKNOWN`, Python `code = HTTP` (§14, F-126-13); the retry decision inspects the raw exception |
+| non-2xx                         | `code = AUTH` if 401/403, else `HTTP`; keep `status`, `data`                                                     |
+| payload the SDK cannot classify | `code = VALIDATION`, `message = 'Unexpected DGII response payload'` (§4.11)                                      |
 
 `TIMEOUT` and `CIRCUIT_OPEN` are part of the enum for callers that classify their own failures; the
-SDK does not currently emit them — a timeout arrives as `UNKNOWN` with a retryable cause.
+SDK does not currently emit them — a timeout arrives as `UNKNOWN` (TypeScript) or `HTTP` (Python)
+with a retryable cause.
 
 **401 special case (A.9):** keep DGII's body message verbatim — it explains the rejection reason.
 
@@ -914,7 +1059,7 @@ are also submissions) — **persist-before-transmit**:
 1. Compute `key`.
 2. `store.get(key)` → if present, return the stored response (`Ok`), **no re-transmit**. A stored
    `"pending"` marker surfaces as `IDEMPOTENCY`; `reconcileSubmission` clears it only when DGII has
-   no record of the document.
+   no record of the document (§9.4).
 3. `store.set(key, pending)` **before** transmitting (hard rule).
 4. Transmit via `HttpClient.postMultipart` / `HttpClient.post_multipart`.
 5. On success → `store.set(key, serializedResponse)`; on failure → `store.delete(key)` so a future
@@ -923,6 +1068,162 @@ are also submissions) — **persist-before-transmit**:
 Query methods (`statusTrackId`, `inquiryStatus`, `trackStatuses`, `getCustomerDirectory`,
 `getDirectoryListing`, `getSummaryInvoiceInquiry`, `getServiceStatus`, `getMaintenanceWindows`,
 `checkServiceAvailability`, `authenticate`) are **not** idempotency-keyed.
+
+### 9.4 Reconcile: the existence read, then a gated reuse chain
+
+Every DGII fact in this section — which response publishes `secuenciaUtilizada`, the track-id
+listing semantics, the `No encontrado` states, the per-document-type sources — is cited from
+`project-tasks/124-source-register.md` rows `TEC-02` and `TEC-01` (register §6 track, §7 reconcile),
+never re-derived from the PDFs. The design record that froze this contract is
+`project-tasks/126-contract-design.md` (§2 decision, §5 ordered operations).
+
+`reconcileSubmission` / `reconcile_submission` answers two questions with two different DGII reads,
+and the order is part of the contract, not an implementation detail. `[READ n]` is a logical call
+(subject to the package's attempt budget), `[PURE]` has no I/O, `[WRITE]` touches the store.
+
+```text
+1. [PURE]  rnc  = extractElementText(signedXml, 'RNCEmisor') ?? 'RncEmisor'
+           encf = extractElementText(signedXml, 'eNCF')      ?? 'SecuenciaeNCFDesde'
+           missing either -> Err(VALIDATION); no I/O, marker untouched
+2. [PURE]  root = local name of the root element
+3. [READ 1] inquiry = inquiryStatus(rnc, encf)            // consultaestado -- the only existence source
+           on Err -> propagate unchanged; marker untouched
+4. [PURE]  cleared   = inquiry.estado === 'No encontrado'  // RAW equality, untrimmed
+           delivered = !cleared
+5. [PURE]  gate = root === 'ECF' && delivered && inquiry.estado.trim() === 'Rechazado'
+6. [READ 2, 3] only when the gate holds:
+     tracks = trackStatuses(rnc, encf)                     // consultatrackids
+     on Err -> propagate unchanged; marker untouched
+     usable     = entries whose estado !== 'No encontrado'
+     followable = usable entries whose trackId is a non-empty string
+     if exactly one usable AND one followable:
+       canReuseSequence = canReuseSequence(statusTrackId(followable[0].trackId))  // consultaresultado
+       on Err -> propagate unchanged; marker untouched
+     else canReuseSequence = false
+7. [PURE]  otherwise canReuseSequence = false              // no error, and no extra call
+8. [PURE]  key = buildIdempotencyKey(signedXml)             // the derivation the send used
+9. [WRITE] if cleared: idempotency.delete(key)              // last fallible statement, exactly once
+10. [PURE] return Ok({ inquiry, delivered, canReuseSequence, cleared })
+```
+
+**Existence is unchanged, and it is the only thing that can clear a marker.** `delivered` and
+`cleared` still come from `consultaestado`, by raw equality on `estado`, computed before any other
+call. The listing is never an existence source: an empty listing, an entry saying `No encontrado`
+and a missing `trackId` can withhold reuse but cannot un-deliver a document or touch the marker.
+Because `cleared` and the gate are mutually exclusive (`cleared ⇒ !delivered ⇒ !gate`), no read can
+occur between the clearing decision and the delete.
+
+**The reuse flag's source, per document type.** `secuenciaUtilizada` is published on
+`consultaresultado` (reached through `consultatrackids`) and on an RFCE summary inquiry
+(`consultarfce`); it is **not** on `consultaestado` (§4.2). On the reconcile path the only route is
+the track result, and both track services are documented for a document sent through the general
+e-CF reception — hence the gate. A reconcile of an `<RFCE>`, `<ACECF>`, `<ANECF>` or unknown root
+therefore answers `canReuseSequence: false`: no consult on that path publishes the flag. For an
+RFCE the reception response does carry it, but that response exists only on the success path, and a
+pending marker exists precisely because no response was stored; `consultarfce`'s flag has no
+textual definition and licenses reuse on another _Resumen de Factura de Consumo_, never on a general
+e-CF. Callers who hold an RFCE summary can still ask `getSummaryInvoiceInquiry` and pass it to
+`canReuseSequence` themselves.
+
+**The predicate, in full.** `true` requires both facts DGII states for a reusable rejection — the
+flag _and_ the verdict — and the function is total: it cannot throw for any input the models admit.
+
+```ts
+const canReuseSequence = (
+  response: TrackingStatusResponse | InquiryInvoiceSummary,
+): boolean => {
+  const estado: unknown = response.estado; // unchecked cast: `estado` can be anything on the wire
+  return (
+    response.secuenciaUtilizada === false &&
+    (typeof estado === 'string' ? estado.trim() : '') === 'Rechazado'
+  );
+};
+```
+
+```python
+def can_reuse_sequence(response: TrackingStatusResponse | InquiryInvoiceSummary) -> bool:
+    return response.secuencia_utilizada is False and (
+        response.estado if isinstance(response.estado, str) else ""
+    ).strip() == "Rechazado"
+```
+
+An absent, `null` or non-boolean flag is not the literal `false`, so it answers `false`; an absent or
+non-string `estado` answers `false` instead of raising; comparison is exact after trimming, with no
+case folding (`rechazado`/`RECHAZADO` ⇒ `false`); `No encontrado` is never compared here, because
+that is the existence rule and it stays raw.
+
+**What `false` means.** `canReuseSequence: false` does not mean DGII consumed the sequence; it
+means the SDK did not obtain a positive reusable answer. The cases it collapses, all `Ok`:
+
+| Cause                                                                                     | What the caller can see                                               |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| root is not a general `<ECF>`                                                             | `inquiry` populated, document type known                              |
+| DGII holds no record                                                                      | `delivered: false`, `cleared: true`                                   |
+| the verdict is not a rejection                                                            | `inquiry.estado`                                                      |
+| rejected, but the listing gave 0 or >1 usable tracks, or none with a `trackId`            | `inquiry.estado === 'Rechazado'`, one `consultatrackids` in the trace |
+| rejected with one track, but its verdict is not `Rechazado`, the flag is absent or `true` | call the public `statusTrackId(trackId)` for the per-track facts      |
+
+The sixth cause — **a flag read that could not be completed — is not in that table: it is `Err`**.
+See §4.11 for which bodies each read refuses and §7 for the codes.
+
+**Failure semantics.** Every failed read fails the call. The error is propagated unchanged (the
+single `toDgiiError`/`to_dgii_error` normalizer, no new code, no wrapper) and the marker is never
+touched; no partial `Ok` is returned. A `false` produced by a failed flag read would be
+indistinguishable from DGII answering "not reusable", which is the silent dead capability #126
+reports.
+
+- `Err` after this change means either "the existence question could not be answered" (as before)
+  or "DGII holds the document, but the reuse flag could not be read". `Ok` vs `Err` is the parity-safe
+  discriminator: it separates "DGII answered" from "could not ask".
+- **TypeScript only:** `error.resource` names the failing read with the real endpoint value
+  (`Endpoint.InquiryStatus`, `Endpoint.AllTrackingEcf`, `Endpoint.TrackResultStatus`), including on
+  the `VALIDATION` failures those reads raise themselves. **Python has no equivalent** — `resource`
+  is not populated on the query path (§14, F-126-12).
+- Recovery: on `Err`, do **not** re-send — the marker is intact, so retrying reconcile later cannot
+  double-issue. If the caller needs an existence answer sooner, call `inquiryStatus(rnc, encf)`
+  directly; that read decides `delivered`/`cleared` and cannot touch the marker. A permanent `Err` on
+  the track services is a delegation problem, not an outage: `consultatrackids` requires the token to
+  be delegated **for the emitter**, where `consultaestado` accepts the emitter **or** the receiver,
+  so a receiver-delegated integrator now gets a visible `Err` on any rejected document it cannot
+  follow (F-126-11 records the option that would remove it).
+- **`canReuseSequence: true` always arrives with `cleared: false`.** A rejected document never clears
+  its marker, so re-sending the identical document keeps returning `IDEMPOTENCY` until the store's
+  TTL: a reusable sequence means _re-sign the same e-NCF as a new document_, never _re-send this
+  one_.
+- Reconcile is not usable in `CerteCF`: DGII documents `consultaestado` and `consultatrackids` as
+  not available to the public in certification, so the first read fails and the chain is
+  unreachable by construction.
+
+### 9.5 What a reconcile costs, and the lease the caller owes
+
+Logical calls, before and after:
+
+| Path                                                          | Calls                         | Before |
+| ------------------------------------------------------------- | ----------------------------- | ------ |
+| any non-`ECF` root, no record, or verdict ≠ `Rechazado`       | **1** (`consultaestado`)      | 1      |
+| `<ECF>`, delivered, `Rechazado`, ≠1 followable track          | **2** (+ `consultatrackids`)  | 1      |
+| `<ECF>`, delivered, `Rechazado`, exactly one followable track | **3** (+ `consultaresultado`) | 1      |
+
+So the common paths cost what they always did and only a **rejected document** pays the chain — but
+that path can now take minutes and can fail where it used to succeed. With the default 15 s
+per-attempt timeout and no auth refresh, one reconcile is bounded by ≈61 s (TypeScript, 4 transport
+attempts per call) / ≈45 s (Python, 3) for one call, ≈121 s / ≈90 s for two, and ≈182 s / ≈135 s for
+the full chain. One token refresh (Seed + ValidarSemilla) adds the same again, so size a queue
+lease against ≈**303 s** (TypeScript) / ≈**225 s** (Python).
+
+Therefore, at the caller:
+
+- **The queue lease (visibility timeout) must exceed the reconcile worst case**, or reconcile must
+  run in a lease-renewing or leader-elected context. Two workers reconciling the same document
+  concurrently is not made safe by the marker: once one of them deletes it, the other can re-send.
+- **Do not nest a retry loop around reconcile.** The SDK's retry policy is the retry policy; schedule
+  the next attempt through the queue's own backoff.
+- **Give reconcile its own worker/limit.** The breaker and the bulkhead are shared with
+  `sendElectronicDocument` (one `HttpClient` per client), so a `consultatrackids` outage can consume
+  the failure budget and the permits submissions need. A separate `HttpClient`/policy for the query
+  path is the structural fix and is not in this release (§14, F-126-2).
+- Instrument reconcile outcomes (delivered/cleared/reusable, `Err` by `resource` in TypeScript), not
+  raw request counts, or the extra reads look like a traffic regression.
 
 ---
 
@@ -1081,6 +1382,28 @@ skipped when credentials absent. Never run in CI without secrets.
   `string`/`Decimal`.
 - **QR URL query parameter order/encoding** is asserted as "exact" in A.7 but only behaviorally
   described; match the reference URL shapes and verify against fixtures.
+
+### 14.1 Registered parity divergences
+
+The two packages are behaviourally identical on the reconcile path for every response DGII answers:
+same payload classification, same `delivered`/`cleared`/`canReuseSequence`, same marker outcome, same
+requests. These divergences are known, permanent until their follow-up lands, and a reader of the
+parity promise must know them:
+
+| #                      | Divergence                                                                                                                                                                                                                                                                                                                                                                              | Where              |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| **F-126-8**            | TypeScript performs **4** transport attempts per logical call where Python performs **3**, under the same nominal setting (cockatiel's `maxAttempts` counts retries, tenacity's `stop_after_attempt` counts attempts). Every 5xx or transport failure is therefore retried one extra time — a difference in attempt count only, never in the outcome. Resource configuration is frozen. | §4.5, §5.5, §9.5   |
+| **F-126-13**           | A **transport** failure normalises to different codes: TypeScript `UNKNOWN`, Python `HTTP`. `code` and `message` match for failures **DGII answered**; the parity claim is scoped to those.                                                                                                                                                                                             | §7                 |
+| **F-126-12**           | `DgiiError.resource` is populated in TypeScript and **not** on the Python query path, so only a TypeScript caller can name the failing read. Python's discriminator is `Ok` vs `Err`, plus a direct `inquiry_status` call.                                                                                                                                                              | §4.11, §5.11, §9.4 |
+| **F-126-7**            | For a body whose `estado` is missing or not a string, both packages answer `VALIDATION` but with their own message text (TypeScript's `Unexpected DGII response payload`, Python's field-level `field 'estado' must be a string, …`). The identical-message requirement covers only the non-object and absent-body cases.                                                               | §4.11, §5.11       |
+| **F-126-1**            | An open breaker costs Python three immediate probes per call (`is_retryable_error` matches pybreaker's message text) and no wall clock; TypeScript treats it as `UNKNOWN`, non-retryable. Not a #126 regression.                                                                                                                                                                        | §5.5, §8.3         |
+| **F-126-2**            | The query path shares the submission's breaker and bulkhead, so a track-service outage can borrow the budget `sendElectronicDocument` needs. Mitigation is operational (a dedicated reconcile worker) until a separate policy lands.                                                                                                                                                    | §9.5               |
+| **Model echo** (RES-1) | TypeScript performs no field-level validation beyond the shape guard, so a malformed **non-classifying** value (`codigo: "abc"`, `montoTotal: "abc"`) reaches the caller verbatim while Python drops it (`0`/`null`). No decision reads these fields; the difference is each type system's, not a decision's.                                                                           | §4.11, §5.11, §5.2 |
+| **Off-path** (RES-2)   | `InquiryInvoiceSummary` (`consultarfce`) still parses its non-classifying fields strictly in Python and passes them through in TypeScript. Pre-existing, and **not** on the reconcile path: `secuenciaUtilizada` on that model is read without coercion in both packages, so the reuse answer agrees.                                                                                   | §5.2               |
+
+One ambiguity inside `canReuseSequence: false` is documented rather than fixed: the boolean cannot
+distinguish "several tracks" from "no followable `trackId`" (§9.4). F-126-6 records the additive
+field that would.
 
 ---
 

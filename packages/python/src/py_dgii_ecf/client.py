@@ -11,7 +11,7 @@ from datetime import datetime
 import httpx2
 
 from ._json import JsonObject, JsonValue
-from ._xml import extract_element_text
+from ._xml import extract_element_text, extract_root_element_name
 from .certificate import P12ReaderData
 from .environment import (
     BaseUrl,
@@ -453,7 +453,13 @@ class ECF:
         return self.send_electronic_document(signed_xml, file_name, buyer_host)
 
     def status_track_id(self, track_id: str) -> DgiiResult[TrackingStatusResponse]:
-        """Query the status of a submission by track id."""
+        """Query the status of a submission by track id.
+
+        A partial answer is accepted: DGII need not publish ``codigo`` or
+        ``estado`` on every body, and neither field decides what the caller can
+        do with ``secuenciaUtilizada`` — the verdict only corroborates it — so
+        both fall back to defaults instead of failing a readable read.
+        """
         url = build_url(self._environment, Endpoint.TRACK_RESULT_STATUS)
         return _parse_response(
             TrackingStatusResponse, self._http.get(url, {"trackId": track_id})
@@ -484,11 +490,21 @@ class ECF:
     def reconcile_submission(self, signed_xml: str) -> DgiiResult[ReconciliationResult]:
         """Resolve what happened to a submission whose marker is pending.
 
-        Queries DGII by e-NCF. When DGII has no record of the document the
-        marker is cleared, because re-submitting cannot double-issue. When DGII
-        does have a record the marker stays in place — it is the lock that
-        prevents a second submission of a document that already exists — and
-        ``delivered`` tells the caller to stop retrying.
+        Existence comes from ``inquiry_status`` (``consultaestado``) and nowhere
+        else: when DGII has no record of the document the marker is cleared,
+        because re-submitting cannot double-issue. When DGII does have a record
+        the marker stays in place — it is the lock that prevents a second
+        submission of a document that already exists — and ``delivered`` tells
+        the caller to stop retrying.
+
+        Only a rejected general e-CF is worth a second question, and only DGII's
+        track services answer it: ``track_statuses`` (``consultatrackids``)
+        finds the track, and ``status_track_id`` (``consultaresultado``) carries
+        the reuse flag. A read that fails — or a payload that cannot be read at
+        all — fails the call with the marker untouched, so a non-answer is never
+        reported as "not reusable". On the result read the verdict only
+        corroborates the flag, so an absent or unreadable one withholds reuse
+        instead of failing a read that did happen.
         """
         rnc = extract_element_text(signed_xml, "RNCEmisor") or extract_element_text(
             signed_xml, "RncEmisor"
@@ -504,20 +520,49 @@ class ECF:
                 )
             )
 
+        root = extract_root_element_name(signed_xml)
+
         inquiry = self.inquiry_status(rnc, encf)
         if inquiry.is_err():
             return Err(inquiry.unwrap_err())
 
+        # Raw equality decides the lock, exactly as it always has: trimming here
+        # would let a padded " No encontrado" clear a marker.
         value = inquiry.unwrap()
-        delivered = value.estado != "No encontrado"
-        cleared = not delivered
+        cleared = value.estado == "No encontrado"
+        delivered = not cleared
+
+        reusable = False
+        # DGII publishes the flag for e-CF tracks and scopes it to a rejection;
+        # every other path keeps the single existence read.
+        if root == "ECF" and delivered and value.estado.strip() == "Rechazado":
+            listing = self.track_statuses(rnc, encf)
+            if listing.is_err():
+                return Err(listing.unwrap_err())
+            usable = [
+                entry for entry in listing.unwrap() if entry.estado != "No encontrado"
+            ]
+            followable = [entry for entry in usable if entry.track_id]
+            # Several tracks mean the same e-NCF reached DGII more than once, and
+            # DGII says nothing about how their flags aggregate: claim nothing.
+            if len(usable) == 1 and len(followable) == 1:
+                track_id = followable[0].track_id
+                # `followable` already guarantees a non-empty id; this narrows it.
+                if track_id:
+                    track = self.status_track_id(track_id)
+                    if track.is_err():
+                        return Err(track.unwrap_err())
+                    reusable = can_reuse_sequence(track.unwrap())
+
+        # The marker is the last fallible statement: no read happens after it,
+        # and the gated branch above can never be reached once `cleared` is set.
         if cleared:
             self._idempotency.delete(self._build_idempotency_key(signed_xml))
         return Ok(
             ReconciliationResult(
                 inquiry=value,
                 delivered=delivered,
-                can_reuse_sequence=can_reuse_sequence(value),
+                can_reuse_sequence=reusable,
                 cleared=cleared,
             )
         )
@@ -525,12 +570,27 @@ class ECF:
     def track_statuses(
         self, rnc_emisor: str, encf: str
     ) -> DgiiResult[list[SummaryTrackingStatusResponse]]:
-        """Return every tracking entry associated with an e-NCF."""
+        """Return every tracking entry associated with an e-NCF.
+
+        DGII publishes a single object in its sample while describing the answer
+        as a listing, so both shapes are accepted. An absent body is not "no
+        records": it is a non-answer and fails loudly, because an empty list is
+        indistinguishable from a document DGII holds.
+        """
         url = build_url(self._environment, Endpoint.ALL_TRACKING_ECF)
         result = self._http.get(url, {"rncEmisor": rnc_emisor, "encf": encf})
         if result.is_err():
             return Err(result.unwrap_err())
-        return _parse_list(SummaryTrackingStatusResponse, result.unwrap())
+        data = result.unwrap()
+        if data is None:
+            return Err(
+                DgiiError(
+                    "Unexpected DGII response payload",
+                    code=DgiiErrorCode.VALIDATION,
+                    data=data,
+                )
+            )
+        return _parse_list(SummaryTrackingStatusResponse, data)
 
     def get_customer_directory(
         self, rnc: str

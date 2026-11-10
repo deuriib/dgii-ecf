@@ -283,7 +283,9 @@ def test_send_returns_typed_invoice_response() -> None:
 
 def test_malformed_payload_becomes_validation_error() -> None:
     def handler(_request: httpx2.Request) -> httpx2.Response:
-        return httpx2.Response(200, json={"unexpected": True})
+        # A body that is not a JSON object is a non-answer, not a field DGII
+        # typed differently: `codigo` no longer fails a readable payload.
+        return httpx2.Response(200, json="not-a-number")
 
     ecf = ECF(
         CREDENTIALS,
@@ -296,7 +298,28 @@ def test_malformed_payload_becomes_validation_error() -> None:
     assert result.is_err()
     error = result.unwrap_err()
     assert error.code.value == "VALIDATION"
-    assert "codigo" in error.message
+    assert error.message == "Unexpected DGII response payload"
+
+
+def test_a_wrong_typed_codigo_is_a_label_not_a_shape_error() -> None:
+    """R17h: `codigo` labels the answer, so its shape cannot fail the read."""
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            200, json={"codigo": "not-a-number", "estado": "Aceptado"}
+        )
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+    result = ecf.status_track_id("TRACK-1")
+
+    assert result.is_ok()
+    assert result.unwrap().codigo == 0
+    assert result.unwrap().estado == "Aceptado"
 
 
 def test_directory_returns_typed_models() -> None:
