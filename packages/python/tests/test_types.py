@@ -41,7 +41,7 @@ def test_parses_tracking_status() -> None:
     assert response.mensajes == (Mensaje(valor="ok", codigo=0),)
 
 
-def test_tolerates_numbers_and_booleans_encoded_as_strings() -> None:
+def test_tolerates_numbers_encoded_as_strings() -> None:
     response = TrackingStatusResponse.from_dict(
         {
             "trackId": "TRACK-1",
@@ -49,7 +49,7 @@ def test_tolerates_numbers_and_booleans_encoded_as_strings() -> None:
             "estado": "Aceptado",
             "rnc": 130862346,
             "encf": "E310000000001",
-            "secuenciaUtilizada": "true",
+            "secuenciaUtilizada": True,
             "fechaRecepcion": "01-01-2026 10:00:00",
         }
     )
@@ -58,6 +58,34 @@ def test_tolerates_numbers_and_booleans_encoded_as_strings() -> None:
     assert response.rnc == "130862346"
     assert response.secuencia_utilizada is True
     assert response.mensajes == ()
+
+
+@pytest.mark.parametrize("flag", ["false", "true", 0, 1, {}, "maybe"])
+def test_a_non_boolean_reuse_flag_is_never_evidence(flag: object) -> None:
+    """§6 rules 1-2: only a literal `false` licenses reuse, so none is coerced.
+
+    Coercing `"false"` or `0` into `False` would let one SDK answer "reusable"
+    where the other answers "not reusable" — the very answer this path exists
+    to get right.
+    """
+    tracking = TrackingStatusResponse.from_dict(
+        {"codigo": 2, "estado": "Rechazado", "secuenciaUtilizada": flag}
+    )
+    summary = InquiryInvoiceSummary.from_dict(
+        {"codigo": 2, "estado": "Rechazado", "secuenciaUtilizada": flag}
+    )
+
+    assert tracking.secuencia_utilizada is None
+    assert summary.secuencia_utilizada is None
+
+
+def test_reception_summary_still_tolerates_a_string_flag() -> None:
+    """The reception answer (E4) keeps its coercion: it is not a reuse read."""
+    response = InvoiceSummaryResponse.from_dict(
+        {"codigo": 1, "estado": "Aceptado", "secuenciaUtilizada": "true"}
+    )
+
+    assert response.secuencia_utilizada is True
 
 
 def test_invoice_response_defaults_empty_fields() -> None:
@@ -181,41 +209,100 @@ def test_void_response_accepts_object_messages() -> None:
     assert response.mensajes[0].codigo == 0
 
 
-def test_missing_required_field_raises() -> None:
-    # `codigo` and `estado` are the only required fields; DGII omits the rest
-    # on a "No encontrado" answer.
-    with pytest.raises(ResponseShapeError, match="codigo"):
-        TrackingStatusResponse.from_dict({"estado": "Aceptado"})
+def test_missing_classifying_field_raises() -> None:
+    # `estado` decides whether a listing entry is usable, so it stays required
+    # there, and so does `codigo` on the models that do not tolerate a partial
+    # body.
     with pytest.raises(ResponseShapeError, match="estado"):
-        TrackingStatusResponse.from_dict({"codigo": 1})
-
-
-def test_wrong_type_raises() -> None:
+        SummaryTrackingStatusResponse.from_dict({"trackId": "TRACK-1"})
     with pytest.raises(ResponseShapeError, match="codigo"):
-        TrackingStatusResponse.from_dict(
-            {
-                "trackId": "TRACK-1",
-                "codigo": "not-a-number",
-                "estado": "Aceptado",
-                "rnc": "130862346",
-                "encf": "E310000000001",
-                "secuenciaUtilizada": True,
-                "fechaRecepcion": "01-01-2026 10:00:00",
-            }
-        )
+        InquiryInvoiceSummary.from_dict({"estado": "Aceptado"})
 
 
-def test_invalid_boolean_raises() -> None:
-    with pytest.raises(ResponseShapeError, match="secuenciaUtilizada"):
-        InquiryInvoiceSummary.from_dict(
-            {
-                "rnc": "130862346",
-                "encf": "E320000000001",
-                "secuenciaUtilizada": "maybe",
-                "codigo": 1,
-                "estado": "Aceptado",
-            }
-        )
+def test_tracking_status_tolerates_a_partial_answer() -> None:
+    """T-K: the result read may only withhold reuse, never fail the call."""
+    response = TrackingStatusResponse.from_dict({})
+
+    assert response.codigo == 0
+    assert response.estado == ""
+    assert response.secuencia_utilizada is None
+
+
+@pytest.mark.parametrize("estado", [1, 2.5, True, {}, ["Aceptado"]])
+def test_a_non_string_state_raises_where_it_classifies(estado: object) -> None:
+    """The state that picks a branch is read exactly as DGII typed it."""
+    with pytest.raises(ResponseShapeError, match="estado"):
+        InquiryStatusResponse.from_dict({"codigo": 1, "estado": estado})
+    with pytest.raises(ResponseShapeError, match="estado"):
+        SummaryTrackingStatusResponse.from_dict({"estado": estado})
+
+
+def test_a_numeric_track_id_is_not_followable() -> None:
+    """Only a string id names a track; a number must not invent one."""
+    response = SummaryTrackingStatusResponse.from_dict(
+        {"estado": "Rechazado", "trackId": 5}
+    )
+
+    assert response.track_id is None
+
+
+def test_inquiry_status_defaults_a_partial_answer() -> None:
+    """§5.6 row 1: an object with a string `estado` is accepted."""
+    response = InquiryStatusResponse.from_dict({"estado": "Aceptado"})
+
+    assert response.codigo == 0
+    assert response.estado == "Aceptado"
+    assert response.monto_total is None
+
+
+def test_inquiry_status_drops_unreadable_optional_fields() -> None:
+    """Existence rests on `estado`, so a malformed amount cannot fail the read."""
+    response = InquiryStatusResponse.from_dict(
+        {
+            "codigo": 1,
+            "estado": "Aceptado",
+            "montoTotal": "abc",
+            "totalITBIS": {},
+            "rncEmisor": {},
+        }
+    )
+
+    assert response.monto_total is None
+    assert response.total_itbis is None
+    assert response.rnc_emisor is None
+
+
+@pytest.mark.parametrize("codigo", ["not-a-number", {}, [], True, None])
+def test_a_wrong_typed_codigo_cannot_fail_a_read(codigo: object) -> None:
+    """R17h/R13l: `codigo` labels the answer, so a malformed one defaults to `0`.
+
+    Nothing on either read branches on it, so its shape may not fail a payload
+    whose `estado` is readable (§5.6 row 1). `estado` is the one that
+    classifies, and it keeps raising where it does.
+    """
+    result = TrackingStatusResponse.from_dict(
+        {
+            "trackId": "TRACK-1",
+            "codigo": codigo,
+            "estado": "Aceptado",
+            "rnc": "130862346",
+            "encf": "E310000000001",
+            "secuenciaUtilizada": True,
+            "fechaRecepcion": "01-01-2026 10:00:00",
+        }
+    )
+
+    assert result.codigo == 0
+    assert result.estado == "Aceptado"
+    assert result.track_id == "TRACK-1"
+
+    inquiry = InquiryStatusResponse.from_dict({"codigo": codigo, "estado": "Aceptado"})
+
+    assert inquiry.codigo == 0
+    assert inquiry.estado == "Aceptado"
+
+    with pytest.raises(ResponseShapeError, match="estado"):
+        InquiryStatusResponse.from_dict({"codigo": 1, "estado": 42})
 
 
 def test_tracking_status_parses_a_not_found_answer() -> None:
