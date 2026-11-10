@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.6.0...typescript-v0.6.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* read canReuseSequence from consultaresultado ([#126](https://github.com/deuriib/dgii-ecf/issues/126)) ([c53bd26](https://github.com/deuriib/dgii-ecf/commit/c53bd264258f6254e18381b4232ec5f2ca599e5e))
+
 ## [0.6.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.5.1...typescript-v0.6.0) (2026-11-03)
 
 

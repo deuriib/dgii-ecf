@@ -90,7 +90,7 @@ from .validation import (
     validate_document,
 )
 
-__version__ = "0.7.1"
+__version__ = "0.7.2"
 
 __all__ = [
     "COMMERCIAL_APPROVAL_ACCEPTED_CODE",
