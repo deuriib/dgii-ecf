@@ -29,7 +29,12 @@ export interface TrackingStatusResponse {
   estado: TrackStatusEnum;
   rnc: string;
   encf: string;
-  secuenciaUtilizada: boolean;
+  /**
+   * `false` when the rejection leaves the sequence reusable. DGII scopes this
+   * flag to a rejected outcome, so any other answer may omit it — absence is
+   * treated as "not reusable".
+   */
+  secuenciaUtilizada?: boolean | null;
   fechaRecepcion: string;
   mensajes?: Mensaje[];
 }
@@ -47,8 +52,8 @@ export type InquiryStatus =
 export interface InquiryStatusResponse {
   codigo: InquiryStatusCode;
   estado: InquiryStatus;
-  /** `true` when the e-NCF sequence is already consumed. */
-  secuenciaUtilizada?: boolean;
+  // DGII publishes no `secuenciaUtilizada` on `consultaestado`; the flag lives
+  // on the track-result and RFCE-inquiry consults. Do not add it back here.
   rncEmisor?: string;
   ncfElectronico?: string;
   montoTotal?: number;
@@ -61,7 +66,8 @@ export interface InquiryStatusResponse {
 }
 
 export interface SummaryTrackingStatusResponse {
-  trackId: string;
+  /** Absent on an entry DGII returns without one; `estado` is always present. */
+  trackId?: string;
   estado: string;
   fechaRecepcion: string;
 }
