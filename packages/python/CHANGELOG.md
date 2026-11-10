@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/deuriib/dgii-ecf/compare/python-v0.7.1...python-v0.7.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* read canReuseSequence from consultaresultado ([#126](https://github.com/deuriib/dgii-ecf/issues/126)) ([c53bd26](https://github.com/deuriib/dgii-ecf/commit/c53bd264258f6254e18381b4232ec5f2ca599e5e))
+
 ## [0.7.1](https://github.com/deuriib/dgii-ecf/compare/python-v0.7.0...python-v0.7.1) (2026-11-03)
 
 
