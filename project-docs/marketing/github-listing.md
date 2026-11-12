@@ -2,7 +2,7 @@
 
 Copy deck for the repository listing. Every claim below is traceable to `README.md`, `packages/*/src/index.ts`,
 `packages/python/src/py_dgii_ecf/__init__.py` or `project-specs/dgii-ecf-setup.md`. Nothing here claims DGII
-certification or endorsement; the packages are pre-1.0 (TypeScript 0.6.0, Python 0.7.1).
+certification or endorsement; the packages are pre-1.0 (current versions in [`versions.json`](./versions.json)).
 
 ## 1. Repository description (About field)
 
