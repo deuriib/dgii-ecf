@@ -5,7 +5,14 @@
       "release-type": "node",
       "package-name": "@deuriib/dgii-ecf",
       "component": "typescript",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "/project-docs/marketing/versions.json",
+          "jsonpath": "$.typescript"
+        }
+      ]
     },
     "packages/python": {
       "release-type": "python",
@@ -17,6 +24,11 @@
           "type": "toml",
           "path": "uv.lock",
           "jsonpath": "$.package[?(@.name.value=='py-dgii-ecf')].version"
+        },
+        {
+          "type": "json",
+          "path": "/project-docs/marketing/versions.json",
+          "jsonpath": "$.python"
         }
       ]
     }
