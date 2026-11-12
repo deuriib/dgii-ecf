@@ -71,8 +71,10 @@ curl -s -A "$UA_B" -o /dev/null -w "%{http_code}\n" -L --max-time 30 "<url>"
   listing label, not on extractable text.
 
 - HTTP status is per-URL and was observed once per row on the access date; DGII republishes files in
-  place, so a status is not a content guarantee. `sha256` for the 15 schemas lives in `MANIFEST.json` —
-  if a schema changes, the manifest hash is what detects it, not this status column.
+  in place, so a status is not a content guarantee. `sha256` for the **12 pinned** schemas (the
+  `schemas` array) lives in `MANIFEST.json`; the **3 `excluded` entries** carry `name`/`reason`/
+  `source_url` and no hash. If a pinned schema changes, the manifest hash is what detects it, not this
+  status column.
 
 **Access date for every row: 2026-11-09.**
 
@@ -95,10 +97,11 @@ Notes:
 - **LEG-01 and LEG-02 are scanned images** (no text layer: **0** extractable characters on either).
   Reachability, file type, page count and title were verified; article-level text was **not**
   machine-verified on this machine, so **neither row carries a `§`**. Their dates come from DGII's own
-  avisos, which are text-extractable and date the instrument in their closing line: LEG-01 = 16 May
-  2023 (Aviso 07-23, `.../2023/07-23.pdf`, 200 — "la publicación oficial de la Ley no. 32-23 … de
-  fecha 16 de mayo de 2023"); LEG-02 = 17 Oct 2024 (Aviso 20-24, `.../2024/20-24.pdf`, 200 — "a los
-  diecisiete (17) días del mes de octubre del año dos mil veinticuatro (2024)"). LEG-02's normative
+  text-extractable avisos, but the location differs: **Aviso 07-23** states the 16 May 2023 date in its
+  **opening paragraph** ("la publicación oficial de la Ley no. 32-23 … de fecha 16 de mayo de 2023")
+  and closes on **25 May 2023**; **Aviso 20-24** states the 17 Oct 2024 date in its **closing line**
+  ("a los diecisiete (17) días del mes de octubre del año dos mil veinticuatro (2024)"). Applying
+  "read the closing line" to Aviso 07-23 would return 25 May 2023, nine days off. LEG-02's normative
   content is nevertheless usable at the article level **through DGII's own quotation of it**:
   TEC-04 §5.2–6.2 and TEC-01 §19 quote Decreto 587-24 Arts. 40–43 by number in extractable text, so
   its § cell records contingency scope (no ground-truth section) rather than §9 — the §9 filing
@@ -754,7 +757,8 @@ These are out of this task's scope — no docs edit, no code change, no change t
   section number, and do not let a shared block template imply one exists.
 - **Fourth: DGII republishes in place.** Any row can change content without changing URL or version. The
   register's status column is a snapshot; `MANIFEST.json` sha256 is the only content guard, and only for
-  the 15 schemas.
+  the 12 pinned schemas — the 3 `excluded` entries carry no hash, so their silent republish is not
+  hash-detected.
 - **Fifth: two rows are unreadable by machine.** LEG-01 and LEG-02 are scans. Never quote their article
   text on the site, and never cite them for a ground-truth section; quote TEC-04's and TEC-01 §19's
   quotation of Decreto 587-24 instead, which is extractable and verified.
