@@ -6,7 +6,9 @@
 > citation.
 
 **Source:** NotebookLM notebook _"Reglamento y Guía de Facturación Electrónica
-de la DGII"_, built from 34 official documents.
+de la DGII"_. The verifiable companion to this file is the committed
+source register at [`project-tasks/124-source-register.md`](../project-tasks/124-source-register.md),
+which names 43 verified official documents and the claim each one backs.
 
 **Extracted:** 2026-11-02, via 12 targeted questions plus direct reads of the
 `ANECF v.1.0` schema source.
@@ -198,7 +200,9 @@ RFCE rules:
 - Certificate: **.p12 / PKCS#12**, "Certificado Digital de Persona Física para Procedimientos Tributarios";
   the certificate `SN` must match the RNC/cédula of the authorized signer or delegate.
 - `<KeyInfo>` **must** contain `<X509Data><X509Certificate>` (base64 DER).
-- `<KeyValue>`, `<RSAKeyValue>`, `<Exponent>` must **NOT** be emitted.
+- `<KeyValue>`, `<RSAKeyValue>`, `<Exponent>` are **not emitted** — an SDK
+  implementation rule derived from DGII's signing examples (TEC-10 names them
+  "no son necesarios"), not a DGII prohibition.
 - Parsing must use `preservewhitespace = false`.
 - After signing, the XML must not be altered (no reformatting, no added newlines/indentation).
 - Empty tags are forbidden: any unused tag must be omitted entirely.
@@ -208,8 +212,12 @@ RFCE rules:
 
 - ACECF root `<ACECF>`: `Version`, `RNCEmisor`, `RNCComprador`, `eNCF`, `EstadoAprobacion`/`Estado`
   (1 = approved, 2 = rejected), `FechaHoraAprobacionComercial`, `Signature`.
-- Legal deadline: by the filing deadline of the corresponding period (aligned with Formato 606,
-  due by the 15th of the following month) — Decreto 587-24 Art. 17 ¶V, Norma General 01-2020 Art. 14 ¶I.
+- Legal obligation: the electronic receiver must acknowledge receipt and then
+  give its conformity either by commercial approval/rejection or by reporting
+  the e-CF in the corresponding Formato 606 filing (Norma General 01-2020
+  Art. 8 ¶I). No calendar date is printed here because no extractable DGII
+  document states one; the 606 filing cadence belongs to Norma General 07-2018 /
+  10-18, which is not part of the verified register.
 - A commercial rejection obliges the issuer to issue an E34 Nota de Crédito.
 - ANECF root `<ANECF>`: `Encabezado` (`Version`, `RncEmisor`, `CantidadeNCFAnulados`,
   `FechaHoraAnulacioneNCF` in `dd-MM-AAAA HH:mm:ss`), `DetalleAnulacion` (1..10 `Anulacion` entries with
@@ -242,3 +250,9 @@ then POST the e-CF to `urlRecepcion/fe/recepcion/api/ecf`, receive an `<ARECF>` 
 then the buyer POSTs the `<ACECF>` to `urlAceptacion/fe/aprobacioncomercial/api/ecf` (HTTP 200 / 400).
 
 B2B direct delivery **does not apply** to E32 < RD$250k, E41, E43, E45, E46, E47.
+This is an **SDK rule**, not a DGII statement: the excluded types and the E32
+threshold are enforced by `B2B_EXCLUDED_TYPES` / `checkB2BApplicability` /
+`enforceB2BRules` in `packages/typescript/src/{reception,client}.ts` and their
+Python counterparts. The rationale is that those documents follow a different
+delivery path (E32 below the threshold is the RFCE summary; E41/E43/E45/E46/E47
+are not direct Emisor↔Receptor documents).
