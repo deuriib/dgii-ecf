@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.8.0...python-v0.9.0) (2026-11-15)
+
+
+### Features
+
+* **transformer:** support static invocation, raw json strings, aliases, and cli command ([#135](https://github.com/deuriib/dgii-ecf/issues/135)) ([fd6992a](https://github.com/deuriib/dgii-ecf/commit/fd6992af411ee930ef0b822af0af9e796d8b1c39))
+
 ## [0.8.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.7.2...python-v0.8.0) (2026-11-15)
 
 
