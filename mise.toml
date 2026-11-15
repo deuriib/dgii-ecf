@@ -89,6 +89,17 @@ dir = "packages/typescript"
 run = "bun run scripts/verify-signing.ts"
 
 # ---------------------------------------------------------------------------
+# Parity
+# ---------------------------------------------------------------------------
+# The two packages share no code and no codegen, so the only defence against
+# silent drift is a gate that compares what must match. Checks the endpoint and
+# environment tables, the error codes, the resilience defaults, the idempotency
+# TTL and marker shape, and byte-identity of the three vendored XSD copies.
+[tasks.parity]
+description = "Compare the two packages for behavioural drift"
+run = "uv run --no-project python scripts/check_parity.py"
+
+# ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
 [tasks.build]
@@ -110,7 +121,10 @@ run = "uv build"
 # ---------------------------------------------------------------------------
 [tasks.docs-build]
 description = "Build the docs site (en + es) with strict validation"
-run = "uvx --from mkdocs --with mkdocs-material --with \"mkdocs-static-i18n>=1.0,<2\" mkdocs build --strict"
+# `mkdocs` emits one root sitemap and one search index, but Material fetches
+# `<locale>/sitemap.xml` and `<locale>/search/search_index.json` — so both
+# per-locale projections are build steps (scripts/localize_*.py).
+run = "uvx --from mkdocs --with mkdocs-material --with \"mkdocs-static-i18n>=1.0,<2\" mkdocs build --strict && python3 scripts/localize_sitemap.py && python3 scripts/localize_search_index.py"
 
 [tasks.docs-serve]
 description = "Serve the docs site locally with live reload"
@@ -120,5 +134,5 @@ run = "uvx --from mkdocs --with mkdocs-material --with \"mkdocs-static-i18n>=1.0
 # Full CI
 # ---------------------------------------------------------------------------
 [tasks.ci]
-description = "Full CI pipeline locally (lint + test + build)"
-depends = ["lint", "test", "build"]
+description = "Full CI pipeline locally (lint + parity + test + build)"
+depends = ["lint", "parity", "test", "build"]

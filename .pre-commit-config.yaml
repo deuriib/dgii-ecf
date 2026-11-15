@@ -79,6 +79,15 @@ repos:
         pass_filenames: false
         files: ^packages/python/.*\.py$
 
+      # The two SDKs share no code: this is the only automated defence against a
+      # change that lands in one package only. Cheap, so it runs on every commit.
+      - id: parity
+        name: cross-package parity
+        language: system
+        entry: uv run --no-project python scripts/check_parity.py
+        pass_filenames: false
+        always_run: true
+
       - id: gitleaks
         name: gitleaks
         language: system
