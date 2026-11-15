@@ -89,36 +89,87 @@ export const pruneEmptyValues = (input: unknown): unknown => {
   return input;
 };
 
+const parseJsonObject = (data: object | string): Result<object, DgiiError> => {
+  if (typeof data === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(data);
+      if (
+        parsed === null ||
+        typeof parsed !== 'object' ||
+        Array.isArray(parsed)
+      ) {
+        return err(
+          new DgiiError(
+            'Error converting JSON to XML: Expected an object as root',
+            { code: 'INVALID_XML' },
+          ),
+        );
+      }
+      return ok(parsed);
+    } catch (error) {
+      return err(
+        new DgiiError(
+          `Error converting JSON to XML: ${error instanceof Error ? error.message : String(error)}`,
+          { code: 'INVALID_XML', cause: error },
+        ),
+      );
+    }
+  }
+
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    return err(
+      new DgiiError(
+        'Error converting JSON to XML: Expected an object as root',
+        { code: 'INVALID_XML' },
+      ),
+    );
+  }
+
+  return ok(data);
+};
+
+const buildXmlPayload = (pruned: unknown): Record<string, unknown> => ({
+  _declaration: { _attributes: { version: '1.0', encoding: 'utf-8' } },
+  ...(pruned !== null &&
+  pruned !== undefined &&
+  typeof pruned === 'object' &&
+  !Array.isArray(pruned)
+    ? (pruned as Record<string, unknown>)
+    : {}),
+});
+
 /**
  * Converts between the DGII XML documents and the "compact" JSON shape used by
  * `xml-js` (a dict key is an element, an array is a repeated element, and
  * `_attributes` / `_text` carry attributes and text).
  */
 export class Transformer {
-  json2xml(dataObject: object, round = false): Result<string, DgiiError> {
-    try {
-      const pruned = pruneEmptyValues(dataObject);
-      const data: Record<string, unknown> = {
-        _declaration: { _attributes: { version: '1.0', encoding: 'utf-8' } },
-        ...(pruned !== null &&
-        pruned !== undefined &&
-        typeof pruned === 'object' &&
-        !Array.isArray(pruned)
-          ? (pruned as Record<string, unknown>)
-          : {}),
-      };
+  static json2xml(
+    data: object | string,
+    round = false,
+  ): Result<string, DgiiError> {
+    const parsed = parseJsonObject(data);
+    if (parsed.isErr()) {
+      return err(parsed.error);
+    }
 
-      const xml = convert.js2xml(data as convert.ElementCompact, {
-        compact: true,
-        ignoreComment: true,
-        spaces: 2,
-        textFn: (value: string, label: string) => {
-          if (round && label.toLowerCase() !== 'version') {
-            return roundHalfUpToCents(value);
-          }
-          return value;
+    try {
+      const xml = convert.js2xml(
+        buildXmlPayload(
+          pruneEmptyValues(parsed.value),
+        ) as convert.ElementCompact,
+        {
+          compact: true,
+          ignoreComment: true,
+          spaces: 2,
+          textFn: (value: string, label: string) => {
+            if (round && label.toLowerCase() !== 'version') {
+              return roundHalfUpToCents(value);
+            }
+            return value;
+          },
         },
-      });
+      );
 
       return ok(xml);
     } catch (error) {
@@ -131,7 +182,7 @@ export class Transformer {
     }
   }
 
-  xml2json<T>(xml: string): Result<T, DgiiError> {
+  static xml2json<T>(xml: string): Result<T, DgiiError> {
     try {
       const json = convert.xml2js(xml, {
         compact: true,
@@ -148,4 +199,38 @@ export class Transformer {
       );
     }
   }
+
+  static json_to_xml = Transformer.json2xml;
+  static jsonToXml = Transformer.json2xml;
+  static xml_to_json = Transformer.xml2json;
+  static xmlToJson = Transformer.xml2json;
+
+  json2xml(data: object | string, round = false): Result<string, DgiiError> {
+    return Transformer.json2xml(data, round);
+  }
+
+  json_to_xml(data: object | string, round = false): Result<string, DgiiError> {
+    return Transformer.json2xml(data, round);
+  }
+
+  jsonToXml(data: object | string, round = false): Result<string, DgiiError> {
+    return Transformer.json2xml(data, round);
+  }
+
+  xml2json<T>(xml: string): Result<T, DgiiError> {
+    return Transformer.xml2json<T>(xml);
+  }
+
+  xml_to_json<T>(xml: string): Result<T, DgiiError> {
+    return Transformer.xml2json<T>(xml);
+  }
+
+  xmlToJson<T>(xml: string): Result<T, DgiiError> {
+    return Transformer.xml2json<T>(xml);
+  }
 }
+
+Transformer.prototype.json_to_xml = Transformer.prototype.json2xml;
+Transformer.prototype.jsonToXml = Transformer.prototype.json2xml;
+Transformer.prototype.xml_to_json = Transformer.prototype.xml2json;
+Transformer.prototype.xmlToJson = Transformer.prototype.xml2json;

@@ -193,17 +193,24 @@ decimales a dos posiciones con **ROUND_HALF_UP** (`2.665` → `2.67`,
 `-2.675` → `-2.68`), igual que el SDK de TypeScript. `Version` y el texto no
 monetario nunca se redondean.
 
+`Transformer.json_to_xml` y `Transformer.xml_to_json` pueden llamarse de forma
+estática o en una instancia, y aceptan tanto un diccionario analizado como una
+cadena JSON en bruto. Los alias de paridad `json2xml` y `xml2json` también están
+disponibles.
+
 ## CLI
 
 ```bash
 py-dgii-ecf sign invoice.xml identity.p12 --output signed.xml
 py-dgii-ecf authenticate identity.p12 --environment CerteCF
 py-dgii-ecf status <track-id> identity.p12 --environment CerteCF
+py-dgii-ecf json-to-xml invoice.json --output invoice.xml --round-monetary
 ```
 
-Cada comando pide la contraseña del `.p12` (`--password`, entrada oculta).
-`--environment` acepta `TesteCF` / `CerteCF` / `eCF`, o los alias `dev`, `cert` y
-`prod`.
+Los comandos que interactúan con la DGII piden la contraseña del `.p12` (`--password`,
+entrada oculta). `--environment` acepta `TesteCF` / `CerteCF` / `eCF`, o los alias `dev`,
+`cert` y `prod`. `json-to-xml` convierte un archivo de factura JSON compacto a XML
+(`--round-monetary` redondea valores monetarios con `ROUND_HALF_UP`).
 
 Consulta [Firma](guides/signing.md), [Resiliencia](guides/resilience.md) y el
 [README del paquete](https://github.com/deuriib/dgii-ecf/tree/main/packages/python).

@@ -460,12 +460,37 @@ in §10.
 
 ```ts
 class Transformer {
-  static json2xml(json: unknown, opts?: { compact?: boolean }): string;
-  static xml2json(xml: string, opts?: { compact?: boolean }): unknown;
+  static json2xml(
+    data: object | string,
+    round?: boolean,
+  ): Result<string, DgiiError>;
+  static xml2json<T = unknown>(xml: string): Result<T, DgiiError>;
+
+  // Parity aliases (static)
+  static json_to_xml: typeof Transformer.json2xml;
+  static jsonToXml: typeof Transformer.json2xml;
+  static xml_to_json: typeof Transformer.xml2json;
+  static xmlToJson: typeof Transformer.xml2json;
+
+  // Instance methods
+  json2xml(data: object | string, round?: boolean): Result<string, DgiiError>;
+  json_to_xml(
+    data: object | string,
+    round?: boolean,
+  ): Result<string, DgiiError>;
+  jsonToXml(data: object | string, round?: boolean): Result<string, DgiiError>;
+  xml2json<T = unknown>(xml: string): Result<T, DgiiError>;
+  xml_to_json<T = unknown>(xml: string): Result<T, DgiiError>;
+  xmlToJson<T = unknown>(xml: string): Result<T, DgiiError>;
 }
 ```
 
-Thin wrapper over `xml-js` in **compact** mode. JSON shape contract in §11.
+Thin wrapper over `xml-js` in **compact** mode. Supports both static calls (`Transformer.json2xml(...)`)
+and instance invocations (`new Transformer().json2xml(...)`). Accepts either a parsed object or a
+raw JSON string; invalid JSON strings or payloads without an object root return `Err(INVALID_XML)`.
+`xml2json` parses XML and returns `Err(INVALID_XML)` on malformed syntax. Parity aliases
+`json_to_xml`, `jsonToXml`, `xml_to_json`, and `xmlToJson` are provided across both static and
+instance surfaces. JSON shape contract in §11.
 
 ### 4.10 `utils.ts` and `telemetry.ts`
 
@@ -920,13 +945,26 @@ them while still failing on invalid XML or an unknown document type. Full signin
 ```python
 class Transformer:
     @staticmethod
-    def json_to_xml(data: Mapping[str, object], round_monetary: bool = False) -> str: ...
+    def json_to_xml(
+        data: dict[str, object] | str,
+        *,
+        round_monetary: bool = False,
+    ) -> DgiiResult[str]: ...
+
     @staticmethod
     def xml_to_json(xml: str) -> DgiiResult[dict[str, object]]: ...
+
+    # Parity aliases (available statically and on instances)
+    json2xml = json_to_xml
+    xml2json = xml_to_json
 ```
 
-Implemented with `lxml` + a small internal `dict_to_xml`/`xml_to_dict` mirroring xml-js **compact**
-semantics — **no extra dependency** (see §11 and §12.2).
+Implemented with `lxml` + internal helpers mirroring xml-js **compact** semantics — **no extra
+dependency** (see §11 and §12.2). Supports both static (`Transformer.json_to_xml(...)`) and instance
+(`Transformer().json_to_xml(...)`) invocations via `@staticmethod`. Accepts either a parsed
+dictionary or a raw JSON string; invalid JSON strings or inputs without a dict root return
+`Err(INVALID_XML)`. `xml_to_json` returns `Err(INVALID_XML)` on malformed XML syntax. Parity
+aliases `json2xml` and `xml2json` are bound on both class and instance.
 
 ### 5.10 `utils.py` and `telemetry.py`
 
@@ -1063,11 +1101,14 @@ def sign(xml_file: Path, p12: Path, password: str, output: Path | None = None) -
 def authenticate(p12: Path, password: str, environment: str = "CerteCF") -> None: ...
 @app.command()
 def status(track_id: str, p12: Path, password: str, environment: str = "CerteCF") -> None: ...
+@app.command(name="json-to-xml")
+def json_to_xml(json_file: Path, output: Path | None = None, round_monetary: bool = False) -> None: ...
 ```
 
 `password` is a required `--password` option with `prompt=True, hide_input=True`, so the CLI asks
 for it when omitted. `--environment` accepts the DGII values or the aliases
-`test`/`dev`, `cert`, `prod`. Entry point (`pyproject`):
+`test`/`dev`, `cert`, `prod`. `json-to-xml` converts a compact JSON file to XML, writing to stdout
+or `--output`, with optional `--round-monetary` (ROUND_HALF_UP). Entry point (`pyproject`):
 `py-dgii-ecf = "py_dgii_ecf.cli:app"`. Minimal surface — see §12.3.
 
 ### 5.13 `__init__.py`
@@ -1510,8 +1551,9 @@ Money round-trips as `string` (TS) / `Decimal`→`str` (Python); no numeric coer
    over `lxml` that mirrors xml-js compact semantics (§11). No `xmltodict`/`dicttoxml` added.
 3. **CLI surface (minimal, concrete).** typer `app`, entry point `py-dgii-ecf`, `no_args_is_help=True`.
    Commands: `sign <xml> <p12>`, `authenticate <p12>`, `status <track_id> <p12>`, each taking a
-   prompted `--password` and, where relevant, `--environment` (DGII value or alias) and `--output`.
-   Plus `--help` on every command. No invented features beyond these three.
+   prompted `--password` and, where relevant, `--environment` (DGII value or alias) and `--output`;
+   plus `json-to-xml <json_file>` with `--output` and `--round-monetary`. Plus `--help` on every command.
+   No invented features beyond these.
 4. **Endpoint mapping confirmed:** `statusTrackId` → `TRACK_RESULT_STATUS`
    (`consultaresultado/api/Consultas/Estado`); `inquiryStatus` → `INQUIRY_STATUS`
    (`consultaestado/api/Consultas/Estado`).

@@ -11,6 +11,7 @@ from .certificate import P12Reader, P12ReaderData
 from .client import ECF
 from .environment import Environment
 from .signing import Signature
+from .transformer import Transformer
 
 app = typer.Typer(
     help="DGII e-CF command line interface.",
@@ -115,3 +116,35 @@ def status(
         typer.echo(f"error: {result.unwrap_err()}", err=True)
         raise typer.Exit(code=1)
     typer.echo(str(result.unwrap()))
+
+
+@app.command(name="json-to-xml")
+def json_to_xml(
+    json_file: Path,
+    output: Annotated[
+        Path | None, typer.Option(help="Write the XML output here.")
+    ] = None,
+    round_monetary: Annotated[
+        bool,
+        typer.Option(
+            "--round-monetary",
+            help="Round monetary values to 2 decimal places with ROUND_HALF_UP.",
+        ),
+    ] = False,
+) -> None:
+    """Convert a compact JSON document to an XML string."""
+    if not json_file.is_file():
+        typer.echo(f"error: file not found: {json_file}", err=True)
+        raise typer.Exit(code=1)
+
+    content = json_file.read_text(encoding="utf-8")
+    result = Transformer.json_to_xml(content, round_monetary=round_monetary)
+    if result.is_err():
+        typer.echo(f"error: {result.unwrap_err()}", err=True)
+        raise typer.Exit(code=1)
+
+    if output is not None:
+        output.write_text(result.unwrap(), encoding="utf-8")
+        typer.echo(f"xml document written to {output}")
+    else:
+        typer.echo(result.unwrap())
