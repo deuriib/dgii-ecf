@@ -1,0 +1,131 @@
+/*
+ * Accessibility overrides for the DGII e-CF SDK documentation.
+ *
+ * The Material default teal (`#009485`) fails WCAG 2.0 AA on this site: axe-core
+ * reports 3.76:1 for white text on the header and for links on white, against a
+ * 4.5:1 requirement (WCAG 1.4.3), on every page — nav links, the header title,
+ * table links and the repository facts.
+ *
+ * These variables move the palette to the darker end of the same teal ramp, so
+ * the brand is unchanged and the contrast clears AA in both the light and the
+ * dark scheme.
+ */
+
+:root {
+  --md-primary-fg-color: #00695c; /* teal 800 — 5.9:1 against white */
+  --md-primary-fg-color--light: #00796b;
+  --md-primary-fg-color--dark: #004d40;
+  --md-accent-fg-color: #00695c;
+  --md-typeset-a-color: #00695c;
+}
+
+[data-md-color-scheme='slate'] {
+  --md-primary-fg-color: #00695c;
+  --md-primary-fg-color--light: #00796b;
+  --md-primary-fg-color--dark: #004d40;
+  --md-accent-fg-color: #4db6ac;
+  --md-typeset-a-color: #4db6ac;
+}
+
+/*
+ * Material's comment/highlight grey (`#717171` on `#f5f5f5`) measures 4.47:1 —
+ * just under AA. One step darker clears it without changing the code theme.
+ */
+:root {
+  --md-code-hl-comment-color: #5f5f5f;
+}
+
+/* The repository facts are rendered at ~18% white: 1.52:1 on the header. */
+.md-source__facts .md-source__fact,
+.md-source__fact {
+  color: #e0f2f1;
+  opacity: 1;
+}
+
+/* Operator words (`new`) inherit the same 4.47:1 grey as the comment colour. */
+.md-typeset .highlight .ow {
+  color: #5f5f5f;
+}
+
+[data-md-color-scheme='slate'] .md-typeset .highlight .ow {
+  color: #a6a6a6;
+}
+
+/* The footer copyright sat at 4.47:1 in the dark scheme. */
+[data-md-color-scheme='slate'] .md-copyright {
+  color: #9e9e9e;
+}
+
+/*
+ * Dark-mode overrides are duplicated behind the media query: axe emulates
+ * `prefers-color-scheme` without toggling `data-md-color-scheme`, and Material
+ * resolves the dark palette through the media query in that case.
+ */
+@media screen and (prefers-color-scheme: dark) {
+  .md-copyright {
+    color: #9e9e9e;
+  }
+
+  .md-typeset .highlight .ow {
+    color: #a6a6a6;
+  }
+}
+
+/*
+ * Links inside running text must not rely on colour alone (WCAG 1.4.1):
+ * `#00695c` against the body text is 2.43:1, under the 3:1 that colour-only
+ * differentiation needs, so the link also gets an underline.
+ */
+.md-typeset p a:not(.md-button),
+.md-typeset li a:not(.md-button),
+.md-typeset td a:not(.md-button) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+/*
+ * The facts list carries an ancestor opacity (~.75), which caps the reachable
+ * contrast: even pure white at that alpha is 3.97:1 against the header. The
+ * opacity has to go, not the text colour.
+ */
+.md-source__facts {
+  opacity: 1;
+}
+
+/* The footer renders a dark surface in both schemes; `rgba(255,255,255,.45)`
+ * measured 4.47:1, so the copyright gets a solid colour outside the ramp. */
+.md-copyright {
+  color: #b8b8b8;
+}
+
+/*
+ * The version fact keeps a theme-level alpha on top of its colour, which caps
+ * the reachable contrast. Pinned explicitly; it is an 11px metadata line, so the
+ * blast radius of `!important` is one element.
+ */
+.md-source__fact--version {
+  color: #e0f2f1 !important;
+  opacity: 1 !important;
+}
+
+/*
+ * The Pygments theme paints comments directly (`#717171`), not through
+ * `--md-code-hl-*`, so the variable overrides above never reached them. 4.47:1
+ * against the code block background is a hair under AA.
+ */
+.md-typeset .highlight .c,
+.md-typeset .highlight .c1,
+.md-typeset .highlight .cm,
+.md-typeset .highlight .cs {
+  color: #5f5f5f;
+}
+
+@media screen and (prefers-color-scheme: dark) {
+  .md-typeset .highlight .c,
+  .md-typeset .highlight .c1,
+  .md-typeset .highlight .cm,
+  .md-typeset .highlight .cs {
+    color: #a6a6a6;
+  }
+}

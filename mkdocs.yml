@@ -10,15 +10,17 @@ theme:
   name: material
   language: en
   palette:
+    # `custom` means the palette comes from `docs/stylesheets/extra.css`: the
+    # stock teal fails WCAG 2.0 AA contrast (3.76:1) on nav links and header text.
     - scheme: default
-      primary: teal
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: teal
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -44,6 +46,9 @@ nav:
   - Examples: examples.md
   - FAQ: faq.md
 
+extra_css:
+  - stylesheets/extra.css
+
 markdown_extensions:
   - admonition
   - attr_list
@@ -60,12 +65,18 @@ markdown_extensions:
       alternate_style: true
 
 plugins:
-  - search
+  # `lang` is declared here, not handed to the theme by the i18n plugin's
+  # `reconfigure_search`: that option rewrites the search config at build time
+  # and leaves the browser with a worker that never returns results (verified
+  # in Chromium against the deployed site — the index loaded, the results pane
+  # stayed empty). See docs review finding F-DOCS-01.
+  - search:
+      lang: [en, es]
   - i18n:
       docs_structure: folder
       fallback_to_default: true
       reconfigure_material: true
-      reconfigure_search: true
+      reconfigure_search: false
       languages:
         # `es` is listed first on purpose: the plugin has no per-locale 404
         # page support, so the last built locale wins the shared `404.html`.
