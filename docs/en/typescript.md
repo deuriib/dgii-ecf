@@ -199,5 +199,46 @@ decimal string rather than via `toFixed` (which loses precision:
 `(2.675).toFixed(2) === '2.67'`). `Version` and non-monetary text are never
 rounded.
 
+`Transformer.json2xml` and `Transformer.xml2json` can be called statically or on
+an instance, and accept either a parsed object or a raw JSON string. Parity
+aliases `json_to_xml`, `jsonToXml`, `xml_to_json`, and `xmlToJson` are also
+available.
+
+### Working with JSON invoices
+
+DGII endpoints accept only digitally signed XML (`signedXml: string`). To submit
+an invoice authored as JSON (or raw JSON string), transform it first with
+`Transformer`, sign the resulting XML with `Signature`, and pass the signed XML
+to `sendDocument`:
+
+```ts
+import {
+  ECF,
+  Environment,
+  P12Reader,
+  Signature,
+  Transformer,
+} from '@deuriib/dgii-ecf';
+
+// 1. Convert JSON to DGII XML (with half-up monetary rounding)
+const xmlResult = Transformer.json2xml(invoiceJson, true);
+if (xmlResult.isErr()) throw xmlResult.error;
+
+// 2. Sign the generated XML
+const credentials = new P12Reader(passphrase).getKeyFromFile('cert.p12');
+if (credentials.isErr()) throw credentials.error;
+
+const signature = new Signature(
+  credentials.value.key!,
+  credentials.value.cert!,
+);
+const signedXml = signature.signXml(xmlResult.value, 'ECF');
+if (signedXml.isErr()) throw signedXml.error;
+
+// 3. Submit through the ECF client
+const ecf = new ECF(credentials.value, Environment.Cert);
+const response = await ecf.sendDocument(signedXml.value, `${rnc}${encf}.xml`);
+```
+
 See [Signing](guides/signing.md), [Resilience](guides/resilience.md), and the
 [package README](https://github.com/deuriib/dgii-ecf/tree/main/packages/typescript).

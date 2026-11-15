@@ -51,3 +51,14 @@ repositorio.
 Consulta
 [SECURITY.md](https://github.com/deuriib/dgii-ecf/blob/main/SECURITY.md). No
 abras un issue público.
+
+## ¿Puedo enviar JSON directamente a los métodos del cliente?
+
+No. Los servicios web de la DGII solo aceptan documentos XML firmados
+digitalmente con XMLDSig (C14N inclusivo 1.0 + RSA-SHA256). Los métodos de envío
+(`sendDocument`, `sendElectronicDocument`, `sendSummary`) requieren `signedXml:
+string` / `signed_xml: str`.
+
+Para enviar una factura elaborada en JSON (o cadena JSON directa), utiliza
+`Transformer.json2xml` (TypeScript) o `Transformer.json_to_xml` (Python) para
+generar el XML, fírmalo con `Signature` y entrega el XML firmado al cliente.

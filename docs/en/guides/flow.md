@@ -159,6 +159,31 @@ E32 below the threshold instead of misrouting it.
 Sign **last**, and never reformat the document afterwards — the signature covers
 the exact bytes.
 
+If your application generates documents as JSON (as an object or raw string),
+convert the payload to DGII-compliant XML first using `Transformer` (passing
+`round = true` / `round_monetary = True` for `ROUND_HALF_UP` monetary rounding):
+
+=== "TypeScript"
+
+    ```ts
+    import { Transformer } from '@deuriib/dgii-ecf';
+
+    const xmlResult = Transformer.json2xml(invoiceJson, true);
+    if (xmlResult.isErr()) throw xmlResult.error;
+    const xml = xmlResult.value;
+    ```
+
+=== "Python"
+
+    ```python
+    from py_dgii_ecf import Transformer
+
+    xml_result = Transformer.json_to_xml(invoice_json, round_monetary=True)
+    if xml_result.is_err():
+        raise RuntimeError(xml_result.unwrap_err())
+    xml = xml_result.unwrap()
+    ```
+
 **Official source:** [Firmado Comprobantes Fiscales Electrónicos (e-CF)](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Firmado%20de%20e-CF.pdf) — the algorithm set to emit: inclusive C14N, RSA-SHA256, SHA-256 digest, `URI=""`, X509 `KeyInfo` (site-updated 2023-11-22) · [Descripción Técnica Servicios Emisores Electrónicos](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Descripcion%20Tecnica%20Emisores%20Electronicos.pdf) — _Firmado de XML_: SHA-256 protocol, the certificate `SN` matching the holder's RNC/cédula/pasaporte, and the rule that a signed XML is never altered (site-updated 2026-05-29).
 
 === "TypeScript"

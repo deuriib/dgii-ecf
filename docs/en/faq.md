@@ -47,3 +47,15 @@ lapses — alert at 60/30/7 days. Never commit the `.p12` or its password.
 
 See [SECURITY.md](https://github.com/deuriib/dgii-ecf/blob/main/SECURITY.md).
 Do not open a public issue.
+
+## Can I submit JSON directly to the client methods?
+
+No. DGII web service endpoints only accept XML documents digitally signed with
+XMLDSig (Inclusive C14N 1.0 + RSA-SHA256). The submission methods (`sendDocument`,
+`sendElectronicDocument`, `sendSummary`) require `signedXml: string` /
+`signed_xml: str`.
+
+To send an invoice authored as JSON (or raw JSON string), use
+`Transformer.json2xml` (TypeScript) or `Transformer.json_to_xml` (Python) to
+generate the XML, sign it with `Signature`, and pass the signed XML to the
+client.
