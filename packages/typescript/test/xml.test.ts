@@ -59,9 +59,37 @@ describe('extractElementText', () => {
     expect(extractElementText('<ECF><eNCF/></ECF>', 'eNCF')).toBeUndefined();
   });
 
-  it('reuses the compiled pattern across calls', () => {
+  it('reads several tags from the same document', () => {
     const xml = '<ECF><eNCF>E1</eNCF><RNCEmisor>130862346</RNCEmisor></ECF>';
     expect(extractElementText(xml, 'eNCF')).toBe('E1');
     expect(extractElementText(xml, 'RNCEmisor')).toBe('130862346');
+  });
+});
+
+describe('extractElementText on hostile input', () => {
+  it('stays linear when a matching open tag is never closed', () => {
+    // The previous regex nested a repetition inside a repetition, so this shape
+    // backtracked for ~9 s at 35 KiB and ~120 s at 120 KiB — a denial of service
+    // on caller-supplied XML, reached by every send and every idempotency key.
+    const xml = `<ECF>${'<eNCF attr="v">'.repeat(8192)}</ECF>`;
+
+    const started = performance.now();
+    const value = extractElementText(xml, 'eNCF');
+    const elapsed = performance.now() - started;
+
+    expect(value).toBeUndefined();
+    expect(elapsed).toBeLessThan(1500);
+  });
+
+  it('still tolerates prefixes, quoted > and whitespace in the close tag', () => {
+    expect(
+      extractElementText(
+        '<ns:ECF><ns:eNCF nota="a > b">E310000000001</ns:eNCF></ns:ECF>',
+        'eNCF',
+      ),
+    ).toBe('E310000000001');
+    expect(extractElementText('<ECF><eNCF>E1</eNCF   ></ECF>', 'eNCF')).toBe(
+      'E1',
+    );
   });
 });

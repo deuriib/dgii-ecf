@@ -16,6 +16,7 @@ from py_dgii_ecf.validation import (
     SCHEMA_DIR,
     UNAVAILABLE_SCHEMAS,
     format_violations,
+    is_schema_unavailable_error,
     validate_document,
 )
 
@@ -180,3 +181,31 @@ def test_unsigned_invoice_32_fixture_is_not_submittable() -> None:
     # The schema ends with an `xs:any` for the signature, so an unsigned
     # document is structurally incomplete — which is the point of the fixture.
     assert result.unwrap()
+
+
+def test_is_schema_unavailable_error_identifies_broken_schemas() -> None:
+    docs = (
+        "<ECF><Encabezado><IdDoc><TipoeCF>31</TipoeCF></IdDoc></Encabezado></ECF>",
+        "<RFCE><Encabezado/></RFCE>",
+        "<ACECF><DetalleAprobacionComercial/></ACECF>",
+    )
+    for xml in docs:
+        result = validate_document(xml)
+        assert result.is_err()
+        assert is_schema_unavailable_error(result.unwrap_err())
+
+
+def test_is_schema_unavailable_error_rejects_other_validation_errors() -> None:
+    unknown_root = validate_document("<Invoice/>")
+    assert unknown_root.is_err()
+    assert not is_schema_unavailable_error(unknown_root.unwrap_err())
+
+    unknown_type = validate_document(
+        "<ECF><Encabezado><IdDoc><TipoeCF>99</TipoeCF></IdDoc></Encabezado></ECF>"
+    )
+    assert unknown_type.is_err()
+    assert not is_schema_unavailable_error(unknown_type.unwrap_err())
+
+    malformed = validate_document("<SemillaModel><unclosed></SemillaModel>")
+    assert malformed.is_err()
+    assert not is_schema_unavailable_error(malformed.unwrap_err())

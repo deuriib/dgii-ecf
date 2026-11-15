@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from py_dgii_ecf._xml import extract_element_text
 
 
@@ -61,7 +63,35 @@ def test_returns_none_for_blank_or_self_closing_element() -> None:
     assert extract_element_text("<ECF><eNCF/></ECF>", "eNCF") is None
 
 
-def test_reuses_cached_pattern() -> None:
+def test_reads_several_tags_from_the_same_document() -> None:
     xml = "<ECF><eNCF>E1</eNCF><RNCEmisor>130862346</RNCEmisor></ECF>"
     assert extract_element_text(xml, "eNCF") == "E1"
     assert extract_element_text(xml, "RNCEmisor") == "130862346"
+
+
+def test_stays_linear_when_a_matching_open_tag_is_never_closed() -> None:
+    """The old regex backtracked quadratically: ~9 s at 35 KiB, ~120 s at 120 KiB.
+
+    That shape is caller-supplied, and every send plus every idempotency key
+    goes through this function, so it was a denial of service on the caller's
+    own input.
+    """
+    xml = "<ECF>" + '<eNCF attr="v">' * 8192 + "</ECF>"
+
+    started = time.perf_counter()
+    value = extract_element_text(xml, "eNCF")
+    elapsed = time.perf_counter() - started
+
+    assert value is None
+    assert elapsed < 1.5
+
+
+def test_tolerates_prefixes_quoted_gt_and_whitespace_before_the_close() -> None:
+    assert (
+        extract_element_text(
+            '<ns:ECF><ns:eNCF nota="a > b">E310000000001</ns:eNCF></ns:ECF>',
+            "eNCF",
+        )
+        == "E310000000001"
+    )
+    assert extract_element_text("<ECF><eNCF>E1</eNCF   ></ECF>", "eNCF") == "E1"

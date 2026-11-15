@@ -90,3 +90,16 @@ describe('P12Reader', () => {
     expect(result.value.validTo.getTime()).toBeGreaterThan(Date.now());
   });
 });
+
+describe('P12Reader secret hygiene', () => {
+  it('keeps the passphrase out of inspection and serialization', () => {
+    const reader = new P12Reader('super-secret-passphrase');
+
+    expect(JSON.stringify(reader)).not.toContain('super-secret-passphrase');
+    expect(String(reader)).not.toContain('super-secret-passphrase');
+    expect(Object.keys(reader)).toEqual([]);
+    expect(
+      (reader as unknown as { passphrase?: string }).passphrase,
+    ).toBeUndefined();
+  });
+});

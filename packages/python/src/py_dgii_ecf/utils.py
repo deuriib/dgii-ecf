@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from decimal import Decimal
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -29,7 +30,7 @@ def get_code_six_digit_from_signature(signed_xml: str) -> DgiiResult[str]:
 def generate_fc_qr_code_url(
     rncemisor: str,
     encf: str,
-    montototal: int | float | str,
+    montototal: Decimal | str,
     codigoseguridad: str,
     env: Environment,
 ) -> str:

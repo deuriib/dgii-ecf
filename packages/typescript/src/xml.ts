@@ -6,31 +6,92 @@
  * namespace prefix and add attributes to it. A literal `<tag>` match misses
  * those variants and silently degrades the caller to a fallback — which on the
  * idempotency path means a duplicate fiscal submission.
+ *
+ * The scan is hand-rolled and single-pass on purpose. The obvious regex
+ * (`<prefix?tag ATTRS>(.*?)</prefix?tag>`) nests a repetition inside a
+ * repetition, so a document with a matching open tag and no close tag made the
+ * engine backtrack quadratically: 35 KiB took ~9 s and 120 KiB took ~120 s on
+ * `sendElectronicDocument`, which is a denial of service on the caller's own
+ * input. Every loop below advances an index, so the cost is O(len(xml)).
  */
 
-const PATTERN_CACHE = new Map<string, RegExp>();
+const NAME_CHAR = /[A-Za-z0-9_.:-]/;
+
+const isSpace = (ch: string | undefined): boolean =>
+  ch === ' ' || ch === '\t' || ch === '\r' || ch === '\n';
+
+/** Read an optionally prefixed XML name starting at `start`. */
+const readQualifiedName = (
+  xml: string,
+  start: number,
+): { readonly name: string; readonly end: number } => {
+  let index = start;
+  while (index < xml.length && NAME_CHAR.test(xml[index] as string)) {
+    index += 1;
+  }
+  return { name: xml.slice(start, index), end: index };
+};
+
+/** Local part of a qualified name: `ns:eNCF` → `eNCF`. */
+const localName = (qualified: string): string => {
+  const colon = qualified.lastIndexOf(':');
+  return colon === -1 ? qualified : qualified.slice(colon + 1);
+};
 
 /**
- * Attribute spans may contain `>` inside quotes (`nota="a > b"`), so both
- * quoted forms get their own alternative instead of a blanket `[^>]*`.
+ * Index just past the `>` that closes an open tag, honouring quoted attribute
+ * values (`nota="a > b"`), or `undefined` when the tag is unterminated.
+ *
+ * Returns `-1` for a self-closing tag so the caller can report the element as
+ * absent instead of pairing it with a later element's closing tag.
  */
-const ATTRIBUTE_SPAN = `(?:[^>"']|"[^"]*"|'[^']*')*`;
-
-const escapeRegExp = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-const elementPattern = (tag: string): RegExp => {
-  const cached = PATTERN_CACHE.get(tag);
-  if (cached !== undefined) {
-    return cached;
+const skipAttributes = (xml: string, start: number): number | undefined => {
+  let index = start;
+  while (index < xml.length) {
+    const ch = xml[index] as string;
+    if (ch === '"' || ch === "'") {
+      const close = xml.indexOf(ch, index + 1);
+      if (close === -1) {
+        return undefined;
+      }
+      index = close + 1;
+      continue;
+    }
+    if (ch === '>') {
+      return xml[index - 1] === '/' ? -1 : index + 1;
+    }
+    if (ch === '<') {
+      return undefined;
+    }
+    index += 1;
   }
-  const name = escapeRegExp(tag);
-  const prefix = '(?:[\\w.-]+:)?';
-  const pattern = new RegExp(
-    `<${prefix}${name}${ATTRIBUTE_SPAN}>([\\s\\S]*?)<\\/${prefix}${name}\\s*>`,
-  );
-  PATTERN_CACHE.set(tag, pattern);
-  return pattern;
+  return undefined;
+};
+
+/** Index of the `</tag …>` that closes the element opening before `from`. */
+const findClosingTag = (
+  xml: string,
+  from: number,
+  tag: string,
+): number | undefined => {
+  let index = from;
+  for (;;) {
+    const open = xml.indexOf('</', index);
+    if (open === -1) {
+      return undefined;
+    }
+    const { name, end } = readQualifiedName(xml, open + 2);
+    if (localName(name) === tag) {
+      let after = end;
+      while (after < xml.length && isSpace(xml[after])) {
+        after += 1;
+      }
+      if (xml[after] === '>') {
+        return open;
+      }
+    }
+    index = open + 2;
+  }
 };
 
 /**
@@ -45,9 +106,45 @@ export const extractElementText = (
   xml: string,
   tag: string,
 ): string | undefined => {
-  const match = elementPattern(tag).exec(xml);
-  const text = match?.[1]?.trim();
-  return text === undefined || text === '' ? undefined : text;
+  let from = 0;
+  for (;;) {
+    const open = xml.indexOf('<', from);
+    if (open === -1) {
+      return undefined;
+    }
+    const marker = xml[open + 1];
+    if (marker === undefined) {
+      return undefined;
+    }
+    // Declarations, comments, CDATA and closing tags are never an open tag.
+    if (marker === '?' || marker === '!' || marker === '/') {
+      from = open + 1;
+      continue;
+    }
+    const { name, end } = readQualifiedName(xml, open + 1);
+    if (name === '') {
+      from = open + 1;
+      continue;
+    }
+    if (localName(name) !== tag) {
+      from = end;
+      continue;
+    }
+    const contentStart = skipAttributes(xml, end);
+    if (contentStart === undefined) {
+      from = end;
+      continue;
+    }
+    if (contentStart === -1) {
+      return undefined; // `<tag/>`: the element carries no text.
+    }
+    const contentEnd = findClosingTag(xml, contentStart, tag);
+    if (contentEnd === undefined) {
+      return undefined;
+    }
+    const text = xml.slice(contentStart, contentEnd).trim();
+    return text === '' ? undefined : text;
+  }
 };
 
 const ROOT_PATTERN = /<\s*(?:[A-Za-z_][\w.-]*:)?([A-Za-z_][\w.-]*)[\s/>]/;
