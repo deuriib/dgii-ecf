@@ -193,6 +193,36 @@ the TypeScript SDK. `Version` and non-monetary text are never rounded.
 or on an instance, and accept either a parsed dictionary or a raw JSON string.
 Parity aliases `json2xml` and `xml2json` are also available.
 
+### Working with JSON invoices
+
+DGII endpoints accept only digitally signed XML (`signed_xml: str`). To submit
+an invoice authored as JSON (as a dictionary or raw JSON string), transform it
+first with `Transformer`, sign the resulting XML with `Signature`, and pass the
+signed XML to `send_document`:
+
+```python
+from py_dgii_ecf import ECF, Environment, P12Reader, Signature, Transformer
+
+# 1. Convert JSON to DGII XML (with half-up monetary rounding)
+xml_result = Transformer.json_to_xml(invoice_json, round_monetary=True)
+if xml_result.is_err():
+    raise RuntimeError(xml_result.unwrap_err())
+
+# 2. Sign the generated XML
+credentials = P12Reader(passphrase).get_key_from_file("cert.p12")
+if credentials.is_err():
+    raise RuntimeError(credentials.unwrap_err())
+
+signature = Signature(credentials.unwrap().key, credentials.unwrap().cert)
+signed_xml = signature.sign_xml(xml_result.unwrap(), "ECF")
+if signed_xml.is_err():
+    raise RuntimeError(signed_xml.unwrap_err())
+
+# 3. Submit through the ECF client
+ecf = ECF(credentials.unwrap(), Environment.CERT)
+response = ecf.send_document(signed_xml.unwrap(), f"{rnc}{encf}.xml")
+```
+
 ## CLI
 
 ```bash

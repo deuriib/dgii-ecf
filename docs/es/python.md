@@ -198,6 +198,36 @@ estática o en una instancia, y aceptan tanto un diccionario analizado como una
 cadena JSON en bruto. Los alias de paridad `json2xml` y `xml2json` también están
 disponibles.
 
+### Facturas en formato JSON
+
+Los servicios web de la DGII solo aceptan XML firmado digitalmente (`signed_xml:
+str`). Para enviar una factura elaborada en JSON (como diccionario o cadena JSON
+directa), transfórmala primero con `Transformer`, firma el XML resultante con
+`Signature` y pásalo a `send_document`:
+
+```python
+from py_dgii_ecf import ECF, Environment, P12Reader, Signature, Transformer
+
+# 1. Convertir JSON a XML de la DGII (con redondeo monetario half-up)
+xml_result = Transformer.json_to_xml(invoice_json, round_monetary=True)
+if xml_result.is_err():
+    raise RuntimeError(xml_result.unwrap_err())
+
+# 2. Firmar el XML generado
+credentials = P12Reader(passphrase).get_key_from_file("cert.p12")
+if credentials.is_err():
+    raise RuntimeError(credentials.unwrap_err())
+
+signature = Signature(credentials.unwrap().key, credentials.unwrap().cert)
+signed_xml = signature.sign_xml(xml_result.unwrap(), "ECF")
+if signed_xml.is_err():
+    raise RuntimeError(signed_xml.unwrap_err())
+
+# 3. Enviar mediante el cliente ECF
+ecf = ECF(credentials.unwrap(), Environment.CERT)
+response = ecf.send_document(signed_xml.unwrap(), f"{rnc}{encf}.xml")
+```
+
 ## CLI
 
 ```bash

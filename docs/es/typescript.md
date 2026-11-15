@@ -202,5 +202,46 @@ calculado sobre la cadena decimal y no con `toFixed` (que pierde precisión:
 `(2.675).toFixed(2) === '2.67'`). `Version` y el texto no monetario nunca se
 redondean.
 
+`Transformer.json2xml` y `Transformer.xml2json` pueden llamarse de forma
+estática o en una instancia, y aceptan tanto un objeto analizado como una cadena
+JSON en bruto. Los alias de paridad `json_to_xml`, `jsonToXml`, `xml_to_json` y
+`xmlToJson` también están disponibles.
+
+### Facturas en formato JSON
+
+Los servicios web de la DGII solo aceptan XML firmado digitalmente (`signedXml:
+string`). Para enviar una factura elaborada en JSON (como objeto o cadena JSON
+directa), transfórmala primero con `Transformer`, firma el XML resultante con
+`Signature` y pásalo a `sendDocument`:
+
+```ts
+import {
+  ECF,
+  Environment,
+  P12Reader,
+  Signature,
+  Transformer,
+} from '@deuriib/dgii-ecf';
+
+// 1. Convertir JSON a XML de la DGII (con redondeo monetario half-up)
+const xmlResult = Transformer.json2xml(invoiceJson, true);
+if (xmlResult.isErr()) throw xmlResult.error;
+
+// 2. Firmar el XML generado
+const credentials = new P12Reader(passphrase).getKeyFromFile('cert.p12');
+if (credentials.isErr()) throw credentials.error;
+
+const signature = new Signature(
+  credentials.value.key!,
+  credentials.value.cert!,
+);
+const signedXml = signature.signXml(xmlResult.value, 'ECF');
+if (signedXml.isErr()) throw signedXml.error;
+
+// 3. Enviar mediante el cliente ECF
+const ecf = new ECF(credentials.value, Environment.Cert);
+const response = await ecf.sendDocument(signedXml.value, `${rnc}${encf}.xml`);
+```
+
 Consulta [Firma](guides/signing.md), [Resiliencia](guides/resilience.md) y el
 [README del paquete](https://github.com/deuriib/dgii-ecf/tree/main/packages/typescript).
