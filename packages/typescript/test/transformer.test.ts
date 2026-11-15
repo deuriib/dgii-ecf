@@ -130,3 +130,162 @@ describe('Transformer empty-tag pruning', () => {
     expect(xml).toContain('<NombreItem>A</NombreItem>');
   });
 });
+
+describe('Transformer static invocation', () => {
+  it('converts JSON object to XML via static Transformer.json2xml', () => {
+    const result = Transformer.json2xml({
+      ECF: { Encabezado: { Version: { _text: '1.0' } } },
+    });
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toContain('<Version>1.0</Version>');
+  });
+
+  it('converts XML to JSON via static Transformer.xml2json', () => {
+    const result = Transformer.xml2json<RoundTrip>(
+      '<?xml version="1.0" encoding="utf-8"?><ECF><Encabezado><Version>1.0</Version><MontoTotal>100.50</MontoTotal></Encabezado></ECF>',
+    );
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value.ECF.Encabezado.Version._text).toBe('1.0');
+    expect(result.value.ECF.Encabezado.MontoTotal._text).toBe('100.50');
+  });
+});
+
+describe('Transformer parity aliases', () => {
+  const payload = { ECF: { Encabezado: { Version: { _text: '1.0' } } } };
+  const xml =
+    '<?xml version="1.0" encoding="utf-8"?><ECF><Encabezado><Version>1.0</Version><MontoTotal>100.50</MontoTotal></Encabezado></ECF>';
+
+  it('provides static aliases identical to json2xml and xml2json', () => {
+    expect(Transformer.json_to_xml).toBe(Transformer.json2xml);
+    expect(Transformer.jsonToXml).toBe(Transformer.json2xml);
+    expect(Transformer.xml_to_json).toBe(Transformer.xml2json);
+    expect(Transformer.xmlToJson).toBe(Transformer.xml2json);
+
+    const res1 = Transformer.json_to_xml(payload);
+    const res2 = Transformer.jsonToXml(payload);
+    expect(res1.isOk()).toBe(true);
+    expect(res2.isOk()).toBe(true);
+    if (res1.isErr() || res2.isErr()) return;
+    expect(res1.value).toContain('<Version>1.0</Version>');
+    expect(res2.value).toContain('<Version>1.0</Version>');
+
+    const parsed1 = Transformer.xml_to_json<RoundTrip>(xml);
+    const parsed2 = Transformer.xmlToJson<RoundTrip>(xml);
+    expect(parsed1.isOk()).toBe(true);
+    expect(parsed2.isOk()).toBe(true);
+  });
+
+  it('provides instance aliases identical to json2xml and xml2json', () => {
+    const transformer = new Transformer();
+    expect(transformer.json_to_xml).toBe(transformer.json2xml);
+    expect(transformer.jsonToXml).toBe(transformer.json2xml);
+    expect(transformer.xml_to_json).toBe(transformer.xml2json);
+    expect(transformer.xmlToJson).toBe(transformer.xml2json);
+
+    const res1 = transformer.json_to_xml(payload);
+    const res2 = transformer.jsonToXml(payload);
+    expect(res1.isOk()).toBe(true);
+    expect(res2.isOk()).toBe(true);
+    if (res1.isErr() || res2.isErr()) return;
+    expect(res1.value).toContain('<Version>1.0</Version>');
+    expect(res2.value).toContain('<Version>1.0</Version>');
+
+    const parsed1 = transformer.xml_to_json<RoundTrip>(xml);
+    const parsed2 = transformer.xmlToJson<RoundTrip>(xml);
+    expect(parsed1.isOk()).toBe(true);
+    expect(parsed2.isOk()).toBe(true);
+  });
+});
+
+describe('Transformer raw JSON string input', () => {
+  it('serializes a valid raw JSON string to XML', () => {
+    const raw = JSON.stringify({
+      ECF: { Encabezado: { Version: { _text: '1.0' } } },
+    });
+    const result = Transformer.json2xml(raw);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toContain('<?xml');
+    expect(result.value).toContain('<Version>1.0</Version>');
+  });
+
+  it('rounds monetary values when converting a raw JSON string', () => {
+    const raw = JSON.stringify({
+      ECF: {
+        Encabezado: {
+          Version: { _text: '1.0' },
+          MontoTotal: { _text: '2.675' },
+        },
+      },
+    });
+    const result = Transformer.json2xml(raw, true);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toContain('<Version>1.0</Version>');
+    expect(result.value).toContain('<MontoTotal>2.68</MontoTotal>');
+  });
+
+  it('works with instance methods when given a raw JSON string', () => {
+    const raw = '{"ECF":{"Encabezado":{"Version":{"_text":"1.0"}}}}';
+    const result = new Transformer().json2xml(raw);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toContain('<Version>1.0</Version>');
+  });
+});
+
+describe('Transformer error handling', () => {
+  it('returns INVALID_XML error on malformed JSON string syntax', () => {
+    const result = Transformer.json2xml('{invalid: json');
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('INVALID_XML');
+    expect(result.error.message).toContain('Error converting JSON to XML:');
+    expect(result.error.cause).toBeDefined();
+  });
+
+  it.each([
+    ['primitive number', '123'],
+    ['primitive boolean', 'true'],
+    ['primitive string', '"hello world"'],
+    ['null literal', 'null'],
+    ['array root', '[1, 2, 3]'],
+    ['array of objects', '[{"a": 1}]'],
+  ])('returns INVALID_XML error when root is %s', (_label, input) => {
+    const result = Transformer.json2xml(input);
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('INVALID_XML');
+    expect(result.error.message).toBe(
+      'Error converting JSON to XML: Expected an object as root',
+    );
+  });
+
+  it('returns INVALID_XML error when passed non-object at runtime', () => {
+    const nullResult = Transformer.json2xml(null as unknown as object);
+    expect(nullResult.isErr()).toBe(true);
+    if (nullResult.isOk()) return;
+    expect(nullResult.error.code).toBe('INVALID_XML');
+    expect(nullResult.error.message).toBe(
+      'Error converting JSON to XML: Expected an object as root',
+    );
+
+    const arrayResult = Transformer.json2xml([] as unknown as object);
+    expect(arrayResult.isErr()).toBe(true);
+    if (arrayResult.isOk()) return;
+    expect(arrayResult.error.code).toBe('INVALID_XML');
+    expect(arrayResult.error.message).toBe(
+      'Error converting JSON to XML: Expected an object as root',
+    );
+  });
+
+  it('returns INVALID_XML error when xml2json encounters invalid XML', () => {
+    const result = Transformer.xml2json('<<invalid>>');
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('INVALID_XML');
+    expect(result.error.message).toContain('Error converting XML to JSON:');
+  });
+});
