@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.8.0...typescript-v0.9.0) (2026-11-15)
+
+
+### Features
+
+* **types:** introduce typed EcfInvoice models without Json suffix ([#138](https://github.com/deuriib/dgii-ecf/issues/138)) ([7e82c1c](https://github.com/deuriib/dgii-ecf/commit/7e82c1c9259fbaa52aa67fe7538f817bf80a63ad))
+
 ## [0.8.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.7.0...typescript-v0.8.0) (2026-11-15)
 
 
