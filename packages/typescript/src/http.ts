@@ -1,10 +1,30 @@
+import {
+  isBrokenCircuitError,
+  isBulkheadRejectedError,
+  isIsolatedCircuitError,
+  isTaskCancelledError,
+} from 'cockatiel';
+import { BaseUrl } from './environment.js';
 import { err, ok, type Result } from './result.js';
-import { DgiiError, extractDgiiErrorMessage, toDgiiError } from './errors.js';
+import {
+  DgiiError,
+  extractDgiiErrorMessage,
+  extractMensajes,
+  toDgiiError,
+} from './errors.js';
 import {
   createResiliencePolicies,
+  defaultResilienceOptions,
   type ResilienceOptions,
   type ResiliencePolicies,
 } from './resilience.js';
+import {
+  SDK_VERSION,
+  emitEvent,
+  newCorrelationId,
+  utcTimestamp,
+  type EcfEvent,
+} from './telemetry.js';
 
 /**
  * Pluggable idempotency store. Provide a Redis/Postgres-backed implementation
@@ -93,6 +113,15 @@ export class InMemoryIdempotencyStore implements IdempotencyStore {
   }
 }
 
+export interface TelemetryContext {
+  readonly correlationId?: string;
+  readonly operation?: string;
+  readonly environment?: string;
+  readonly rnc?: string;
+  readonly encf?: string;
+  readonly documentHash?: string;
+}
+
 export interface HttpClientOptions {
   baseUrl: string;
   token?: string;
@@ -100,6 +129,10 @@ export interface HttpClientOptions {
   policies?: ResiliencePolicies;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /** Optional telemetry callback; never awaited and exceptions are swallowed. */
+  onEvent?: (event: EcfEvent) => void;
+  /** Optional environment label included on emitted telemetry events. */
+  environment?: string;
   /** Runs before every authenticated request; may refresh credentials. */
   beforeRequest?: () => Promise<void>;
   /** Runs on a 401; return `true` to replay the request once. */
@@ -119,6 +152,15 @@ export interface RequestOptions {
   skipAuthHooks?: boolean;
   /** Do not attach the bearer token (used by the status service). */
   omitAuth?: boolean;
+  /**
+   * Whether the retry policy wraps this request. Default `true`.
+   *
+   * Set `false` for the non-idempotent submissions: a retry of a POST whose
+   * outcome is unknown re-sends a fiscal document DGII may already hold.
+   */
+  retry?: boolean;
+  /** Optional telemetry metadata attached to transmission events. */
+  telemetry?: TelemetryContext;
 }
 
 interface RequestContext {
@@ -127,33 +169,142 @@ interface RequestContext {
   baseURL: string;
 }
 
-/** Thin HTTP client over the native `fetch`, wrapped in resilience policies. */
+const parseRetryAfterMs = (header: string | null): number | undefined => {
+  if (!header) {
+    return undefined;
+  }
+  const trimmed = header.trim();
+  if (/^\d+$/.test(trimmed)) {
+    return Number.parseInt(trimmed, 10) * 1000;
+  }
+  const dateMs = Date.parse(trimmed);
+  if (!Number.isNaN(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+  return undefined;
+};
+
+/** Thin HTTP client over the native `fetch`, wrapped in per-origin resilience policies. */
 export class HttpClient {
   private token?: string;
-  private readonly policies: ResiliencePolicies;
+  private readonly tokensByOrigin = new Map<string, string>();
+  private readonly policiesByOrigin = new Map<string, ResiliencePolicies>();
+  private readonly resilienceOptions: ResilienceOptions;
+  private readonly halfOpenAfterMs: number;
+  private readonly breakerOpenedAt = new Map<string, number>();
   private readonly fetchImpl: typeof fetch;
   private readonly baseUrl: string;
+  private readonly onEvent: ((event: EcfEvent) => void) | undefined;
+  private readonly environment: string | undefined;
   private readonly beforeRequest: (() => Promise<void>) | undefined;
   private readonly onUnauthorized: (() => Promise<boolean>) | undefined;
 
   constructor(options: HttpClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.token = options.token;
+    this.onEvent = options.onEvent;
+    this.environment = options.environment;
     this.beforeRequest = options.beforeRequest;
     this.onUnauthorized = options.onUnauthorized;
-    this.policies =
-      options.policies ??
-      createResiliencePolicies({
-        ...options.resilience,
-        ...(options.timeoutMs !== undefined
-          ? { timeoutMs: options.timeoutMs }
-          : {}),
-      });
+    this.resilienceOptions = {
+      ...options.resilience,
+      ...(options.timeoutMs !== undefined
+        ? { timeoutMs: options.timeoutMs }
+        : {}),
+    };
+    this.halfOpenAfterMs =
+      this.resilienceOptions.halfOpenAfterMs ??
+      defaultResilienceOptions.halfOpenAfterMs;
+    if (options.policies) {
+      this.policiesByOrigin.set(this.originKey(this.baseUrl), options.policies);
+    }
     this.fetchImpl = options.fetchImpl ?? fetch;
+  }
+
+  private originKey(url: string): string {
+    try {
+      return new URL(url).origin;
+    } catch {
+      return this.baseUrl;
+    }
+  }
+
+  private isDgiiOrigin(origin: string): boolean {
+    return (
+      origin === this.originKey(this.baseUrl) ||
+      origin === BaseUrl.ECF ||
+      origin === BaseUrl.CF
+    );
+  }
+
+  private getPoliciesForOrigin(origin: string): ResiliencePolicies {
+    let policies = this.policiesByOrigin.get(origin);
+    if (!policies) {
+      policies = createResiliencePolicies(this.resilienceOptions);
+      const cb = policies.circuitBreaker as {
+        onBreak?: (cb: () => void) => void;
+        onHalfOpen?: (cb: () => void) => void;
+        onReset?: (cb: () => void) => void;
+      };
+      cb.onBreak?.(() => {
+        const now = Date.now();
+        this.breakerOpenedAt.set(origin, now);
+        emitEvent(this.onEvent, {
+          type: 'breaker.changed',
+          correlationId: newCorrelationId(),
+          operation: 'circuitBreaker',
+          resource: origin,
+          ...(this.environment !== undefined
+            ? { environment: this.environment }
+            : {}),
+          breakerState: 'open',
+          breakerSince: now,
+          timestamp: utcTimestamp(),
+          sdkVersion: SDK_VERSION,
+        });
+      });
+      cb.onHalfOpen?.(() => {
+        emitEvent(this.onEvent, {
+          type: 'breaker.changed',
+          correlationId: newCorrelationId(),
+          operation: 'circuitBreaker',
+          resource: origin,
+          ...(this.environment !== undefined
+            ? { environment: this.environment }
+            : {}),
+          breakerState: 'half_open',
+          breakerSince: Date.now(),
+          timestamp: utcTimestamp(),
+          sdkVersion: SDK_VERSION,
+        });
+      });
+      cb.onReset?.(() => {
+        this.breakerOpenedAt.delete(origin);
+        emitEvent(this.onEvent, {
+          type: 'breaker.changed',
+          correlationId: newCorrelationId(),
+          operation: 'circuitBreaker',
+          resource: origin,
+          ...(this.environment !== undefined
+            ? { environment: this.environment }
+            : {}),
+          breakerState: 'closed',
+          breakerSince: Date.now(),
+          timestamp: utcTimestamp(),
+          sdkVersion: SDK_VERSION,
+        });
+      });
+      this.policiesByOrigin.set(origin, policies);
+    }
+    return policies;
   }
 
   setToken(token: string): void {
     this.token = token;
+  }
+
+  setTokenForOrigin(origin: string, token: string): void {
+    this.tokensByOrigin.set(this.originKey(origin), token);
   }
 
   getToken(): string | undefined {
@@ -189,12 +340,18 @@ export class HttpClient {
   }
 
   private authHeaders(
+    origin: string,
     extra?: Record<string, string>,
     omitAuth = false,
   ): Record<string, string> {
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (!omitAuth && this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+    if (!omitAuth) {
+      const token = this.isDgiiOrigin(origin)
+        ? this.token
+        : this.tokensByOrigin.get(origin);
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
     }
     return { ...headers, ...extra };
   }
@@ -216,6 +373,27 @@ export class HttpClient {
     response: Response,
     ctx: RequestContext,
   ): Promise<Result<T, DgiiError>> {
+    // A redirect is never followed. `fetch` defaults to follow, which would
+    // replay a signed fiscal document — and the `Authorization` header — to
+    // whatever host the response names. `redirect: 'manual'` surfaces the 3xx
+    // instead, and it is rejected here without reading the body.
+    if (response.status >= 300 && response.status < 400) {
+      return err(
+        new DgiiError(
+          `DGII responded with a redirect (${response.status}); refusing to replay the request to another host`,
+          {
+            code: 'HTTP',
+            status: response.status,
+            statusText: response.statusText,
+            resource: ctx.resource,
+            method: ctx.method,
+            baseURL: ctx.baseURL,
+            retryable: false,
+          },
+        ),
+      );
+    }
+
     const data = await this.readBody(response);
 
     if (response.ok) {
@@ -233,6 +411,8 @@ export class HttpClient {
       method: ctx.method,
       baseURL: ctx.baseURL,
       data,
+      mensajes: extractMensajes(data),
+      retryAfter: parseRetryAfterMs(response.headers.get('retry-after')),
     });
 
     // Throw retryable failures so the retry/breaker policies can act on them;
@@ -244,49 +424,161 @@ export class HttpClient {
   }
 
   async request<T>(options: RequestOptions): Promise<Result<T, DgiiError>> {
-    if (!options.skipAuthHooks) {
+    const correlationId =
+      options.telemetry?.correlationId ?? newCorrelationId();
+    const resource = options.resource ?? options.path;
+    const operation = options.telemetry?.operation ?? resource;
+    const environment = options.telemetry?.environment ?? this.environment;
+    const startedAt = performance.now();
+
+    const baseTelemetry = {
+      correlationId,
+      operation,
+      resource,
+      ...(environment !== undefined ? { environment } : {}),
+      ...(options.telemetry?.rnc !== undefined
+        ? { rnc: options.telemetry.rnc }
+        : {}),
+      ...(options.telemetry?.encf !== undefined
+        ? { encf: options.telemetry.encf }
+        : {}),
+      ...(options.telemetry?.documentHash !== undefined
+        ? { documentHash: options.telemetry.documentHash }
+        : {}),
+      sdkVersion: SDK_VERSION,
+    };
+
+    emitEvent(this.onEvent, {
+      ...baseTelemetry,
+      type: 'transmission.started',
+      timestamp: utcTimestamp(),
+    });
+
+    const targetUrl = this.buildUrl(
+      options.path,
+      options.absoluteUrl,
+      options.query,
+    );
+    const isBaseOrigin = this.isDgiiOrigin(this.originKey(targetUrl));
+
+    if (!options.skipAuthHooks && isBaseOrigin) {
       await this.beforeRequest?.();
     }
 
-    const first = await this.execute<T>(options);
+    let finalResult = await this.execute<T>(options);
 
     if (
       !options.skipAuthHooks &&
-      first.isErr() &&
-      first.error.status === 401 &&
+      isBaseOrigin &&
+      finalResult.isErr() &&
+      finalResult.error.status === 401 &&
       this.onUnauthorized !== undefined
     ) {
       const replayed = await this.onUnauthorized();
       if (replayed) {
-        return this.execute<T>(options);
+        finalResult = await this.execute<T>(options);
       }
     }
-    return first;
+
+    const durationMs = Math.round((performance.now() - startedAt) * 100) / 100;
+    if (finalResult.isOk()) {
+      emitEvent(this.onEvent, {
+        ...baseTelemetry,
+        type: 'transmission.succeeded',
+        durationMs,
+        httpStatus: 200,
+        timestamp: utcTimestamp(),
+      });
+    } else {
+      emitEvent(this.onEvent, {
+        ...baseTelemetry,
+        type: 'transmission.failed',
+        durationMs,
+        ...(finalResult.error.status !== undefined
+          ? { httpStatus: finalResult.error.status }
+          : {}),
+        errorCode: finalResult.error.code,
+        retryable: finalResult.error.retryable,
+        timestamp: utcTimestamp(),
+      });
+    }
+    return finalResult;
   }
 
   private async execute<T>(
     options: RequestOptions,
   ): Promise<Result<T, DgiiError>> {
     const url = this.buildUrl(options.path, options.absoluteUrl, options.query);
+    const origin = this.originKey(url);
     const method = options.method ?? 'GET';
-    const headers = this.authHeaders(options.headers, options.omitAuth);
+    const headers = this.authHeaders(origin, options.headers, options.omitAuth);
     const ctx: RequestContext = {
       method,
       resource: options.resource ?? options.path,
-      baseURL: this.baseUrl,
+      baseURL: origin,
     };
 
+    const policies = this.getPoliciesForOrigin(origin);
+    const policy =
+      options.retry === false ? policies.policyWithoutRetry : policies.policy;
+
     try {
-      return await this.policies.policy.execute(async ({ signal }) => {
+      return await policy.execute(async ({ signal }) => {
         const response = await this.fetchImpl(url, {
           method,
           headers,
           body: options.body,
           signal,
+          redirect: 'manual',
         });
         return this.parseResponse<T>(response, ctx);
       });
     } catch (error) {
+      if (
+        isBrokenCircuitError(error) ||
+        isIsolatedCircuitError(error) ||
+        isBulkheadRejectedError(error)
+      ) {
+        const openedAt = this.breakerOpenedAt.get(origin);
+        const retryAfter =
+          openedAt !== undefined
+            ? Math.max(0, openedAt + this.halfOpenAfterMs - Date.now())
+            : undefined;
+        return err(
+          new DgiiError(error.message, {
+            code: 'CIRCUIT_OPEN',
+            retryable: true,
+            retryAfter,
+            resource: ctx.resource,
+            method: ctx.method,
+            baseURL: ctx.baseURL,
+            cause: error,
+          }),
+        );
+      }
+      if (
+        isTaskCancelledError(error) ||
+        (error instanceof Error &&
+          (error.name === 'TimeoutError' ||
+            error.name === 'AbortError' ||
+            (error as { isTaskCancelledError?: unknown })
+              .isTaskCancelledError === true ||
+            error.message.toLowerCase().includes('timed out')))
+      ) {
+        return err(
+          new DgiiError(
+            error instanceof Error ? error.message : 'DGII request timed out',
+            {
+              code: 'TIMEOUT',
+              retryable: true,
+              resource: ctx.resource,
+              method: ctx.method,
+              baseURL: ctx.baseURL,
+              cause: error,
+            },
+          ),
+        );
+      }
       return err(toDgiiError(error, ctx));
     }
   }
@@ -298,6 +590,7 @@ export class HttpClient {
       absoluteUrl?: boolean;
       resource?: string;
       skipAuthHooks?: boolean;
+      telemetry?: TelemetryContext;
     },
   ): Promise<Result<T, DgiiError>> {
     return this.request<T>({
@@ -307,6 +600,7 @@ export class HttpClient {
       absoluteUrl: opts?.absoluteUrl,
       resource: opts?.resource,
       skipAuthHooks: opts?.skipAuthHooks,
+      telemetry: opts?.telemetry,
     });
   }
 
@@ -322,6 +616,8 @@ export class HttpClient {
       absoluteUrl?: boolean;
       resource?: string;
       skipAuthHooks?: boolean;
+      retry?: boolean;
+      telemetry?: TelemetryContext;
     },
   ): Promise<Result<T, DgiiError>> {
     const form = new FormData();
@@ -334,6 +630,8 @@ export class HttpClient {
       absoluteUrl: opts?.absoluteUrl,
       resource: opts?.resource,
       skipAuthHooks: opts?.skipAuthHooks,
+      retry: opts?.retry,
+      telemetry: opts?.telemetry,
     });
   }
 }

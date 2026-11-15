@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from py_dgii_ecf.environment import Environment
 from py_dgii_ecf.utils import (
     convert_ecf32_to_rfce,
@@ -38,10 +40,11 @@ def test_security_code_missing() -> None:
 
 def test_fc_qr_url() -> None:
     url = generate_fc_qr_code_url(
-        "130862346", "E310000000001", 1180, "abc123", Environment.DEV
+        "130862346", "E310000000001", Decimal("1180.00"), "abc123", Environment.DEV
     )
     assert url.startswith("https://fc.dgii.gov.do/testecf/consultatimbrefc")
     assert "rncemisor=130862346" in url
+    assert "montototal=1180.00" in url
     assert "codigoseguridad=abc123" in url
 
 

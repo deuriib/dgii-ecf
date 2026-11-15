@@ -56,8 +56,8 @@ export interface InquiryStatusResponse {
   // on the track-result and RFCE-inquiry consults. Do not add it back here.
   rncEmisor?: string;
   ncfElectronico?: string;
-  montoTotal?: number;
-  totalITBIS?: number;
+  montoTotal?: string;
+  totalITBIS?: string;
   fechaEmision?: string;
   fechaFirma?: string;
   rncComprador?: string;

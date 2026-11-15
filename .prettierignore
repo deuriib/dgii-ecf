@@ -16,3 +16,9 @@ site/
 # touch them — the `examples/fixtures/` directory is also excluded from the
 # whitespace hooks in .pre-commit-config.yaml for the same reason.
 examples/fixtures/
+
+# Local agent configuration (`.omp/agents/`), not part of the published project.
+.omp/
+
+# Review-board run artifacts: generated prose, formatted by their authors.
+project-tasks/review-board/

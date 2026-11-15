@@ -20,6 +20,7 @@ import {
 import type { ResilienceOptions } from './resilience.js';
 import { checkB2BApplicability, resolveReceptionRoute } from './reception.js';
 import {
+  AMBIGUOUS_SUBMISSION_MESSAGE,
   PENDING_SUBMISSION_MESSAGE,
   canReuseSequence,
   type ReconciliationResult,
@@ -27,6 +28,15 @@ import {
 import { Signature } from './signing.js';
 import { formatViolations, validateDocument } from './validation.js';
 import { extractElementText, extractRootElementName } from './xml.js';
+import {
+  SDK_VERSION,
+  documentIdentity,
+  emitEvent,
+  newCorrelationId,
+  utcTimestamp,
+  type DocumentIdentity,
+  type EcfEvent,
+} from './telemetry.js';
 import type { P12ReaderData } from './certificate.js';
 import type {
   AuthToken,
@@ -75,6 +85,8 @@ export interface EcfOptions {
   validateBeforeSend?: boolean;
   /** `xmllint` binary used by `validateBeforeSend`. */
   xmllintBin?: string;
+  /** Optional telemetry callback; never awaited and exceptions are swallowed. */
+  onEvent?: (event: EcfEvent) => void;
 }
 
 /**
@@ -83,6 +95,15 @@ export interface EcfOptions {
  * `VALIDATION` failure for a non-object or absent body.
  */
 const UNEXPECTED_PAYLOAD_MESSAGE = 'Unexpected DGII response payload';
+
+/**
+ * Message used when a submission's 2xx body cannot be read as a model. Reused
+ * verbatim from the Python package, and deliberately distinct from
+ * {@link UNEXPECTED_PAYLOAD_MESSAGE}: DGII already has the document, so the
+ * instruction is to reconcile — never to retry blind.
+ */
+const UNEXPECTED_SUBMISSION_MESSAGE =
+  'Unexpected DGII response payload; reconcile via a status lookup before retrying';
 
 /** A JSON object, as opposed to an array, a scalar, `null` or `undefined`. */
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -134,19 +155,117 @@ const isInquiryStatusResponse = (
 ): value is InquiryStatusResponse =>
   isRecord(value) && typeof value.estado === 'string';
 
+const DECIMAL_AMOUNT_RE = /^-?\d+(?:\.\d+)?$/;
+
+const normalizeOptionalAmount = (value: unknown): string | undefined => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : undefined;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return DECIMAL_AMOUNT_RE.test(trimmed) ? trimmed : undefined;
+  }
+  return undefined;
+};
+
+const normalizeInquiryStatus = (
+  payload: InquiryStatusResponse,
+): InquiryStatusResponse => {
+  const raw = payload as unknown as Record<string, unknown>;
+  const montoTotal = normalizeOptionalAmount(raw.montoTotal);
+  const totalITBIS = normalizeOptionalAmount(raw.totalITBIS);
+  const next: Record<string, unknown> = { ...raw };
+  if (montoTotal !== undefined) {
+    next.montoTotal = montoTotal;
+  } else {
+    delete next.montoTotal;
+  }
+  if (totalITBIS !== undefined) {
+    next.totalITBIS = totalITBIS;
+  } else {
+    delete next.totalITBIS;
+  }
+  return next as unknown as InquiryStatusResponse;
+};
+
+const validateBuyerHost = (buyerHost: string): Result<void, DgiiError> => {
+  const trimmed = buyerHost.trim();
+  if (!trimmed || /\s/.test(trimmed)) {
+    return err(
+      new DgiiError(`Invalid buyerHost URL: "${buyerHost}"`, {
+        code: 'VALIDATION',
+      }),
+    );
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return err(
+      new DgiiError(`Invalid buyerHost URL: "${buyerHost}"`, {
+        code: 'VALIDATION',
+      }),
+    );
+  }
+  if (parsed.protocol !== 'https:') {
+    return err(
+      new DgiiError('buyerHost must use https:', { code: 'VALIDATION' }),
+    );
+  }
+  if (!parsed.hostname) {
+    return err(
+      new DgiiError('buyerHost must include a hostname', {
+        code: 'VALIDATION',
+      }),
+    );
+  }
+  if (parsed.username !== '' || parsed.password !== '') {
+    return err(
+      new DgiiError('buyerHost must not include embedded credentials', {
+        code: 'VALIDATION',
+      }),
+    );
+  }
+  return ok(undefined);
+};
+
 interface PendingSubmission {
-  readonly pending: true;
+  readonly __pending__: true;
 }
 
-const PENDING_SUBMISSION: PendingSubmission = { pending: true };
+/**
+ * The pending marker written before a submission is transmitted.
+ *
+ * The wire shape is shared verbatim with the Python package
+ * (`{"__pending__": True}`): the store is pluggable and may be shared by both
+ * SDKs, so a marker written by one must be recognised by the other instead of
+ * being read back as a delivered payload.
+ */
+const PENDING_SUBMISSION: PendingSubmission = { __pending__: true };
 
+/**
+ * Accepts the current marker and the legacy `{pending: true}` shape this
+ * package wrote before the two packages were aligned, so an in-flight marker
+ * from an older deployment is still honoured rather than replayed as a
+ * delivered result.
+ */
 const isPendingSubmission = (value: unknown): value is PendingSubmission =>
   typeof value === 'object' &&
   value !== null &&
-  (value as { pending?: unknown }).pending === true;
+  ((value as { __pending__?: unknown }).__pending__ === true ||
+    (value as { pending?: unknown }).pending === true);
 
 const sha256Hex = (value: string): string =>
   createHash('sha256').update(value, 'utf8').digest('hex');
+
+/**
+ * Destination scope for an idempotency key: the buyer host, normalized the same
+ * way the request URL is built, or `undefined` for DGII itself.
+ */
+const destinationScope = (buyerHost: string | undefined): string | undefined =>
+  buyerHost === undefined
+    ? undefined
+    : buyerHost.replace(/\/+$/, '').toLowerCase();
 
 /** Parse DGII's ISO-8601 `expira` into epoch milliseconds. */
 const parseExpiry = (value: string | undefined): number | undefined => {
@@ -175,6 +294,7 @@ export class ECF {
   private readonly enforceB2BRules: boolean;
   private readonly validateBeforeSend: boolean;
   private readonly xmllintBin: string | undefined;
+  private readonly onEvent: ((event: EcfEvent) => void) | undefined;
   private tokenExpiresAt: number | undefined;
   private refreshPromise: Promise<Result<AuthToken, DgiiError>> | undefined;
 
@@ -191,10 +311,13 @@ export class ECF {
     this.enforceB2BRules = options.enforceB2BRules ?? true;
     this.validateBeforeSend = options.validateBeforeSend ?? false;
     this.xmllintBin = options.xmllintBin;
+    this.onEvent = options.onEvent;
     this.idempotency =
       options.idempotencyStore ?? new InMemoryIdempotencyStore();
     this.http = new HttpClient({
       baseUrl: BaseUrl.ECF,
+      environment: this.environment,
+      ...(this.onEvent !== undefined ? { onEvent: this.onEvent } : {}),
       ...(options.token !== undefined ? { token: options.token } : {}),
       ...(options.resilience !== undefined
         ? { resilience: options.resilience }
@@ -212,7 +335,19 @@ export class ECF {
     });
   }
 
-  private buildIdempotencyKey(signedXml: string): string {
+  /**
+   * Idempotency key for a submission.
+   *
+   * `RNC + eNCF + SHA-256(signed XML)` for DGII, and the same key suffixed with
+   * the destination host for a direct buyer-host delivery. The destination
+   * scope is load-bearing: without it, delivering the same document to a buyer
+   * after DGII accepted it was answered from the DGII entry in the cache and
+   * never transmitted, so the buyer never received its copy.
+   *
+   * DGII keys keep the documented three-part shape, which leaves markers
+   * written by an earlier version readable.
+   */
+  private buildIdempotencyKey(signedXml: string, destination?: string): string {
     // ECF/ACECF use `RNCEmisor`; the ANECF schema spells it `RncEmisor`.
     const rnc =
       extractElementText(signedXml, 'RNCEmisor') ??
@@ -225,7 +360,8 @@ export class ECF {
       extractElementText(signedXml, 'SecuenciaeNCFDesde') ??
       extractElementText(signedXml, 'RangoNCF') ??
       'unknown-ncf';
-    return `${rnc}:${ncf}:${sha256Hex(signedXml)}`;
+    const scope = destination === undefined ? '' : `@${destination}`;
+    return `${rnc}:${ncf}:${sha256Hex(signedXml)}${scope}`;
   }
 
   /**
@@ -234,28 +370,95 @@ export class ECF {
    * The pending marker is written first so an interrupted send can be
    * reconciled instead of re-issued; a successful response replaces it, and
    * a failure clears it so the caller can retry.
+   *
+   * A 2xx whose body is not a JSON object is **not** success: DGII accepted the
+   * document, but the SDK has nothing readable to give the caller, so the
+   * marker is kept and a `VALIDATION` failure is returned with the instruction
+   * to reconcile. Overwriting the marker with `undefined` used to drop the
+   * lock, and the next identical call re-transmitted the same e-NCF.
    */
+  private emitIdempotency(
+    state: 'miss' | 'hit' | 'pending' | 'joined',
+    meta: {
+      correlationId: string;
+      operation: string;
+      resource: string;
+      identity: DocumentIdentity;
+    },
+  ): void {
+    emitEvent(this.onEvent, {
+      type: 'idempotency',
+      correlationId: meta.correlationId,
+      operation: meta.operation,
+      resource: meta.resource,
+      environment: this.environment,
+      ...(meta.identity.rnc !== undefined ? { rnc: meta.identity.rnc } : {}),
+      ...(meta.identity.encf !== undefined ? { encf: meta.identity.encf } : {}),
+      documentHash: meta.identity.documentHash,
+      idempotency: state,
+      timestamp: utcTimestamp(),
+      sdkVersion: SDK_VERSION,
+    });
+  }
+
   private async submitIdempotent<T>(
     key: string,
-    send: () => Promise<Result<T, DgiiError>>,
+    send: (
+      correlationId: string,
+      identity: DocumentIdentity,
+    ) => Promise<Result<T, DgiiError>>,
+    meta: { operation: string; resource: string; signedXml: string },
   ): Promise<Result<T, DgiiError>> {
+    const correlationId = newCorrelationId();
+    const identity = documentIdentity(meta.signedXml);
+    const eventMeta = {
+      correlationId,
+      operation: meta.operation,
+      resource: meta.resource,
+      identity,
+    };
+
     const cached = await this.idempotency.get<T | PendingSubmission>(key);
     if (cached !== undefined) {
       if (isPendingSubmission(cached)) {
+        this.emitIdempotency('pending', eventMeta);
         return err(
           new DgiiError(PENDING_SUBMISSION_MESSAGE, { code: 'IDEMPOTENCY' }),
         );
       }
+      this.emitIdempotency('hit', eventMeta);
       return ok(cached);
     }
+    this.emitIdempotency('miss', eventMeta);
     return this.singleFlight(key, async () => {
       await this.idempotency.set(key, PENDING_SUBMISSION);
-      const result = await send();
-      if (result.isOk()) {
-        await this.idempotency.set(key, result.value);
-      } else {
+      const result = await send(correlationId, identity);
+      if (result.isErr()) {
+        // No HTTP status means the request may still have reached DGII with the
+        // answer lost. Clearing the marker would license the caller to re-send
+        // a document DGII may already hold, so it is kept and the caller is
+        // told to reconcile instead.
+        if (result.error.status === undefined) {
+          return err(
+            new DgiiError(AMBIGUOUS_SUBMISSION_MESSAGE, {
+              code: 'IDEMPOTENCY',
+              data: result.error.data,
+              cause: result.error,
+            }),
+          );
+        }
         await this.idempotency.delete(key);
+        return result;
       }
+      if (!isRecord(result.value)) {
+        return err(
+          new DgiiError(UNEXPECTED_SUBMISSION_MESSAGE, {
+            code: 'VALIDATION',
+            data: result.value,
+          }),
+        );
+      }
+      await this.idempotency.set(key, result.value);
       return result;
     });
   }
@@ -318,6 +521,12 @@ export class ECF {
   async authenticate(
     buyerHost?: string,
   ): Promise<Result<AuthToken, DgiiError>> {
+    if (buyerHost !== undefined) {
+      const valid = validateBuyerHost(buyerHost);
+      if (valid.isErr()) {
+        return err(valid.error);
+      }
+    }
     const seed = await this.getSeed(buyerHost);
     if (seed.isErr()) {
       return err(seed.error);
@@ -346,8 +555,12 @@ export class ECF {
     if (token.isErr()) {
       return err(token.error);
     }
-    this.http.setToken(token.value.token);
-    this.tokenExpiresAt = parseExpiry(token.value.expira);
+    if (buyerHost !== undefined) {
+      this.http.setTokenForOrigin(buyerHost, token.value.token);
+    } else {
+      this.http.setToken(token.value.token);
+      this.tokenExpiresAt = parseExpiry(token.value.expira);
+    }
     return ok(token.value);
   }
 
@@ -437,7 +650,14 @@ export class ECF {
    */
   async reconcileSubmission(
     signedXml: string,
+    buyerHost?: string,
   ): Promise<Result<ReconciliationResult, DgiiError>> {
+    if (buyerHost !== undefined) {
+      const valid = validateBuyerHost(buyerHost);
+      if (valid.isErr()) {
+        return err(valid.error);
+      }
+    }
     const rnc =
       extractElementText(signedXml, 'RNCEmisor') ??
       extractElementText(signedXml, 'RncEmisor');
@@ -494,7 +714,9 @@ export class ECF {
     }
 
     if (cleared) {
-      await this.idempotency.delete(this.buildIdempotencyKey(signedXml));
+      await this.idempotency.delete(
+        this.buildIdempotencyKey(signedXml, destinationScope(buyerHost)),
+      );
     }
     return ok({
       inquiry: value,
@@ -547,10 +769,16 @@ export class ECF {
     fileName: string,
     buyerHost?: string,
   ): Promise<Result<InvoiceResponse, DgiiError>> {
-    if (buyerHost !== undefined && this.enforceB2BRules) {
-      const applicable = checkB2BApplicability(signedXml);
-      if (applicable.isErr()) {
-        return err(applicable.error);
+    if (buyerHost !== undefined) {
+      const valid = validateBuyerHost(buyerHost);
+      if (valid.isErr()) {
+        return err(valid.error);
+      }
+      if (this.enforceB2BRules) {
+        const applicable = checkB2BApplicability(signedXml);
+        if (applicable.isErr()) {
+          return err(applicable.error);
+        }
       }
     }
     if (this.validateBeforeSend) {
@@ -559,9 +787,13 @@ export class ECF {
         this.xmllintBin !== undefined ? { bin: this.xmllintBin } : {},
       );
       if (validation.isErr()) {
-        return err(validation.error);
-      }
-      if (validation.value.length > 0) {
+        const isSchemaUnavailable =
+          validation.error.code === 'VALIDATION' &&
+          validation.error.message.startsWith('Schema unavailable');
+        if (!isSchemaUnavailable) {
+          return err(validation.error);
+        }
+      } else if (validation.value.length > 0) {
         return err(
           new DgiiError(
             `Document does not match the DGII XML Schema: ${formatViolations(validation.value)}`,
@@ -570,18 +802,42 @@ export class ECF {
         );
       }
     }
-    const key = this.buildIdempotencyKey(signedXml);
-    return this.submitIdempotent(key, () => {
-      const url = buyerHost
-        ? buildSenderReceiverUrl(buyerHost, SenderReceiverEndpoint.SendInvoice)
-        : buildUrl(this.environment, Endpoint.SendInvoice);
-      return this.http.postMultipart<InvoiceResponse>(
-        url,
-        fileName,
+    const key = this.buildIdempotencyKey(
+      signedXml,
+      destinationScope(buyerHost),
+    );
+    return this.submitIdempotent(
+      key,
+      (correlationId, identity) => {
+        const url = buyerHost
+          ? buildSenderReceiverUrl(
+              buyerHost,
+              SenderReceiverEndpoint.SendInvoice,
+            )
+          : buildUrl(this.environment, Endpoint.SendInvoice);
+        return this.http.postMultipart<InvoiceResponse>(
+          url,
+          fileName,
+          signedXml,
+          {
+            absoluteUrl: true,
+            resource: Endpoint.SendInvoice,
+            retry: false,
+            telemetry: {
+              correlationId,
+              operation: 'sendElectronicDocument',
+              environment: this.environment,
+              ...identity,
+            },
+          },
+        );
+      },
+      {
+        operation: 'sendElectronicDocument',
+        resource: Endpoint.SendInvoice,
         signedXml,
-        { absoluteUrl: true, resource: Endpoint.SendInvoice },
-      );
-    });
+      },
+    );
   }
 
   /** Submit a signed summary invoice (RFCE). Idempotent like submissions. */
@@ -590,13 +846,30 @@ export class ECF {
     fileName: string,
   ): Promise<Result<InvoiceSummaryResponse, DgiiError>> {
     const key = this.buildIdempotencyKey(signedXml);
-    return this.submitIdempotent(key, () =>
-      this.http.postMultipart<InvoiceSummaryResponse>(
-        buildUrl(this.environment, Endpoint.SendSummary, BaseUrl.CF),
-        fileName,
+    return this.submitIdempotent(
+      key,
+      (correlationId, identity) =>
+        this.http.postMultipart<InvoiceSummaryResponse>(
+          buildUrl(this.environment, Endpoint.SendSummary, BaseUrl.CF),
+          fileName,
+          signedXml,
+          {
+            absoluteUrl: true,
+            resource: Endpoint.SendSummary,
+            retry: false,
+            telemetry: {
+              correlationId,
+              operation: 'sendSummary',
+              environment: this.environment,
+              ...identity,
+            },
+          },
+        ),
+      {
+        operation: 'sendSummary',
+        resource: Endpoint.SendSummary,
         signedXml,
-        { absoluteUrl: true, resource: Endpoint.SendSummary },
-      ),
+      },
     );
   }
 
@@ -613,6 +886,12 @@ export class ECF {
     fileName: string,
     buyerHost?: string,
   ): Promise<Result<InvoiceResponse | InvoiceSummaryResponse, DgiiError>> {
+    if (buyerHost !== undefined) {
+      const valid = validateBuyerHost(buyerHost);
+      if (valid.isErr()) {
+        return err(valid.error);
+      }
+    }
     const route = resolveReceptionRoute(signedXml);
     if (route.isErr()) {
       return err(route.error);
@@ -691,7 +970,7 @@ export class ECF {
     if (!isInquiryStatusResponse(payload)) {
       return err(unexpectedPayload(Endpoint.InquiryStatus, payload));
     }
-    return ok(payload);
+    return ok(normalizeInquiryStatus(payload));
   }
 
   /**
@@ -818,11 +1097,20 @@ export class ECF {
       DgiiError
     >
   > {
-    const key = this.buildIdempotencyKey(signedXml);
+    if (buyerHost !== undefined) {
+      const valid = validateBuyerHost(buyerHost);
+      if (valid.isErr()) {
+        return Promise.resolve(err(valid.error));
+      }
+    }
+    const key = this.buildIdempotencyKey(
+      signedXml,
+      destinationScope(buyerHost),
+    );
     if (buyerHost !== undefined) {
       return this.submitIdempotent<B2BCommercialApprovalResponse>(
         key,
-        async () => {
+        async (correlationId, identity) => {
           const url = buildSenderReceiverUrl(
             buyerHost,
             SenderReceiverEndpoint.CommercialApproval,
@@ -834,6 +1122,13 @@ export class ECF {
             {
               absoluteUrl: true,
               resource: SenderReceiverEndpoint.CommercialApproval,
+              retry: false,
+              telemetry: {
+                correlationId,
+                operation: 'sendCommercialApproval',
+                environment: this.environment,
+                ...identity,
+              },
             },
           );
           if (result.isErr()) {
@@ -846,15 +1141,37 @@ export class ECF {
           }
           return ok({ status: 200, accepted: true });
         },
+        {
+          operation: 'sendCommercialApproval',
+          resource: SenderReceiverEndpoint.CommercialApproval,
+          signedXml,
+        },
       );
     }
-    return this.submitIdempotent(key, () =>
-      this.http.postMultipart<CommercialApprovalResponse>(
-        buildUrl(this.environment, Endpoint.CommercialApproval),
-        fileName,
+    return this.submitIdempotent(
+      key,
+      (correlationId, identity) =>
+        this.http.postMultipart<CommercialApprovalResponse>(
+          buildUrl(this.environment, Endpoint.CommercialApproval),
+          fileName,
+          signedXml,
+          {
+            absoluteUrl: true,
+            resource: Endpoint.CommercialApproval,
+            retry: false,
+            telemetry: {
+              correlationId,
+              operation: 'sendCommercialApproval',
+              environment: this.environment,
+              ...identity,
+            },
+          },
+        ),
+      {
+        operation: 'sendCommercialApproval',
+        resource: Endpoint.CommercialApproval,
         signedXml,
-        { absoluteUrl: true, resource: Endpoint.CommercialApproval },
-      ),
+      },
     );
   }
 
@@ -867,13 +1184,30 @@ export class ECF {
     fileName: string,
   ): Promise<Result<VoidNCFResponse, DgiiError>> {
     const key = this.buildIdempotencyKey(signedXml);
-    return this.submitIdempotent(key, () =>
-      this.http.postMultipart<VoidNCFResponse>(
-        buildUrl(this.environment, Endpoint.Void),
-        fileName,
+    return this.submitIdempotent(
+      key,
+      (correlationId, identity) =>
+        this.http.postMultipart<VoidNCFResponse>(
+          buildUrl(this.environment, Endpoint.Void),
+          fileName,
+          signedXml,
+          {
+            absoluteUrl: true,
+            resource: Endpoint.Void,
+            retry: false,
+            telemetry: {
+              correlationId,
+              operation: 'voidENCF',
+              environment: this.environment,
+              ...identity,
+            },
+          },
+        ),
+      {
+        operation: 'voidENCF',
+        resource: Endpoint.Void,
         signedXml,
-        { absoluteUrl: true, resource: Endpoint.Void },
-      ),
+      },
     );
   }
 }

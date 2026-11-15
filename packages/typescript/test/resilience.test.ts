@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { isRetryableError } from '../src/resilience.js';
+import {
+  createResiliencePolicies,
+  isRetryableError,
+} from '../src/resilience.js';
 import { DgiiError } from '../src/errors.js';
 
 describe('isRetryableError', () => {
@@ -23,5 +26,41 @@ describe('isRetryableError', () => {
   it('does not retry unknown errors', () => {
     expect(isRetryableError(new Error('business rule'))).toBe(false);
     expect(isRetryableError('nope')).toBe(false);
+  });
+});
+
+describe('retry budget', () => {
+  it('counts maxRetries as attempts including the first, like Python', async () => {
+    // `maxRetries: 3` sent 4 times because cockatiel counts retries while the
+    // public option (and Python's `stop_after_attempt`) counts attempts.
+    const policies = createResiliencePolicies({
+      maxRetries: 3,
+      retryInitialDelayMs: 1,
+    });
+    let attempts = 0;
+    await policies.policy
+      .execute(async () => {
+        attempts += 1;
+        throw new DgiiError('upstream unavailable', { status: 503 });
+      })
+      .catch(() => undefined);
+
+    expect(attempts).toBe(3);
+  });
+
+  it('sends exactly once when maxRetries is 1', async () => {
+    const policies = createResiliencePolicies({
+      maxRetries: 1,
+      retryInitialDelayMs: 1,
+    });
+    let attempts = 0;
+    await policies.policy
+      .execute(async () => {
+        attempts += 1;
+        throw new DgiiError('upstream unavailable', { status: 503 });
+      })
+      .catch(() => undefined);
+
+    expect(attempts).toBe(1);
   });
 });

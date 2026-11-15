@@ -93,13 +93,16 @@ What is enforced:
 | `mypy --strict`        | `packages/python/src`                                       |
 | `tsc --noEmit`         | `packages/typescript`                                       |
 | `prettier --check`     | every tracked `.md`, `.json`, `.yaml` and JS/TS file        |
-| `gitleaks`             | every file                                                  |
+| `gitleaks`             | working tree (`gitleaks dir`)                               |
 | `certificate-material` | rejects `*.p12`, `*.pfx`, `*.pem`, `*.jks`, `*.der`, `*.p8` |
 | `conventional-commit`  | the commit subject                                          |
 
 The hooks are not a substitute for CI: the `pre-commit` workflow runs
 `mise run hooks` on every pull request, so a commit made with `--no-verify`
-is still verified before merge.
+is still verified against the working tree before merge. In addition, the
+`secret-scan` workflow checks out full git history (`fetch-depth: 0`) and runs
+`gitleaks git . --redact --no-banner --log-opts="--all"` so secrets added in an
+earlier commit and removed in a later one are still caught.
 
 ## Certificates
 

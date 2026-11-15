@@ -8,6 +8,18 @@ import type {
 export const PENDING_SUBMISSION_MESSAGE =
   'A submission with this key is already pending; call reconcileSubmission() before retrying';
 
+/**
+ * Message returned when a submission may or may not have reached DGII.
+ *
+ * A transport failure carries no HTTP status, so the SDK cannot tell "DGII
+ * never saw it" from "DGII accepted it and the answer was lost". The pending
+ * marker is kept in that case and the caller must reconcile instead of
+ * re-sending, because a duplicate e-CF is a fiscal document DGII never asked
+ * for — and unlike a stuck marker, it cannot be undone.
+ */
+export const AMBIGUOUS_SUBMISSION_MESSAGE =
+  'The submission outcome is unknown: it may have reached DGII; the pending marker was kept — call reconcileSubmission() before retrying';
+
 /** Outcome of reconciling a pending submission against DGII. */
 export interface ReconciliationResult {
   /** DGII's answer for the e-NCF. */

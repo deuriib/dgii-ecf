@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import threading
+import time
 
 import httpx2
 
+from py_dgii_ecf._json import JsonObject
 from py_dgii_ecf.certificate import P12ReaderData
 from py_dgii_ecf.client import ECF
 from py_dgii_ecf.environment import Environment
@@ -71,6 +75,56 @@ def test_sends_bearer_and_multipart() -> None:
     assert "/TesteCF/recepcion/api/FacturasElectronicas" in captured["url"]
 
 
+def test_posts_the_xml_field_with_the_caller_filename() -> None:
+    captured_body: list[bytes] = []
+    captured_accept: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured_body.append(request.content)
+        captured_accept.append(request.headers.get("accept", ""))
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+    result = ecf.send_electronic_document(
+        signed_ecf("130862346", "E310000000003"), "f.xml"
+    )
+
+    assert result.is_ok()
+    body = captured_body[0]
+    assert b'name="xml"' in body
+    assert b'filename="f.xml"' in body
+    assert b"application/xml" in body
+    assert captured_accept[0] == "application/json"
+
+
+def test_leaves_content_length_to_the_transport() -> None:
+    captured: list[tuple[str | None, int]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        captured.append((request.headers.get("content-length"), len(request.content)))
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+    result = ecf.send_electronic_document(
+        signed_ecf("130862346", "E310000000004"), "f.xml"
+    )
+
+    assert result.is_ok()
+    header_len, body_len = captured[0]
+    assert header_len is not None
+    assert int(header_len) == body_len
+
+
 def test_does_not_retry_4xx() -> None:
     calls = {"n": 0}
 
@@ -93,14 +147,19 @@ def test_does_not_retry_4xx() -> None:
     assert calls["n"] == 1
 
 
-def test_retries_5xx_then_succeeds() -> None:
+def test_does_not_retry_a_submission_on_5xx() -> None:
+    """A submission must not be re-sent by the SDK.
+
+    DGII does not de-duplicate by e-NCF, so an in-SDK retry cannot distinguish
+    "rejected" from "accepted, answer lost" — one call used to deliver three
+    copies of the same document. A definitive status clears the marker, so the
+    caller owns the retry.
+    """
     calls = {"n": 0}
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         calls["n"] += 1
-        if calls["n"] == 1:
-            return httpx2.Response(503, text="boom")
-        return httpx2.Response(200, json={"trackId": "t2"})
+        return httpx2.Response(503, text="boom")
 
     ecf = ECF(
         CREDENTIALS,
@@ -110,6 +169,31 @@ def test_retries_5xx_then_succeeds() -> None:
         http_client=make_client(handler),
     )
     result = ecf.send_electronic_document(signed_ecf("2", "E2"), "f.xml")
+
+    assert result.is_err()
+    assert result.unwrap_err().status == 503
+    assert calls["n"] == 1
+
+
+def test_still_retries_a_query_on_5xx() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx2.Response(503, text="boom")
+        return httpx2.Response(
+            200, json={"estado": "Aceptado", "secuenciaUtilizada": True}
+        )
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        resilience=ResilienceOptions(max_retries=3),
+        http_client=make_client(handler),
+    )
+    result = ecf.status_track_id("TRACK-1")
 
     assert result.is_ok()
     assert calls["n"] == 2
@@ -936,3 +1020,430 @@ def test_void_key_uses_the_anecf_schema_elements() -> None:
 
     assert result.is_ok()
     assert store.get(key) is not None
+
+
+def _idempotency_key(rnc: str, encf: str, xml: str) -> str:
+    return f"{rnc}:{encf}:{hashlib.sha256(xml.encode('utf-8')).hexdigest()}"
+
+
+def test_unreadable_2xx_body_keeps_the_marker_and_does_not_resend() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, text="", headers={"content-type": "text/plain"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+    )
+    xml = signed_ecf("130862346", "E310000000010")
+
+    first = ecf.send_electronic_document(xml, "f.xml")
+    assert first.is_err()
+    assert first.unwrap_err().code == DgiiErrorCode.VALIDATION
+    assert "reconcile" in first.unwrap_err().message
+
+    second = ecf.send_electronic_document(xml, "f.xml")
+    assert second.is_err()
+    assert second.unwrap_err().code == DgiiErrorCode.IDEMPOTENCY
+    assert calls["n"] == 1
+
+
+def test_idempotency_key_is_scoped_to_the_destination() -> None:
+    urls: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        urls.append(str(request.url))
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        enforce_b2b_rules=False,
+    )
+    xml = signed_ecf("130862346", "E310000000011")
+
+    assert ecf.send_electronic_document(xml, "f.xml").is_ok()
+    assert ecf.send_electronic_document(xml, "f.xml", "https://buyer.example").is_ok()
+
+    assert len(urls) == 2
+    assert "buyer.example/fe/recepcion/api/ecf" in urls[1]
+
+    # A repeat DGII submit must be answered from the DGII cache, not the buyer's.
+    assert ecf.send_electronic_document(xml, "f.xml").is_ok()
+    assert len(urls) == 2
+
+
+class InspectingStore(InMemoryIdempotencyStore):
+    """Records the marker written before the request leaves the process."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.markers: list[JsonObject] = []
+
+    def set(self, key: str, value: JsonObject) -> None:
+        if value.get("__pending__") is True:
+            self.markers.append(dict(value))
+        super().set(key, value)
+
+
+def test_writes_the_shared_pending_marker_shape() -> None:
+    store = InspectingStore()
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+    )
+
+    ecf.send_electronic_document(signed_ecf("130862346", "E310000000015"), "f.xml")
+
+    assert store.markers == [{"__pending__": True}]
+
+
+def test_idempotency_keys_carry_the_destination_scope() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    store = InMemoryIdempotencyStore()
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+        enforce_b2b_rules=False,
+    )
+    xml = signed_ecf("130862346", "E310000000016")
+
+    ecf.send_electronic_document(xml, "f.xml")
+    ecf.send_electronic_document(xml, "f.xml", "https://Buyer.Example/")
+
+    # Private access on purpose: the stored key shape is the contract here.
+    stored = list(store._store)
+    assert len(stored) == 2
+    assert any(key.endswith("@https://buyer.example") for key in stored)
+    assert any("@" not in key for key in stored)
+
+
+def test_legacy_pending_marker_is_still_pending() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    store = InMemoryIdempotencyStore()
+    xml = signed_ecf("130862346", "E310000000012")
+    store.set(_idempotency_key("130862346", "E310000000012", xml), {"pending": True})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+    )
+
+    result = ecf.send_electronic_document(xml, "f.xml")
+
+    assert result.is_err()
+    assert result.unwrap_err().code == DgiiErrorCode.IDEMPOTENCY
+    assert calls["n"] == 0
+
+
+class RacingStore(InMemoryIdempotencyStore):
+    """Store that forces both callers to read before either writes.
+
+    That is the check-then-act window the per-key lock closes: without it both
+    callers see "no marker" and both transmit. The barrier times out so a caller
+    that never reaches the read (the coalesced case) cannot deadlock the test.
+    """
+
+    def __init__(self, expected_readers: int = 2) -> None:
+        super().__init__()
+        self._barrier = threading.Barrier(expected_readers)
+
+    def get(self, key: str) -> JsonObject | None:
+        # Read first, then rendezvous, then answer with the value read before
+        # the other caller could write: that is exactly the stale read that lets
+        # a check-then-act store transmit twice.
+        value = super().get(key)
+        with contextlib.suppress(threading.BrokenBarrierError):
+            self._barrier.wait(timeout=0.5)
+        return value
+
+
+def test_concurrent_submissions_of_one_document_transmit_once() -> None:
+    calls = {"n": 0}
+    lock = threading.Lock()
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        with lock:
+            calls["n"] += 1
+        time.sleep(0.02)
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    store = RacingStore()
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+    )
+    xml = signed_ecf("130862346", "E310000000013")
+    results: list[object] = []
+    start = threading.Barrier(2)
+
+    def submit() -> None:
+        start.wait()
+        results.append(ecf.send_electronic_document(xml, "f.xml"))
+
+    threads = [threading.Thread(target=submit) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert calls["n"] == 1
+    assert len(results) == 2
+    for result in results:
+        assert result.is_ok()  # type: ignore[attr-defined]
+
+
+def test_ambiguous_transmission_keeps_the_marker() -> None:
+    calls = {"n": 0}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        raise httpx2.ReadTimeout("read timed out")
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="tok",
+        http_client=make_client(handler),
+        resilience=ResilienceOptions(max_retries=1),
+    )
+    xml = signed_ecf("130862346", "E310000000014")
+
+    first = ecf.send_electronic_document(xml, "f.xml")
+    assert first.is_err()
+    assert first.unwrap_err().code == DgiiErrorCode.IDEMPOTENCY
+    assert "outcome is unknown" in first.unwrap_err().message
+
+    second = ecf.send_electronic_document(xml, "f.xml")
+    assert second.is_err()
+    assert "already pending" in second.unwrap_err().message
+    assert calls["n"] == 1
+
+
+def test_rejects_invalid_buyer_host_with_validation_and_zero_network_calls() -> None:
+    calls = {"n": 0}
+
+    def handler(_request: httpx2.Request) -> httpx2.Response:
+        calls["n"] += 1
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    store = InMemoryIdempotencyStore()
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="dgii-tok",
+        http_client=make_client(handler),
+        idempotency_store=store,
+        enforce_b2b_rules=False,
+    )
+    xml = signed_ecf("130862346", "E310000000090")
+
+    for invalid_host in (
+        "http://buyer.example.com",
+        "ftp://buyer.example.com",
+        "https://",
+        "https://buyer.example.com:notaport",
+        "https://user:pass@buyer.example.com",
+        "https://user@buyer.example.com",
+        "not-a-url",
+    ):
+        send_res = ecf.send_electronic_document(xml, "f.xml", invalid_host)
+        assert send_res.is_err()
+        assert send_res.unwrap_err().code == DgiiErrorCode.VALIDATION
+
+        send_doc_res = ecf.send_document(xml, "f.xml", invalid_host)
+        assert send_doc_res.is_err()
+        assert send_doc_res.unwrap_err().code == DgiiErrorCode.VALIDATION
+
+        auth_res = ecf.authenticate(invalid_host)
+        assert auth_res.is_err()
+        assert auth_res.unwrap_err().code == DgiiErrorCode.VALIDATION
+
+        approval_res = ecf.send_commercial_approval(xml, "a.xml", invalid_host)
+        assert approval_res.is_err()
+        assert approval_res.unwrap_err().code == DgiiErrorCode.VALIDATION
+
+        reconcile_res = ecf.reconcile_submission(xml, invalid_host)
+        assert reconcile_res.is_err()
+        assert reconcile_res.unwrap_err().code == DgiiErrorCode.VALIDATION
+
+    assert calls["n"] == 0
+    assert store.size == 0
+
+
+def test_never_sends_dgii_token_to_buyer_host() -> None:
+    captured_auth: dict[str, str | None] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        url = str(request.url)
+        captured_auth[url] = request.headers.get("Authorization")
+        if "recepcionfc" in url:
+            return httpx2.Response(
+                200,
+                json={
+                    "codigo": 1,
+                    "estado": "Aceptado",
+                    "encf": "E320000000001",
+                    "secuenciaUtilizada": True,
+                },
+            )
+        return httpx2.Response(200, json={"trackId": "t1"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="dgii-secret-token",
+        http_client=make_client(handler),
+        enforce_b2b_rules=False,
+    )
+
+    to_buyer = ecf.send_electronic_document(
+        signed_ecf("130862346", "E310000000091"),
+        "f.xml",
+        "https://buyer.example.com",
+    )
+    assert to_buyer.is_ok()
+    assert captured_auth["https://buyer.example.com/fe/recepcion/api/ecf"] is None
+
+    to_dgii = ecf.send_electronic_document(
+        signed_ecf("130862346", "E310000000092"),
+        "f.xml",
+    )
+    assert to_dgii.is_ok()
+    assert (
+        captured_auth[
+            "https://ecf.dgii.gov.do/TesteCF/recepcion/api/FacturasElectronicas"
+        ]
+        == "Bearer dgii-secret-token"
+    )
+
+    to_summary = ecf.send_summary(
+        "<RFCE><Encabezado><RNCEmisor>130862346</RNCEmisor>"
+        "<IdDoc><eNCF>E320000000001</eNCF></IdDoc></Encabezado></RFCE>",
+        "rfce.xml",
+    )
+    assert to_summary.is_ok()
+    assert (
+        captured_auth["https://fc.dgii.gov.do/TesteCF/recepcionfc/api/recepcion/ecf"]
+        == "Bearer dgii-secret-token"
+    )
+
+
+def test_buyer_host_401_does_not_trigger_dgii_reauthentication() -> None:
+    urls: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        url = str(request.url)
+        urls.append(url)
+        if url.startswith("https://buyer.example.com"):
+            return httpx2.Response(401, json={"message": "unauthorized"})
+        return httpx2.Response(200, json={"trackId": "t-dgii"})
+
+    ecf = ECF(
+        CREDENTIALS,
+        Environment.DEV,
+        token="dgii-valid-token",
+        http_client=make_client(handler),
+        enforce_b2b_rules=False,
+    )
+
+    buyer_res = ecf.send_electronic_document(
+        signed_ecf("130862346", "E310000000095"),
+        "f.xml",
+        "https://buyer.example.com",
+    )
+    assert buyer_res.is_err()
+    assert urls == ["https://buyer.example.com/fe/recepcion/api/ecf"]
+
+
+def test_authenticate_buyer_host_isolates_token_per_origin(
+    self_signed: tuple[str, str, object],
+) -> None:
+    key_pem, cert_pem, _ = self_signed
+    real_creds = P12ReaderData(key=key_pem, cert=cert_pem)
+    auth_by_url: dict[str, str | None] = {}
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        url = str(request.url)
+        auth_by_url[url] = request.headers.get("Authorization")
+        if url.endswith("/semilla"):
+            return httpx2.Response(
+                200,
+                text=(
+                    '<?xml version="1.0" encoding="utf-8"?>'
+                    "<SemillaModel><valor>seed</valor></SemillaModel>"
+                ),
+                headers={"content-type": "application/xml"},
+            )
+        if "validarsemilla" in url or "validacioncertificado" in url:
+            is_buyer = url.startswith("https://buyer.example.com")
+            return httpx2.Response(
+                200,
+                json={
+                    "token": "buyer-token-xyz" if is_buyer else "dgii-token-abc",
+                    "expira": "2099-01-01T00:00:00Z",
+                    "expedido": "2026-01-01T00:00:00Z",
+                },
+            )
+        return httpx2.Response(200, json={"trackId": "t-ok"})
+
+    ecf = ECF(
+        real_creds,
+        Environment.DEV,
+        token="dgii-initial-token",
+        http_client=make_client(handler),
+        enforce_b2b_rules=False,
+    )
+
+    buyer_auth = ecf.authenticate("https://buyer.example.com")
+    assert buyer_auth.is_ok()
+
+    ecf.send_electronic_document(
+        signed_ecf("130862346", "E310000000093"),
+        "f.xml",
+        "https://buyer.example.com",
+    )
+    ecf.send_electronic_document(
+        signed_ecf("130862346", "E310000000094"),
+        "f.xml",
+    )
+
+    assert (
+        auth_by_url["https://buyer.example.com/fe/recepcion/api/ecf"]
+        == "Bearer buyer-token-xyz"
+    )
+    assert (
+        auth_by_url[
+            "https://ecf.dgii.gov.do/TesteCF/recepcion/api/FacturasElectronicas"
+        ]
+        == "Bearer dgii-initial-token"
+    )

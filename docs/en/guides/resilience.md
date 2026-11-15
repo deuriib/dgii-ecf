@@ -17,12 +17,27 @@ Only **transient** failures are retried:
 
 A rejected e-CF (e.g. `400`, `401`) is **never** blindly re-sent.
 
+**A document submission is never retried by the SDK.** Retrying a `POST` whose
+outcome is unknown cannot tell "rejected" from "accepted, answer lost", and DGII
+does not de-duplicate by e-NCF — one call could deliver the same document more
+than once. So `sendElectronicDocument`, `sendSummary`,
+`sendCommercialApproval` and `voidENCF` make **one** attempt:
+
+- a definitive answer (`408`, `429`, `5xx`, `4xx`) clears the pending marker and
+  the failure carries its status — retrying is then yours to make, safely;
+- an answer that never arrives (timeout, reset, DNS) keeps the marker and
+  reports `AMBIGUOUS_SUBMISSION_MESSAGE` — call `reconcileSubmission` before
+  re-sending, because DGII may already have the document.
+
+Queries (`statusTrackId`, `inquiryStatus`, …) and authentication are retried
+normally, because repeating them cannot issue a fiscal document.
+
 When a transmission fails and you fall back to contingency, this governs it:
 **Official source:** [Informe Técnico Comprobante Fiscal Electrónico](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Informe%20T%C3%A9cnico%20e-CF%20v1.0.pdf) — §19: contingency operation, the clocks it sets for transmitting what was generated offline, and the identifiers that mark a replacement receipt (v1.0; site-updated 2026-10-16) · [Instructivo de Contingencia de Facturación Electrónica](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Instructivo%20de%20Contingencia%20de%20FE.pdf) — the operational manual for working in contingency (site-updated 2026-10-15).
 
 | Option              | Default                |
 | ------------------- | ---------------------- |
-| Max attempts        | 3 (4 in TypeScript)    |
+| Max attempts        | 3 (submissions: 1)     |
 | Breaker threshold   | 5 consecutive failures |
 | Half-open after     | 30 s                   |
 | Per-attempt timeout | 15 s                   |

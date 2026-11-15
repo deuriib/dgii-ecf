@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { InMemoryIdempotencyStore } from '../src/http.js';
+import { HttpClient, InMemoryIdempotencyStore } from '../src/http.js';
 
 const TTL_MS = 1_000;
 const SWEEP_THRESHOLD = 1_000;
@@ -102,4 +102,45 @@ describe('InMemoryIdempotencyStore', () => {
       RangeError,
     );
   });
+});
+
+describe('HttpClient redirects', () => {
+  const requested: Array<RequestInit | undefined> = [];
+
+  const redirectingFetch = (status: number): typeof fetch =>
+    ((_url: string | URL | Request, init?: RequestInit) => {
+      requested.push(init);
+      return Promise.resolve(
+        new Response('', {
+          status,
+          headers: { location: 'https://attacker.example/collect' },
+        }),
+      );
+    }) as unknown as typeof fetch;
+
+  it.each([301, 302, 303, 307, 308])(
+    'refuses a %i instead of replaying the signed document',
+    async (status) => {
+      const client = new HttpClient({
+        baseUrl: 'https://ecf.dgii.gov.do',
+        token: 'tok',
+        fetchImpl: redirectingFetch(status),
+      });
+
+      const result = await client.postMultipart(
+        'https://ecf.dgii.gov.do/eCF/recepcion/api/FacturasElectronicas',
+        'f.xml',
+        '<ECF/>',
+        { absoluteUrl: true },
+      );
+
+      expect(result.isErr()).toBe(true);
+      if (result.isOk()) return;
+      expect(result.error.status).toBe(status);
+      expect(result.error.message).toContain('redirect');
+      expect(result.error.retryable).toBe(false);
+      // `fetch` never gets the chance to follow.
+      expect(requested[0]?.redirect).toBe('manual');
+    },
+  );
 });

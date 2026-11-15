@@ -4,8 +4,9 @@ import {
   TimeoutStrategy,
   bulkhead,
   circuitBreaker,
-  handleAll,
   handleWhen,
+  isBulkheadRejectedError,
+  isTaskCancelledError,
   retry,
   timeout,
   wrap,
@@ -14,7 +15,11 @@ import {
 import { DgiiError } from './errors.js';
 
 export interface ResilienceOptions {
-  /** Maximum number of attempts (including the first). Default 3. */
+  /**
+   * Maximum number of attempts **including the first**. Default 3 (i.e. up to
+   * 2 retries). Same meaning as `max_retries` in the Python package: the value
+   * is a send budget, not a retry budget.
+   */
   maxRetries?: number;
   /** Consecutive failures before the circuit opens. Default 5. */
   breakerThreshold?: number;
@@ -48,6 +53,9 @@ export const isRetryableError = (error: unknown): boolean => {
   if (error instanceof DgiiError) {
     return error.retryable;
   }
+  if (isTaskCancelledError(error)) {
+    return true;
+  }
   if (error instanceof Error) {
     const name = error.name.toLowerCase();
     const message = error.message.toLowerCase();
@@ -58,6 +66,7 @@ export const isRetryableError = (error: unknown): boolean => {
       name === 'timeouterror' ||
       name.includes('cancel') ||
       message.includes('timeout') ||
+      message.includes('timed out') ||
       message.includes('aborted') ||
       message.includes('network')
     );
@@ -72,6 +81,15 @@ export interface ResiliencePolicies {
   readonly bulkhead: IPolicy;
   /** Composed policy: `retry → circuitBreaker → timeout → bulkhead`. */
   readonly policy: IPolicy;
+  /**
+   * Composed policy without retry: `circuitBreaker → timeout → bulkhead`.
+   *
+   * Used for the non-idempotent submissions. Retrying a POST whose outcome is
+   * unknown is how a single call put three copies of one e-NCF into DGII's
+   * hands: the retry cannot tell "rejected" from "accepted, answer lost", and
+   * DGII does not de-duplicate by e-NCF.
+   */
+  readonly policyWithoutRetry: IPolicy;
 }
 
 /** Build the composed resilience policy used by the HTTP client. */
@@ -81,26 +99,41 @@ export const createResiliencePolicies = (
   const opts = { ...defaultResilienceOptions, ...options };
 
   const retryPolicy = retry(handleWhen(isRetryableError), {
-    maxAttempts: opts.maxRetries,
+    // cockatiel counts *retries*, the public option counts *attempts*, so the
+    // budget is converted here instead of leaking the off-by-one to callers
+    // (`maxAttempts: 3` sent 4 times, while Python's `stop_after_attempt(3)`
+    // sent 3).
+    maxAttempts: Math.max(0, opts.maxRetries - 1),
     backoff: new ExponentialBackoff({ initialDelay: opts.retryInitialDelayMs }),
   });
 
-  const breakerPolicy = circuitBreaker(handleAll, {
-    halfOpenAfter: opts.halfOpenAfterMs,
-    breaker: new ConsecutiveBreaker(opts.breakerThreshold),
-  });
+  // Local capacity rejections must not open the circuit breaker, and placing
+  // the breaker outside retry counts logical operations rather than individual
+  // retry attempts.
+  const breakerPolicy = circuitBreaker(
+    handleWhen((err) => !isBulkheadRejectedError(err)),
+    {
+      halfOpenAfter: opts.halfOpenAfterMs,
+      breaker: new ConsecutiveBreaker(opts.breakerThreshold),
+    },
+  );
 
   const timeoutPolicy = timeout(opts.timeoutMs, TimeoutStrategy.Aggressive);
   const bulkheadPolicy = bulkhead(opts.bulkheadLimit, opts.bulkheadQueue);
 
+  // Bulkhead sits outside timeout so queue wait is never charged to the
+  // per-attempt network timeout.
   const policy = wrap(
-    retryPolicy,
     breakerPolicy,
-    timeoutPolicy,
+    retryPolicy,
     bulkheadPolicy,
+    timeoutPolicy,
   );
 
+  const policyWithoutRetry = wrap(breakerPolicy, bulkheadPolicy, timeoutPolicy);
+
   return {
+    policyWithoutRetry,
     retry: retryPolicy,
     circuitBreaker: breakerPolicy,
     timeout: timeoutPolicy,

@@ -1,0 +1,65 @@
+{
+  "eventTypes": [
+    "transmission.started",
+    "transmission.succeeded",
+    "transmission.failed",
+    "attempt",
+    "idempotency",
+    "reconcile.completed",
+    "breaker.changed",
+    "token.changed",
+    "certificate.checked"
+  ],
+  "errorCodes": [
+    "INVALID_XML",
+    "CERTIFICATE",
+    "SIGNING",
+    "HTTP",
+    "AUTH",
+    "TIMEOUT",
+    "CIRCUIT_OPEN",
+    "IDEMPOTENCY",
+    "VALIDATION",
+    "UNKNOWN"
+  ],
+  "idempotencyStates": [
+    "miss",
+    "hit",
+    "pending",
+    "joined"
+  ],
+  "breakerStates": [
+    "closed",
+    "open",
+    "half_open"
+  ],
+  "resources": [
+    "Autenticacion/api/Autenticacion/Semilla",
+    "autenticacion/api/Autenticacion/ValidarSemilla",
+    "recepcion/api/FacturasElectronicas",
+    "recepcionfc/api/recepcion/ecf",
+    "consultarfce/api/Consultas/Consulta",
+    "aprobacionComercial/api/AprobacionComercial",
+    "consultaresultado/api/Consultas/Estado",
+    "consultaestado/api/Consultas/Estado",
+    "ConsultaTrackIds/api/TrackIds/Consulta",
+    "consultadirectorio/api/consultas/obtenerdirectorioporrnc",
+    "consultadirectorio/api/consultas/listado",
+    "anulacionrangos/api/operaciones/anularrango",
+    "fe/autenticacion/api/semilla",
+    "fe/autenticacion/api/validacioncertificado",
+    "fe/recepcion/api/ecf",
+    "fe/aprobacioncomercial/api/ecf",
+    "status:api/estatusservicios/obtenerestatus",
+    "status:api/estatusservicios/obtenerventanasmantenimiento",
+    "status:api/estatusservicios/verificarestado"
+  ],
+  "knownPartiallySupported": [
+    {
+      "field": "idempotency",
+      "value": "joined",
+      "missingIn": "python",
+      "followUp": "F-OBS-07"
+    }
+  ]
+}

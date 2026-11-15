@@ -82,6 +82,9 @@ const validationError = (message: string, cause?: unknown): DgiiError =>
   });
 
 const VIOLATION_LINE = /^.*?:(\d+):\s*element\s+([^:]+):\s*(.*)$/;
+const SCHEMA_ERROR_LINE =
+  /^.*?:\d+:\s*(?:Schemas\s+validity\s+(?:error|warning)\s*:\s*)?(.*)$/i;
+const ELEMENT_IN_MESSAGE = /^Element\s+'([^']+)'/;
 
 /** Parse `xmllint --schema` stderr into violations. */
 const parseViolations = (stderr: string): SchemaViolation[] => {
@@ -101,12 +104,33 @@ const parseViolations = (stderr: string): SchemaViolation[] => {
         path: (match[2] ?? '').trim(),
         message: (match[3] ?? '').trim(),
       });
-    } else {
-      violations.push({ path: '', message: line });
+      continue;
     }
+    const schemaMatch = SCHEMA_ERROR_LINE.exec(line);
+    if (schemaMatch !== null) {
+      const message = (schemaMatch[1] ?? '').trim();
+      const elementMatch = ELEMENT_IN_MESSAGE.exec(message);
+      violations.push({
+        path: elementMatch?.[1] ? `/${elementMatch[1]}` : '',
+        message,
+      });
+      continue;
+    }
+    violations.push({ path: '', message: line });
   }
   return violations;
 };
+
+/**
+ * Whether a validation error means DGII never published a usable schema for
+ * this document type (`E31`, `RFCE`, `ACECF`), as opposed to an invalid
+ * document or missing `xmllint` binary.
+ */
+export const isSchemaUnavailableError = (error: DgiiError): boolean =>
+  error.code === 'VALIDATION' &&
+  Object.values(UNAVAILABLE_SCHEMAS).some((reason) =>
+    error.message.includes(reason),
+  );
 
 /**
  * Validate a DGII document against its bundled XML Schema.

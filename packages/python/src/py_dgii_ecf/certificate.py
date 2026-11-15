@@ -19,11 +19,23 @@ from .result import DgiiResult, Err, Ok
 
 @dataclass(frozen=True, slots=True)
 class P12ReaderData:
-    """PEM-encoded private key, certificate and public key."""
+    """PEM-encoded private key, certificate and public key.
+
+    ``repr`` is overridden so ``print(credentials)``, a logged exception payload
+    or a notebook cell cannot show the PEM private key of a live signing
+    certificate — which a dataclass would print for every field by default.
+    """
 
     key: str | None = None
     cert: str | None = None
     public_key: str | None = None
+
+    def __repr__(self) -> str:
+        """Render the private key redacted."""
+        return (
+            f"P12ReaderData(key=<redacted>, cert={'<set>' if self.cert else None}, "
+            f"public_key={'<set>' if self.public_key else None})"
+        )
 
 
 @dataclass(frozen=True, slots=True)

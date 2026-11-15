@@ -16,6 +16,7 @@ from __future__ import annotations
 import enum
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Protocol, Self, TypeVar
 
 # Commercial approval vocabulary, as documented by DGII. `codigo` is a string
@@ -46,11 +47,22 @@ class Mensaje:
 
 @dataclass(frozen=True, slots=True)
 class AuthToken:
-    """Authentication token returned by the DGII SEED flow."""
+    """Authentication token returned by the DGII SEED flow.
+
+    ``repr`` is overridden so a logged token object cannot hand a live bearer
+    credential to whoever reads the log.
+    """
 
     token: str
     expira: str
     expedido: str
+
+    def __repr__(self) -> str:
+        """Render the token redacted."""
+        return (
+            f"AuthToken(token=<redacted>, expira={self.expira!r}, "
+            f"expedido={self.expedido!r})"
+        )
 
 
 class TrackStatus(enum.StrEnum):
@@ -177,19 +189,29 @@ def _as_code(value: object) -> int | str:
     return 0
 
 
-def _as_float(value: object, key: str) -> float:
+def _as_decimal(value: object, key: str) -> Decimal:
     if isinstance(value, bool):
-        raise _type_error(key, "a number", value)
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        try:
-            return float(value.strip())
-        except ValueError:
+        raise _type_error(key, "a decimal", value)
+    if isinstance(value, Decimal):
+        if not value.is_finite():
             raise ResponseShapeError(
-                f"field {key!r} must be a number, got {value!r}"
+                f"field {key!r} must be a finite decimal, got {value!r}"
+            )
+        return value
+    if isinstance(value, (int, float, str)):
+        raw = value.strip() if isinstance(value, str) else str(value)
+        try:
+            parsed = Decimal(raw)
+        except InvalidOperation:
+            raise ResponseShapeError(
+                f"field {key!r} must be a decimal, got {value!r}"
             ) from None
-    raise _type_error(key, "a number", value)
+        if not parsed.is_finite():
+            raise ResponseShapeError(
+                f"field {key!r} must be a finite decimal, got {value!r}"
+            )
+        return parsed
+    raise _type_error(key, "a decimal", value)
 
 
 def _as_bool(value: object, key: str) -> bool:
@@ -347,8 +369,8 @@ class InquiryStatusResponse:
     estado: str
     rnc_emisor: str | None = None
     ncf_electronico: str | None = None
-    monto_total: float | None = None
-    total_itbis: float | None = None
+    monto_total: Decimal | None = None
+    total_itbis: Decimal | None = None
     fecha_emision: str | None = None
     fecha_firma: str | None = None
     rnc_comprador: str | None = None
@@ -367,10 +389,10 @@ class InquiryStatusResponse:
                 _as_str, data.get("ncfElectronico"), "ncfElectronico"
             ),
             monto_total=_as_optional_or_none(
-                _as_float, data.get("montoTotal"), "montoTotal"
+                _as_decimal, data.get("montoTotal"), "montoTotal"
             ),
             total_itbis=_as_optional_or_none(
-                _as_float, data.get("totalITBIS"), "totalITBIS"
+                _as_decimal, data.get("totalITBIS"), "totalITBIS"
             ),
             fecha_emision=_as_optional_or_none(
                 _as_str, data.get("fechaEmision"), "fechaEmision"

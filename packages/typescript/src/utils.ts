@@ -24,14 +24,14 @@ export const getCodeSixDigitfromSignature = (
 export const generateFcQRCodeURL = (
   rncemisor: string,
   encf: string,
-  montototal: number,
+  montototal: string,
   codigoseguridad: string,
   env: Environment,
 ): string =>
   `${BaseUrl.CF}/${env.toLowerCase()}/consultatimbrefc?rncemisor=${encodeURIComponent(
     rncemisor,
   )}&encf=${encodeURIComponent(encf)}&montototal=${encodeURIComponent(
-    String(montototal),
+    montototal,
   )}&codigoseguridad=${encodeURIComponent(codigoseguridad)}`;
 
 /** QR URL for a crédito fiscal (e-CF). */
@@ -181,9 +181,18 @@ export const convertECF32ToRFCE = (
     return err(parsed.error);
   }
 
-  const encabezado = parsed.value.ECF.Encabezado;
+  const ecf = parsed.value?.ECF;
+  const encabezado =
+    typeof ecf === 'object' && ecf !== null ? ecf.Encabezado : undefined;
+  if (
+    typeof encabezado !== 'object' ||
+    encabezado === null ||
+    Array.isArray(encabezado)
+  ) {
+    return err(new DgiiError('Encabezado not found', { code: 'VALIDATION' }));
+  }
   const impuestos = toArray(
-    encabezado?.Totales?.ImpuestosAdicionales?.ImpuestoAdicional,
+    encabezado.Totales?.ImpuestosAdicionales?.ImpuestoAdicional,
   );
 
   const rfce = pruneEmptyValues({

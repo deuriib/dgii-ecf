@@ -22,12 +22,24 @@ const asErrorMessage = (error: unknown): string =>
 
 /** Reads a PKCS#12 (.p12) bundle and extracts the private key + certificate. */
 export class P12Reader {
-  constructor(private readonly passphrase: string) {}
+  /**
+   * The keystore passphrase.
+   *
+   * A `#` field, not a TypeScript `private` one: `private` is erased at compile
+   * time, so the passphrase stayed an own enumerable property and
+   * `JSON.stringify`, `console.log`, `util.inspect` or an error reporter handed
+   * a full keystore unlock to whoever read the log.
+   */
+  readonly #passphrase: string;
+
+  constructor(passphrase: string) {
+    this.#passphrase = passphrase;
+  }
 
   private load(base64: string): forge.pkcs12.Pkcs12Pfx {
     const der = forge.util.decode64(base64);
     const asn1 = forge.asn1.fromDer(der);
-    return forge.pkcs12.pkcs12FromAsn1(asn1, false, this.passphrase);
+    return forge.pkcs12.pkcs12FromAsn1(asn1, false, this.#passphrase);
   }
 
   private extractKey(p12: forge.pkcs12.Pkcs12Pfx): string | undefined {

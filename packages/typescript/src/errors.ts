@@ -27,6 +27,7 @@ export interface DgiiErrorOptions {
   data?: unknown;
   mensajes?: Mensaje[];
   retryable?: boolean;
+  retryAfter?: number;
   cause?: unknown;
 }
 
@@ -204,6 +205,7 @@ export class DgiiError extends Error {
   readonly data?: unknown;
   readonly mensajes?: Mensaje[];
   readonly retryable: boolean;
+  readonly retryAfter?: number;
 
   constructor(message: string, options: DgiiErrorOptions = {}) {
     super(message);
@@ -219,6 +221,7 @@ export class DgiiError extends Error {
     this.data = options.data;
     this.mensajes = options.mensajes;
     this.retryable = options.retryable ?? isRetryableStatus(options.status);
+    this.retryAfter = options.retryAfter;
 
     if (options.cause !== undefined) {
       Object.defineProperty(this, 'cause', {
@@ -239,11 +242,21 @@ export class DgiiError extends Error {
       statusText: this.statusText,
       resource: this.resource,
       method: this.method,
+      baseURL: this.baseURL,
+      retryable: this.retryable,
+      retryAfter: this.retryAfter,
       mensajes: this.mensajes,
       data: this.data,
     };
   }
 }
+
+export const extractMensajes = (data: unknown): Mensaje[] | undefined => {
+  if (!isObject(data)) {
+    return undefined;
+  }
+  return readMensajes(data.mensajes ?? data.Mensajes);
+};
 
 export interface DgiiErrorContext {
   code?: DgiiErrorCode;

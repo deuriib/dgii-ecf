@@ -47,12 +47,13 @@ describe('QR code URLs', () => {
     const url = generateFcQRCodeURL(
       '130862346',
       'E310000000001',
-      1180,
+      '1180.00',
       'abc123',
       Environment.Dev,
     );
     expect(url).toContain('https://fc.dgii.gov.do/testecf/consultatimbrefc');
     expect(url).toContain('rncemisor=130862346');
+    expect(url).toContain('montototal=1180.00');
     expect(url).toContain('codigoseguridad=abc123');
   });
 
@@ -120,5 +121,27 @@ describe('convertECF32ToRFCE', () => {
       '<CodigoSeguridadeCF>abcdef</CodigoSeguridadeCF>',
     );
     expect(result.value.xml).not.toContain('<Comprador></Comprador>');
+  });
+
+  it('returns an Err instead of throwing on a non-ECF root', () => {
+    const result = convertECF32ToRFCE(
+      '<ANECF><SignatureValue>abcdef123456</SignatureValue></ANECF>',
+    );
+
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('VALIDATION');
+    expect(result.error.message).toBe('Encabezado not found');
+  });
+
+  it('returns an Err when ECF has no Encabezado', () => {
+    const result = convertECF32ToRFCE(
+      '<ECF><SignatureValue>abcdef123456</SignatureValue></ECF>',
+    );
+
+    expect(result.isErr()).toBe(true);
+    if (result.isOk()) return;
+    expect(result.error.code).toBe('VALIDATION');
+    expect(result.error.message).toBe('Encabezado not found');
   });
 });

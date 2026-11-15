@@ -127,6 +127,17 @@ def validate_document(xml: str) -> DgiiResult[tuple[SchemaViolation, ...]]:
     )
 
 
+def is_schema_unavailable_error(error: DgiiError) -> bool:
+    """Whether a validation error means DGII never published a usable schema.
+
+    Matches the document types in ``UNAVAILABLE_SCHEMAS`` (``E31``, ``RFCE``,
+    ``ACECF``), as opposed to invalid XML or an unknown document type.
+    """
+    return error.code == DgiiErrorCode.VALIDATION and any(
+        reason in error.message for reason in UNAVAILABLE_SCHEMAS.values()
+    )
+
+
 def format_violations(violations: tuple[SchemaViolation, ...]) -> str:
     """One-line summary of the first violations, for an error message."""
     shown = "; ".join(f"{v.path}: {v.message}" for v in violations[:5])

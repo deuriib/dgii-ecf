@@ -56,10 +56,30 @@ Notes that save a round trip: `mise run lint-python` and the `mypy` hook typeche
   pretty-print. Unit tests recompute the same code path, so they pass on a broken digest; only
   libxmlsec1 disagrees. Any signing change needs the XMLDSig gate and both packages updated together.
 - **Retry predicate is deliberately narrow:** network/transport plus 408, 429, 5xx. Never retry other
-  4xx — a rejected e-CF must not be re-sent.
+  4xx — a rejected e-CF must not be re-sent. `maxRetries` / `max_retries` counts **attempts
+  including the first** (`3` = at most three sends) for queries and authentication; cockatiel counts
+  retries, so the TS policy converts the budget (`maxAttempts: maxRetries - 1`).
+- **A document submission is never retried inside the SDK.** `sendElectronicDocument`,
+  `sendSummary`, `sendCommercialApproval` and `voidENCF` pass `retry: false` / `retry=False`, so one
+  call is at most one transmission. Retrying an ambiguous `POST` delivered the same e-NCF two or
+  three times because DGII does not de-duplicate. A definitive status clears the marker (the caller
+  may retry); an answer that never arrives keeps it and returns `AMBIGUOUS_SUBMISSION_MESSAGE`.
 - **Idempotency persists before transmit.** `sendElectronicDocument`/`sendSummary` (and commercial
-  approval / voiding) write `"pending"` under `RNC + eNCF + SHA-256(signedXml)` before sending and
-  delete it on failure. Query methods are not keyed. Preserve the ordering.
+  approval / voiding) write a `{"__pending__": true}` marker under
+  `RNC + eNCF + SHA-256(signedXml)` before sending. Query methods are not keyed. Preserve the
+  ordering, and preserve these three rules:
+  - the marker shape is shared with the Python package (both also accept the legacy
+    `{"pending": true}` so an in-flight marker from an older deployment is never read as a
+    delivered result);
+  - a direct buyer-host delivery appends `@<host>` to the key — without it, a delivery to a buyer
+    was answered from the DGII cache entry and never transmitted;
+  - a failure with **no HTTP status** is ambiguous (the document may have reached DGII with the
+    answer lost), so the marker is **kept** and `AMBIGUOUS_SUBMISSION_MESSAGE` is returned; only a
+    definitive HTTP answer clears it. A 2xx whose body is not a JSON object is not success either:
+    it fails as `VALIDATION` and keeps the marker.
+- **Redirects are never followed.** `fetch` uses `redirect: 'manual'` and any 3xx is refused, so a
+  signed document and the bearer token are never replayed to another host (`httpx2` already defaults
+  to `follow_redirects=False`).
 - **Reception routing is derived from the signed XML.** `<RFCE>` → `recepcionfc`. `E32` at or above
   RD$250,000 → general reception. `E32` **below** it is rejected — the caller must run
   `convertECF32ToRFCE` first. Don't hardcode the endpoint at call sites.
