@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import httpx2
 import pytest
 
-from py_dgii_ecf.http import InMemoryIdempotencyStore
+from py_dgii_ecf.http import (
+    HttpClient,
+    HttpClientOptions,
+    InMemoryIdempotencyStore,
+)
 
 TTL_S = 60.0
 SWEEP_THRESHOLD = 1_000
@@ -100,3 +105,28 @@ def test_sweeps_expired_entries_past_threshold() -> None:
 def test_rejects_non_positive_ttl() -> None:
     with pytest.raises(ValueError):
         InMemoryIdempotencyStore(ttl_s=0)
+
+
+def test_does_not_follow_redirects() -> None:
+    """A 3xx must never replay the signed document (or the token) elsewhere."""
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
+            307, headers={"location": "https://attacker.example/collect"}
+        )
+
+    client = httpx2.Client(transport=httpx2.MockTransport(handler))
+    http = HttpClient(
+        HttpClientOptions(base_url="https://ecf.dgii.gov.do", token="tok"),
+        client=client,
+    )
+
+    result = http.post_multipart(
+        "https://ecf.dgii.gov.do/eCF/recepcion/api/FacturasElectronicas",
+        "f.xml",
+        "<ECF/>",
+    )
+
+    assert result.is_err()
+    assert result.unwrap_err().status == 307
+    assert client.follow_redirects is False

@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   SUMMARY_ACCEPTED,
   SUMMARY_CONDITIONAL_ACCEPTED,
   SUMMARY_REJECTED,
   type InquiryStatus,
+  type InquiryStatusResponse,
   type InvoiceSummaryResponse,
   type VoidNCFResponse,
 } from '../src/types.js';
@@ -12,6 +13,24 @@ describe('response contracts', () => {
   it('accepts conditional acceptance in the eNCF inquiry', () => {
     const estado: InquiryStatus = 'Aceptado Condicional';
     expect(estado).toBe('Aceptado Condicional');
+  });
+
+  it('models InquiryStatusResponse monetary amounts as strings', () => {
+    expectTypeOf<InquiryStatusResponse['montoTotal']>().toEqualTypeOf<
+      string | undefined
+    >();
+    expectTypeOf<InquiryStatusResponse['totalITBIS']>().toEqualTypeOf<
+      string | undefined
+    >();
+
+    const inquiry: InquiryStatusResponse = {
+      codigo: 1,
+      estado: 'Aceptado',
+      montoTotal: '1180.00',
+      totalITBIS: '180.00',
+    };
+    expect(inquiry.montoTotal).toBe('1180.00');
+    expect(inquiry.totalITBIS).toBe('180.00');
   });
 
   it('exposes the documented RFCE reception states', () => {

@@ -11,4 +11,5 @@ export * from './reception.js';
 export * from './reconciliation.js';
 export * from './validation.js';
 export * from './utils.js';
+export * from './telemetry.js';
 export * from './client.js';

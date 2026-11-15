@@ -7,6 +7,7 @@ import threading
 import time
 from collections.abc import Callable, Mapping
 from datetime import datetime
+from urllib.parse import urlparse
 
 import httpx2
 
@@ -30,9 +31,11 @@ from .http import (
     HttpClientOptions,
     IdempotencyStore,
     InMemoryIdempotencyStore,
+    TelemetryContext,
 )
 from .reception import check_b2b_applicability, resolve_reception_route
 from .reconciliation import (
+    AMBIGUOUS_SUBMISSION_MESSAGE,
     PENDING_SUBMISSION_MESSAGE,
     ReconciliationResult,
     can_reuse_sequence,
@@ -40,6 +43,15 @@ from .reconciliation import (
 from .resilience import ResilienceOptions
 from .result import DgiiResult, Err, Ok
 from .signing import Signature
+from .telemetry import (
+    SDK_VERSION,
+    DocumentIdentity,
+    EcfEvent,
+    document_identity,
+    emit_event,
+    new_correlation_id,
+    utc_timestamp,
+)
 from .types import (
     AuthToken,
     B2BCommercialApprovalResponse,
@@ -64,7 +76,59 @@ _PENDING_MARKER: JsonObject = {"__pending__": True}
 
 
 def _is_pending(value: JsonObject) -> bool:
-    return value.get("__pending__") is True
+    """Whether a stored value is the in-flight marker.
+
+    Accepts the legacy ``{"pending": True}`` shape the TypeScript package wrote
+    before the two packages were aligned, so a marker written by an older
+    deployment is still honoured instead of being parsed as a delivered
+    response.
+    """
+    return value.get("__pending__") is True or value.get("pending") is True
+
+
+def _destination_scope(buyer_host: str | None) -> str | None:
+    """Destination scope for an idempotency key, or ``None`` for DGII itself."""
+    return None if buyer_host is None else f"@{buyer_host.rstrip('/').lower()}"
+
+
+def _validate_buyer_host(buyer_host: str) -> DgiiResult[None]:
+    """Validate that ``buyer_host`` is an ``https:`` URL without embedded credentials."""
+    trimmed = buyer_host.strip()
+    if not trimmed or any(ch.isspace() for ch in trimmed):
+        return Err(
+            DgiiError(
+                f'Invalid buyer_host URL: "{buyer_host}"',
+                code=DgiiErrorCode.VALIDATION,
+            )
+        )
+    try:
+        parsed = urlparse(trimmed)
+        _ = parsed.port
+    except ValueError:
+        return Err(
+            DgiiError(
+                f'Invalid buyer_host URL: "{buyer_host}"',
+                code=DgiiErrorCode.VALIDATION,
+            )
+        )
+    if parsed.scheme.lower() != "https":
+        return Err(
+            DgiiError("buyer_host must use https:", code=DgiiErrorCode.VALIDATION)
+        )
+    if not parsed.hostname:
+        return Err(
+            DgiiError(
+                "buyer_host must include a hostname", code=DgiiErrorCode.VALIDATION
+            )
+        )
+    if parsed.username is not None or parsed.password is not None:
+        return Err(
+            DgiiError(
+                "buyer_host must not include embedded credentials",
+                code=DgiiErrorCode.VALIDATION,
+            )
+        )
+    return Ok(None)
 
 
 def _sha256_hex(value: str) -> str:
@@ -162,6 +226,7 @@ class ECF:
         status_api_key: str | None = None,
         enforce_b2b_rules: bool = True,
         validate_before_send: bool = False,
+        on_event: Callable[[EcfEvent], None] | None = None,
     ) -> None:
         self._credentials = credentials
         self._environment = environment
@@ -171,17 +236,25 @@ class ECF:
         self._status_api_key = status_api_key
         self._enforce_b2b_rules = enforce_b2b_rules
         self._validate_before_send = validate_before_send
+        self._on_event = on_event
         self._token_refresh_skew_s = token_refresh_skew_s
         self._now = now
         self._token_expires_at: float | None = None
         self._last_token: AuthToken | None = None
         self._refresh_lock = threading.Lock()
+        # One lock per idempotency key, so two callers submitting the same
+        # document coalesce into one transmission instead of racing past a
+        # check-then-act read of the store.
+        self._send_locks: dict[str, threading.Lock] = {}
+        self._send_locks_guard = threading.Lock()
         self._http = HttpClient(
             HttpClientOptions(
                 base_url=BaseUrl.ECF.value,
                 token=token,
                 resilience=resilience,
                 timeout_s=timeout_s,
+                on_event=on_event,
+                environment=environment.value,
                 before_request=self._ensure_token,
                 on_unauthorized=self._reauthenticate,
             ),
@@ -220,7 +293,19 @@ class ECF:
         self._last_token = None
         return self._refresh_token(force=True).is_ok()
 
-    def _build_idempotency_key(self, signed_xml: str) -> str:
+    def _build_idempotency_key(
+        self, signed_xml: str, destination: str | None = None
+    ) -> str:
+        """Idempotency key for a submission.
+
+        ``RNC + eNCF + SHA-256(signed XML)`` for DGII, suffixed with the buyer
+        host for a direct delivery. The destination scope is load-bearing:
+        without it, delivering the same document to a buyer after DGII accepted
+        it was answered from the DGII cache entry and never transmitted.
+
+        DGII keys keep the documented three-part shape, which leaves markers
+        written by an earlier version readable.
+        """
         # ECF/ACECF use ``RNCEmisor``; the ANECF schema spells it ``RncEmisor``.
         rnc = (
             extract_element_text(signed_xml, "RNCEmisor")
@@ -236,7 +321,7 @@ class ECF:
             or extract_element_text(signed_xml, "RangoNCF")
             or "unknown-ncf"
         )
-        return f"{rnc}:{ncf}:{_sha256_hex(signed_xml)}"
+        return f"{rnc}:{ncf}:{_sha256_hex(signed_xml)}{destination or ''}"
 
     def _cache_submission(
         self, key: str, model: type[_ModelT], data: JsonValue
@@ -261,38 +346,132 @@ class ECF:
         self._idempotency.set(key, data)
         return parsed
 
+    def _lock_for(self, key: str) -> threading.Lock:
+        """The per-key submission lock, created on first use."""
+        with self._send_locks_guard:
+            lock = self._send_locks.get(key)
+            if lock is None:
+                lock = threading.Lock()
+                self._send_locks[key] = lock
+            return lock
+
+    def _emit_idempotency(
+        self,
+        state: str,
+        *,
+        correlation_id: str,
+        operation: str,
+        resource: str,
+        identity: DocumentIdentity,
+    ) -> None:
+        emit_event(
+            self._on_event,
+            EcfEvent(
+                type="idempotency",
+                correlation_id=correlation_id,
+                timestamp=utc_timestamp(),
+                sdk_version=SDK_VERSION,
+                document_hash=identity.document_hash,
+                operation=operation,
+                resource=resource,
+                environment=self._environment.value,
+                rnc=identity.rnc,
+                encf=identity.encf,
+                idempotency=state,
+            ),
+        )
+
     def _submit_idempotent(
         self,
         key: str,
         model: type[_ModelT],
-        send: Callable[[], DgiiResult[JsonValue]],
+        send: Callable[[TelemetryContext], DgiiResult[JsonValue]],
+        *,
+        operation: str,
+        resource: str,
+        signed_xml: str,
     ) -> DgiiResult[_ModelT]:
         """Run a submission through the persist-before-transmit flow.
 
         The pending marker is written first so an interrupted send can be
         reconciled instead of re-issued; a successful response replaces it and
         a failure clears it so the caller can retry.
-        """
-        cached = self._idempotency.get(key)
-        if cached is not None:
-            if _is_pending(cached):
-                return Err(
-                    DgiiError(
-                        PENDING_SUBMISSION_MESSAGE,
-                        code=DgiiErrorCode.IDEMPOTENCY,
-                    )
-                )
-            return _parse_one(model, cached)
 
-        self._idempotency.set(key, dict(_PENDING_MARKER))
-        result = send()
-        if result.is_err():
-            self._idempotency.delete(key)
-            return Err(result.unwrap_err())
-        return self._cache_submission(key, model, result.unwrap())
+        Two callers submitting the same document are serialised on a per-key
+        lock, because the store read above is check-then-act: without it both
+        callers found no marker and both transmitted.
+
+        A failure with no HTTP status is ambiguous — the document may have been
+        received with the answer lost — so the marker is kept and the caller is
+        told to reconcile, rather than being handed a clear "retry" that issues
+        a second fiscal document.
+        """
+        correlation_id = new_correlation_id()
+        identity = document_identity(signed_xml)
+        telemetry = TelemetryContext(
+            correlation_id=correlation_id,
+            operation=operation,
+            environment=self._environment.value,
+            rnc=identity.rnc,
+            encf=identity.encf,
+            document_hash=identity.document_hash,
+        )
+        with self._lock_for(key):
+            cached = self._idempotency.get(key)
+            if cached is not None:
+                if _is_pending(cached):
+                    self._emit_idempotency(
+                        "pending",
+                        correlation_id=correlation_id,
+                        operation=operation,
+                        resource=resource,
+                        identity=identity,
+                    )
+                    return Err(
+                        DgiiError(
+                            PENDING_SUBMISSION_MESSAGE,
+                            code=DgiiErrorCode.IDEMPOTENCY,
+                        )
+                    )
+                self._emit_idempotency(
+                    "hit",
+                    correlation_id=correlation_id,
+                    operation=operation,
+                    resource=resource,
+                    identity=identity,
+                )
+                return _parse_one(model, cached)
+
+            self._emit_idempotency(
+                "miss",
+                correlation_id=correlation_id,
+                operation=operation,
+                resource=resource,
+                identity=identity,
+            )
+            self._idempotency.set(key, dict(_PENDING_MARKER))
+            result = send(telemetry)
+            if result.is_err():
+                error = result.unwrap_err()
+                if error.status is None:
+                    return Err(
+                        DgiiError(
+                            AMBIGUOUS_SUBMISSION_MESSAGE,
+                            code=DgiiErrorCode.IDEMPOTENCY,
+                            data=error.data,
+                            cause=error,
+                        )
+                    )
+                self._idempotency.delete(key)
+                return Err(error)
+            return self._cache_submission(key, model, result.unwrap())
 
     def authenticate(self, buyer_host: str | None = None) -> DgiiResult[AuthToken]:
         """Authenticate against DGII (or a buyer host) and store the token."""
+        if buyer_host is not None:
+            valid = _validate_buyer_host(buyer_host)
+            if valid.is_err():
+                return Err(valid.unwrap_err())
         seed = self._get_seed(buyer_host)
         if seed.is_err():
             return Err(seed.unwrap_err())
@@ -317,9 +496,12 @@ class ECF:
             return Err(token.unwrap_err())
 
         issued = token.unwrap()
-        self._http.set_token(issued.token)
-        self._last_token = issued
-        self._token_expires_at = _parse_expiry(issued.expira)
+        if buyer_host is not None:
+            self._http.set_token_for_origin(buyer_host, issued.token)
+        else:
+            self._http.set_token(issued.token)
+            self._last_token = issued
+            self._token_expires_at = _parse_expiry(issued.expira)
         return token
 
     def _get_seed(self, buyer_host: str | None) -> DgiiResult[str]:
@@ -328,7 +510,10 @@ class ECF:
             if buyer_host
             else build_url(self._environment, Endpoint.SEED)
         )
-        result = self._http.get(url, skip_auth_hooks=True)
+        resource = (
+            SenderReceiverEndpoint.SEED.value if buyer_host else Endpoint.SEED.value
+        )
+        result = self._http.get(url, resource=resource, skip_auth_hooks=True)
         if result.is_err():
             return Err(result.unwrap_err())
         data = result.unwrap()
@@ -351,7 +536,11 @@ class ECF:
             else build_url(self._environment, Endpoint.VALIDATE_SEED)
         )
         result = self._http.post_multipart(
-            url, "signed.xml", signed_seed, skip_auth_hooks=True
+            url,
+            "signed.xml",
+            signed_seed,
+            resource=Endpoint.VALIDATE_SEED.value,
+            skip_auth_hooks=True,
         )
         if result.is_err():
             return Err(result.unwrap_err())
@@ -379,36 +568,57 @@ class ECF:
         buyer_host: str | None = None,
     ) -> DgiiResult[InvoiceResponse]:
         """Submit a signed e-CF (idempotent on RNC + eNCF + document hash)."""
-        if buyer_host is not None and self._enforce_b2b_rules:
-            applicable = check_b2b_applicability(signed_xml)
-            if applicable.is_err():
-                return Err(applicable.unwrap_err())
+        if buyer_host is not None:
+            valid = _validate_buyer_host(buyer_host)
+            if valid.is_err():
+                return Err(valid.unwrap_err())
+            if self._enforce_b2b_rules:
+                applicable = check_b2b_applicability(signed_xml)
+                if applicable.is_err():
+                    return Err(applicable.unwrap_err())
         if self._validate_before_send:
             validation = validate_document(signed_xml)
             if validation.is_err():
-                return Err(validation.unwrap_err())
-            violations = validation.unwrap()
-            if violations:
-                return Err(
-                    DgiiError(
-                        "Document does not match the DGII XML Schema: "
-                        + format_violations(violations),
-                        code=DgiiErrorCode.VALIDATION,
-                        data=[
-                            {"path": violation.path, "message": violation.message}
-                            for violation in violations
-                        ],
-                    )
+                val_err = validation.unwrap_err()
+                is_schema_unavailable = (
+                    val_err.code == DgiiErrorCode.VALIDATION
+                    and val_err.message.startswith("Schema unavailable")
                 )
+                if not is_schema_unavailable:
+                    return Err(val_err)
+            else:
+                violations = validation.unwrap()
+                if violations:
+                    return Err(
+                        DgiiError(
+                            "Document does not match the DGII XML Schema: "
+                            + format_violations(violations),
+                            code=DgiiErrorCode.VALIDATION,
+                            data=[
+                                {"path": violation.path, "message": violation.message}
+                                for violation in violations
+                            ],
+                        )
+                    )
         url = (
             build_sender_receiver_url(buyer_host, SenderReceiverEndpoint.SEND_INVOICE)
             if buyer_host
             else build_url(self._environment, Endpoint.SEND_INVOICE)
         )
         return self._submit_idempotent(
-            self._build_idempotency_key(signed_xml),
+            self._build_idempotency_key(signed_xml, _destination_scope(buyer_host)),
             InvoiceResponse,
-            lambda: self._http.post_multipart(url, file_name, signed_xml),
+            lambda telemetry: self._http.post_multipart(
+                url,
+                file_name,
+                signed_xml,
+                resource=Endpoint.SEND_INVOICE.value,
+                retry=False,
+                telemetry=telemetry,
+            ),
+            operation="send_electronic_document",
+            resource=Endpoint.SEND_INVOICE.value,
+            signed_xml=signed_xml,
         )
 
     def send_summary(
@@ -421,7 +631,17 @@ class ECF:
         return self._submit_idempotent(
             self._build_idempotency_key(signed_xml),
             InvoiceSummaryResponse,
-            lambda: self._http.post_multipart(url, file_name, signed_xml),
+            lambda telemetry: self._http.post_multipart(
+                url,
+                file_name,
+                signed_xml,
+                resource=Endpoint.SEND_SUMMARY.value,
+                retry=False,
+                telemetry=telemetry,
+            ),
+            operation="send_summary",
+            resource=Endpoint.SEND_SUMMARY.value,
+            signed_xml=signed_xml,
         )
 
     def send_document(
@@ -437,6 +657,10 @@ class ECF:
         :meth:`send_electronic_document` for an ECF. An E32 below RD$250,000 is
         rejected because DGII only accepts the summary form for those.
         """
+        if buyer_host is not None:
+            valid = _validate_buyer_host(buyer_host)
+            if valid.is_err():
+                return Err(valid.unwrap_err())
         route = resolve_reception_route(signed_xml)
         if route.is_err():
             return Err(route.unwrap_err())
@@ -462,7 +686,12 @@ class ECF:
         """
         url = build_url(self._environment, Endpoint.TRACK_RESULT_STATUS)
         return _parse_response(
-            TrackingStatusResponse, self._http.get(url, {"trackId": track_id})
+            TrackingStatusResponse,
+            self._http.get(
+                url,
+                {"trackId": track_id},
+                resource=Endpoint.TRACK_RESULT_STATUS.value,
+            ),
         )
 
     def inquiry_status(
@@ -484,10 +713,13 @@ class ECF:
                     "rncComprador": rnc_comprador,
                     "codigoSeguridad": codigo_seguridad,
                 },
+                resource=Endpoint.INQUIRY_STATUS.value,
             ),
         )
 
-    def reconcile_submission(self, signed_xml: str) -> DgiiResult[ReconciliationResult]:
+    def reconcile_submission(
+        self, signed_xml: str, buyer_host: str | None = None
+    ) -> DgiiResult[ReconciliationResult]:
         """Resolve what happened to a submission whose marker is pending.
 
         Existence comes from ``inquiry_status`` (``consultaestado``) and nowhere
@@ -506,6 +738,10 @@ class ECF:
         corroborates the flag, so an absent or unreadable one withholds reuse
         instead of failing a read that did happen.
         """
+        if buyer_host is not None:
+            valid = _validate_buyer_host(buyer_host)
+            if valid.is_err():
+                return Err(valid.unwrap_err())
         rnc = extract_element_text(signed_xml, "RNCEmisor") or extract_element_text(
             signed_xml, "RncEmisor"
         )
@@ -557,7 +793,9 @@ class ECF:
         # The marker is the last fallible statement: no read happens after it,
         # and the gated branch above can never be reached once `cleared` is set.
         if cleared:
-            self._idempotency.delete(self._build_idempotency_key(signed_xml))
+            self._idempotency.delete(
+                self._build_idempotency_key(signed_xml, _destination_scope(buyer_host))
+            )
         return Ok(
             ReconciliationResult(
                 inquiry=value,
@@ -578,7 +816,11 @@ class ECF:
         indistinguishable from a document DGII holds.
         """
         url = build_url(self._environment, Endpoint.ALL_TRACKING_ECF)
-        result = self._http.get(url, {"rncEmisor": rnc_emisor, "encf": encf})
+        result = self._http.get(
+            url,
+            {"rncEmisor": rnc_emisor, "encf": encf},
+            resource=Endpoint.ALL_TRACKING_ECF.value,
+        )
         if result.is_err():
             return Err(result.unwrap_err())
         data = result.unwrap()
@@ -597,7 +839,7 @@ class ECF:
     ) -> DgiiResult[list[ServiceDirectoryResponse] | None]:
         """Return the customer directory, normalizing single-object responses."""
         url = build_url(self._environment, Endpoint.DIRECTORY)
-        result = self._http.get(url, {"rnc": rnc})
+        result = self._http.get(url, {"rnc": rnc}, resource=Endpoint.DIRECTORY.value)
         if result.is_err():
             return Err(result.unwrap_err())
         data = result.unwrap()
@@ -608,7 +850,7 @@ class ECF:
     def get_directory_listing(self) -> DgiiResult[list[ServiceDirectoryResponse]]:
         """General directory listing — every receiver that publishes URLs."""
         url = build_url(self._environment, Endpoint.DIRECTORY_LIST)
-        result = self._http.get(url)
+        result = self._http.get(url, resource=Endpoint.DIRECTORY_LIST.value)
         if result.is_err():
             return Err(result.unwrap_err())
         return _parse_list(ServiceDirectoryResponse, result.unwrap())
@@ -634,6 +876,7 @@ class ECF:
                     "encf": encf,
                     "cod_seguridad_eCF": cod_seguridad,
                 },
+                resource=Endpoint.INQUIRY_INVOICE_SUMMARY.value,
             ),
         )
 
@@ -683,6 +926,7 @@ class ECF:
             build_status_url(endpoint),
             params,
             headers=headers,
+            resource=f"status:{endpoint.value}",
             skip_auth_hooks=True,
             omit_auth=True,
         )
@@ -701,14 +945,25 @@ class ECF:
         documents HTTP 200 as satisfactory and HTTP 400 as unsatisfactory — a
         business outcome, not a transport failure.
         """
-        key = self._build_idempotency_key(signed_xml)
+        if buyer_host is not None:
+            valid = _validate_buyer_host(buyer_host)
+            if valid.is_err():
+                return Err(valid.unwrap_err())
+        key = self._build_idempotency_key(signed_xml, _destination_scope(buyer_host))
         if buyer_host is not None:
 
-            def _send_to_buyer() -> DgiiResult[JsonValue]:
+            def _send_to_buyer(telemetry: TelemetryContext) -> DgiiResult[JsonValue]:
                 url = build_sender_receiver_url(
                     buyer_host, SenderReceiverEndpoint.COMMERCIAL_APPROVAL
                 )
-                result = self._http.post_multipart(url, file_name, signed_xml)
+                result = self._http.post_multipart(
+                    url,
+                    file_name,
+                    signed_xml,
+                    resource=SenderReceiverEndpoint.COMMERCIAL_APPROVAL.value,
+                    retry=False,
+                    telemetry=telemetry,
+                )
                 if result.is_err():
                     error = result.unwrap_err()
                     if error.status == 400:
@@ -717,14 +972,29 @@ class ECF:
                 return Ok({"status": 200, "accepted": True})
 
             return self._submit_idempotent(
-                key, B2BCommercialApprovalResponse, _send_to_buyer
+                key,
+                B2BCommercialApprovalResponse,
+                _send_to_buyer,
+                operation="send_commercial_approval",
+                resource=SenderReceiverEndpoint.COMMERCIAL_APPROVAL.value,
+                signed_xml=signed_xml,
             )
 
         url = build_url(self._environment, Endpoint.COMMERCIAL_APPROVAL)
         return self._submit_idempotent(
             key,
             CommercialApprovalResponse,
-            lambda: self._http.post_multipart(url, file_name, signed_xml),
+            lambda telemetry: self._http.post_multipart(
+                url,
+                file_name,
+                signed_xml,
+                resource=Endpoint.COMMERCIAL_APPROVAL.value,
+                retry=False,
+                telemetry=telemetry,
+            ),
+            operation="send_commercial_approval",
+            resource=Endpoint.COMMERCIAL_APPROVAL.value,
+            signed_xml=signed_xml,
         )
 
     def void_encf(self, signed_xml: str, file_name: str) -> DgiiResult[VoidNCFResponse]:
@@ -733,5 +1003,15 @@ class ECF:
         return self._submit_idempotent(
             self._build_idempotency_key(signed_xml),
             VoidNCFResponse,
-            lambda: self._http.post_multipart(url, file_name, signed_xml),
+            lambda telemetry: self._http.post_multipart(
+                url,
+                file_name,
+                signed_xml,
+                resource=Endpoint.VOID.value,
+                retry=False,
+                telemetry=telemetry,
+            ),
+            operation="void_encf",
+            resource=Endpoint.VOID.value,
+            signed_xml=signed_xml,
         )

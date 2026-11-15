@@ -51,50 +51,52 @@ Both SDKs: authenticate against DGII web services, sign documents with **XMLDSig
 
 ### TypeScript (`packages/typescript/src/`)
 
-| Module              | Responsibility                                               |
-| ------------------- | ------------------------------------------------------------ |
-| `index.ts`          | Public re-exports (package surface)                          |
-| `environment.ts`    | `Environment`, `BaseUrl`, `Endpoint`, URL builders           |
-| `types.ts`          | Wire/response models (`AuthToken`, `InvoiceResponse`, …)     |
-| `errors.ts`         | `DgiiError`, `DgiiErrorCode`, `toDgiiError()`                |
-| `result.ts`         | `neverthrow` re-exports + `DgiiResult<T>`                    |
-| `resilience.ts`     | cockatiel policy factory + retry predicate                   |
-| `http.ts`           | `HttpClient`, `IdempotencyStore`, `InMemoryIdempotencyStore` |
-| `xml.ts`            | Strict parse, root/element extraction                        |
-| `certificate.ts`    | `P12Reader` (node-forge)                                     |
-| `signing.ts`        | `Signature`, `validateXMLCertificate`                        |
-| `transformer.ts`    | `Transformer` (xml-js json2xml/xml2json)                     |
-| `reception.ts`      | Reception routing + B2B applicability (A.2)                  |
-| `reconciliation.ts` | Pending-marker reconciliation, sequence reuse                |
-| `validation.ts`     | XSD validation via `xmllint` (ADR 0002)                      |
-| `utils.ts`          | security code, QR URLs, date/time, RFCE, XML-body helpers    |
-| `client.ts`         | `ECF` (auth + all endpoints)                                 |
+| Module              | Responsibility                                                     |
+| ------------------- | ------------------------------------------------------------------ |
+| `index.ts`          | Public re-exports (package surface)                                |
+| `environment.ts`    | `Environment`, `BaseUrl`, `Endpoint`, URL builders                 |
+| `types.ts`          | Wire/response models (`AuthToken`, `InvoiceResponse`, …)           |
+| `errors.ts`         | `DgiiError`, `DgiiErrorCode`, `toDgiiError()`                      |
+| `result.ts`         | `neverthrow` re-exports + `DgiiResult<T>`                          |
+| `resilience.ts`     | cockatiel policy factory + retry predicate                         |
+| `http.ts`           | `HttpClient`, `IdempotencyStore`, `InMemoryIdempotencyStore`       |
+| `xml.ts`            | Strict parse, root/element extraction                              |
+| `certificate.ts`    | `P12Reader` (node-forge)                                           |
+| `signing.ts`        | `Signature`, `validateXMLCertificate`                              |
+| `transformer.ts`    | `Transformer` (xml-js json2xml/xml2json)                           |
+| `reception.ts`      | Reception routing + B2B applicability (A.2)                        |
+| `reconciliation.ts` | Pending-marker reconciliation, sequence reuse                      |
+| `validation.ts`     | XSD validation via `xmllint` (ADR 0002)                            |
+| `utils.ts`          | security code, QR URLs, date/time, RFCE, XML-body helpers          |
+| `telemetry.ts`      | `EcfEvent`, `EcfEventType`, `DocumentIdentity`, `documentIdentity` |
+| `client.ts`         | `ECF` (auth + all endpoints)                                       |
 
 ### Python (`packages/python/src/py_dgii_ecf/`)
 
 Mirrors the TS map 1:1, with `cli.py` (Python-only) replacing `index.ts` as the "extra" module;
 `__init__.py` is the package surface (analogous to `index.ts`).
 
-| Module              | Responsibility                                               |
-| ------------------- | ------------------------------------------------------------ |
-| `__init__.py`       | Public re-exports                                            |
-| `environment.py`    | `Environment`, `BaseUrl`, `Endpoint`, URL builders           |
-| `types.py`          | Models (`AuthToken`, response types)                         |
-| `errors.py`         | `DgiiError`, `DgiiErrorCode`, `to_dgii_error()`              |
-| `result.py`         | `result` re-exports + `DgiiResult[T]`                        |
-| `resilience.py`     | tenacity + pybreaker wrapper + retry predicate               |
-| `http.py`           | `HttpClient`, `IdempotencyStore`, `InMemoryIdempotencyStore` |
-| `_xml.py`           | Strict parse, root/element extraction                        |
-| `_json.py`          | JSON value types used by the transformer                     |
-| `certificate.py`    | `P12Reader` (cryptography)                                   |
-| `signing.py`        | `Signature`, `validate_xml_certificate`                      |
-| `transformer.py`    | `Transformer` (internal `dict_to_xml`/`xml_to_dict`)         |
-| `reception.py`      | Reception routing + B2B applicability (A.2)                  |
-| `reconciliation.py` | Pending-marker reconciliation, sequence reuse                |
-| `validation.py`     | XSD validation via `lxml` (offline, bundled schemas)         |
-| `utils.py`          | security code, QR URLs, date/time, RFCE, XML-body helpers    |
-| `client.py`         | `ECF` (auth + all endpoints)                                 |
-| `cli.py`            | typer `app` → `py-dgii-ecf` entry point                      |
+| Module              | Responsibility                                                     |
+| ------------------- | ------------------------------------------------------------------ |
+| `__init__.py`       | Public re-exports                                                  |
+| `environment.py`    | `Environment`, `BaseUrl`, `Endpoint`, URL builders                 |
+| `types.py`          | Models (`AuthToken`, response types)                               |
+| `errors.py`         | `DgiiError`, `DgiiErrorCode`, `to_dgii_error()`                    |
+| `result.py`         | `result` re-exports + `DgiiResult[T]`                              |
+| `resilience.py`     | tenacity + lock-free circuit breaker + `BoundedSemaphore` bulkhead |
+| `http.py`           | `HttpClient`, `IdempotencyStore`, `InMemoryIdempotencyStore`       |
+| `_xml.py`           | Strict parse, root/element extraction                              |
+| `_json.py`          | JSON value types used by the transformer                           |
+| `certificate.py`    | `P12Reader` (cryptography)                                         |
+| `signing.py`        | `Signature`, `validate_xml_certificate`                            |
+| `transformer.py`    | `Transformer` (internal `dict_to_xml`/`xml_to_dict`)               |
+| `reception.py`      | Reception routing + B2B applicability (A.2)                        |
+| `reconciliation.py` | Pending-marker reconciliation, sequence reuse                      |
+| `validation.py`     | XSD validation via `lxml` (offline, bundled schemas)               |
+| `utils.py`          | security code, QR URLs, date/time, RFCE, XML-body helpers          |
+| `telemetry.py`      | `EcfEvent`, `DocumentIdentity`, `document_identity`                |
+| `client.py`         | `ECF` (auth + all endpoints)                                       |
+| `cli.py`            | typer `app` → `py-dgii-ecf` entry point                            |
 
 ---
 
@@ -145,7 +147,9 @@ function buildSenderReceiverUrl(
 Constants must match Appendix A.1/A.2 **byte-for-byte**. Sender↔Receiver (buyer-host) paths are
 prefixed `fe/...` and hit `buyerHost` directly (no `/env` prefix):
 `fe/autenticacion/api/semilla`, `fe/autenticacion/api/validacioncertificado`,
-`fe/recepcion/api/ecf`, `fe/aprobacioncomercial/api/ecf`. The service-status host uses
+`fe/recepcion/api/ecf`, `fe/aprobacioncomercial/api/ecf`. `buyerHost` must use `https:` (any non-HTTPS
+scheme is rejected as `VALIDATION`) and uses per-origin token isolation so the DGII bearer token is
+never transmitted to a `buyerHost`. The service-status host uses
 `StatusEndpoint` (`api/estatusservicios/...`) and takes an `Apikey` header, not a bearer token.
 
 ### 4.2 `types.ts`
@@ -214,6 +218,8 @@ interface InquiryStatusResponse {
   // no `secuenciaUtilizada` — DGII does not publish it here; do not add it back
   rncEmisor?: string;
   ncfElectronico?: string;
+  montoTotal?: string;
+  totalITBIS?: string;
   /* …the remaining documented output parameters… */
 }
 
@@ -271,10 +277,14 @@ type DgiiErrorCode =
 class DgiiError extends Error {
   readonly code: DgiiErrorCode;
   readonly status?: number; // HTTP status if any
+  readonly statusText?: string;
   readonly resource?: string; // endpoint path attempted
+  readonly method?: string;
+  readonly baseURL?: string;
   readonly data?: unknown; // raw response body
   readonly mensajes?: Mensaje[]; // normalized DGII `mensajes` array (if any)
-  readonly retryable?: boolean;
+  readonly retryable: boolean;
+  readonly retryAfter?: number; // Retry-After / breaker remaining delay in ms
 }
 
 function toDgiiError(error: unknown): DgiiError; // A.8 normalizer
@@ -298,9 +308,11 @@ export type DgiiResult<T> = Result<T, DgiiError>;
 ```ts
 interface ResilienceOptions {
   /**
-   * Retries after the first attempt, passed straight to cockatiel's
-   * `maxAttempts`. Default 3 — i.e. **4** transport attempts per logical call,
-   * where Python's `stop_after_attempt(3)` means 3 (§14, F-126-8).
+   * Maximum attempts **including the first**. Default 3 — i.e. at most three
+   * sends per logical call, the same budget as Python's `stop_after_attempt(3)`.
+   * cockatiel counts retries, so the policy passes `maxAttempts: maxRetries - 1`
+   * and the off-by-one never reaches a caller (it used to send 4 times here and
+   * 3 times in Python).
    */
   maxRetries?: number;
   /** Consecutive failures before the circuit opens. Default 5. */
@@ -317,12 +329,17 @@ interface ResilienceOptions {
   bulkheadQueue?: number;
 }
 
-function isRetryable(error: unknown): boolean; // network | 408 | 429 | 5xx
+function isRetryable(error: unknown): boolean; // network | timeout | 408 | 429 | 5xx
 function createResiliencePolicies(opts?: ResilienceOptions): ResiliencePolicies;
 ```
 
-The composed policy wraps, innermost→outermost: `bulkhead → timeout → breaker → retry`, so retries
-re-enter the breaker and respect the overall timeout. See §8 for the retry predicate contract.
+The composed policy (`wrap(breakerPolicy, retryPolicy, bulkheadPolicy, timeoutPolicy)`) wraps,
+innermost→outermost: `timeout → bulkhead → retry → breaker` (and `timeout → bulkhead → breaker`
+when `retry: false`), so queue wait inside the bulkhead is never charged to the per-attempt network
+timeout, bulkhead rejections are excluded from opening the circuit breaker, and the circuit breaker
+counts logical operations rather than individual retry attempts. `HttpClient` maintains per-origin
+policy isolation (`policiesByOrigin`), so a failing buyer host never trips the circuit breaker or
+exhausts the bulkhead for DGII origins. See §8 for the retry predicate contract.
 
 ### 4.6 `http.ts`
 
@@ -370,6 +387,10 @@ class HttpClient {
   computes it from the Blob.
 - `get`/`postMultipart` inject `Authorization: Bearer <token>` and `Accept: application/json`, run
   through the composed policy, and map failures through `toDgiiError`.
+- Redirects are refused: `fetch` is called with `redirect: 'manual'` and any 3xx returns a
+  non-retryable `HTTP` error without reading the body, because following one would replay a signed
+  fiscal document and the bearer token to whatever host the response names. Python's `httpx2`
+  already defaults to `follow_redirects=False`.
 - The idempotency key is derived by the client (`ECF#buildIdempotencyKey`), not by `HttpClient`:
   `RNC + eNCF + SHA-256(signed XML)` (see §9).
 
@@ -406,7 +427,7 @@ and the `pkcs8ShroudedKeyBag` — falling back to a plain `keyBag` for unencrypt
 `certBag` never holds a private key, so it must not be used as a fallback. Every method returns
 `Err(DgiiError)` on a bad passphrase or a malformed P12.
 
-### 4.8 `signing.ts`
+### 4.8 `signing.ts` and `validation.ts`
 
 ```ts
 class Signature {
@@ -418,11 +439,22 @@ class Signature {
 }
 
 function validateXMLCertificate(xml: string): XmlCertificateValidation;
+
+// validation.ts
+function validateDocument(
+  xml: string,
+  options?: ValidationOptions,
+): Result<SchemaViolation[], DgiiError>;
+function isSchemaUnavailableError(error: DgiiError): boolean;
+function formatViolations(violations: readonly SchemaViolation[]): string;
 ```
 
 The reference digest is xml-crypto's built-in SHA-256, over the node-set it has already
 canonicalized with inclusive C14N 1.0 (Appendix A.5). `rootElName` defaults to the parsed root
-element, so callers rarely pass it. Full algorithm in §10.
+element, so callers rarely pass it. `isSchemaUnavailableError` identifies the three document types
+(`E31`, `RFCE`, `ACECF`) whose published DGII XSDs do not compile, so `validateBeforeSend` does not
+block them while still failing on invalid XML or a missing `xmllint` binary. Full signing algorithm
+in §10.
 
 ### 4.9 `transformer.ts`
 
@@ -435,25 +467,27 @@ class Transformer {
 
 Thin wrapper over `xml-js` in **compact** mode. JSON shape contract in §11.
 
-### 4.10 `utils.ts`
+### 4.10 `utils.ts` and `telemetry.ts`
 
 ```ts
-function getCodeSixDigitfromSignature(xml: string): string; // first 6 of <SignatureValue>
+function getCodeSixDigitfromSignature(
+  signedXml: string,
+): Result<string, DgiiError>; // first 6 of <SignatureValue>
 function generateFcQRCodeURL(
-  rnc: string,
+  rncemisor: string,
   encf: string,
-  monto: string,
-  codigo: string,
+  montototal: string,
+  codigoseguridad: string,
   env: Environment,
 ): string;
 function generateEcfQRCodeURL(
-  rnc: string,
+  rncemisor: string,
   rncComprador: string | undefined,
   encf: string,
-  monto: string,
+  montototal: string,
   fechaEmision: string,
   fechaFirma: string,
-  codigo: string,
+  codigoseguridad: string,
   env: Environment,
 ): string; // omit RncComprador query param for E43/E47
 function getCurrentFormattedDateTime(): string; // DD-MM-YYYY HH:mm:ss, America/Santo_Domingo
@@ -461,14 +495,58 @@ function getXmlFromBodyResponse(
   body: string,
   lastTag?: string,
 ): string | undefined; // regex <\?xml[\s\S]*?</{tag}>
-function convertECF32ToRFCE(ecf32Xml: string): {
-  xml: string;
-  securityCode: string;
-};
+function convertECF32ToRFCE(
+  ecf32Xml: string,
+): Result<{ xml: string; securityCode: string }, DgiiError>;
+
+// telemetry.ts
+type EcfEventType =
+  | 'transmission.started'
+  | 'transmission.succeeded'
+  | 'transmission.failed'
+  | 'attempt'
+  | 'idempotency'
+  | 'reconcile.completed'
+  | 'breaker.changed'
+  | 'token.changed'
+  | 'certificate.checked';
+
+interface EcfEvent {
+  readonly type: EcfEventType;
+  readonly correlationId: string;
+  readonly documentHash?: string;
+  readonly operation: string;
+  readonly resource?: string;
+  readonly environment?: string;
+  readonly rnc?: string;
+  readonly encf?: string;
+  readonly attempt?: number;
+  readonly maxAttempts?: number;
+  readonly durationMs?: number;
+  readonly httpStatus?: number;
+  readonly errorCode?: string;
+  readonly retryable?: boolean;
+  readonly idempotency?: 'miss' | 'hit' | 'pending' | 'joined';
+  readonly breakerState?: 'closed' | 'open' | 'half_open';
+  readonly breakerSince?: number;
+  readonly expiresAt?: string;
+  readonly timestamp: string;
+  readonly sdkVersion: string;
+}
+
+interface DocumentIdentity {
+  readonly rnc?: string;
+  readonly encf?: string;
+  readonly documentHash: string;
+}
+
+function documentIdentity(signedXml: string): DocumentIdentity;
 ```
 
 All behaviours match Appendix A.7 exactly (QR query shapes, E43/E47 omission, RFCE empty-drop +
-lone `ImpuestoAdicional`→list wrap).
+lone `ImpuestoAdicional`→list wrap). `convertECF32ToRFCE` returns `Err(VALIDATION: 'Encabezado not found')`
+when the input is not a signed `<ECF>` with an `<Encabezado>`. `documentIdentity` extracts only the
+emitter RNC, e-NCF, and SHA-256 document hash (never buyer RNCs or credentials).
 
 ### 4.11 `client.ts`
 
@@ -485,6 +563,7 @@ interface EcfOptions {
   enforceB2BRules?: boolean; // default true
   validateBeforeSend?: boolean; // default false, requires xmllint
   xmllintBin?: string;
+  onEvent?: (event: EcfEvent) => void; // optional synchronous telemetry callback
 }
 
 class ECF {
@@ -548,6 +627,7 @@ class ECF {
   ): Promise<DgiiResult<InquiryInvoiceSummary>>;
   reconcileSubmission(
     signedXml: string,
+    buyerHost?: string,
   ): Promise<DgiiResult<ReconciliationResult>>;
 
   // Service status (Apikey, no environment segment, no bearer token).
@@ -568,7 +648,10 @@ Endpoint wiring (Appendix A.2): `authenticate` → `Seed` then `ValidateSeed`; `
 
 `sendDocument` rejects an E32 below RD$250,000 (the caller must build the RFCE first) and rejects a
 `buyerHost` for an RFCE summary. `sendElectronicDocument` additionally enforces the B2B
-applicability rules and, when enabled, XSD validation before any network call.
+applicability rules and, when enabled, XSD validation before any network call. Any `buyerHost`
+passed to `authenticate`, `sendElectronicDocument`, `sendDocument` or `sendCommercialApproval` must
+be `https:` and uses per-origin token isolation (the DGII bearer token is never sent to a
+`buyerHost`).
 
 `reconcileSubmission` composes the query chain of §9.4 — it is not a single endpoint: `inquiryStatus`
 (`consultaestado`, existence) runs first and alone decides `delivered`/`cleared`; only for a rejected
@@ -606,12 +689,13 @@ track result are classified by `canReuseSequence` (§9.4) and never fail the rea
 ### 4.12 `index.ts`
 
 Re-exports the whole package surface: `ECF`, `P12Reader`, `Signature`, `Transformer`,
-`validateDocument`, `formatViolations`, `resolveReceptionRoute`, `checkB2BApplicability`,
-`canReuseSequence`, `getCodeSixDigitfromSignature`, `generateFcQRCodeURL`,
+`validateDocument`, `isSchemaUnavailableError`, `formatViolations`, `resolveReceptionRoute`,
+`checkB2BApplicability`, `canReuseSequence`, `getCodeSixDigitfromSignature`, `generateFcQRCodeURL`,
 `generateEcfQRCodeURL`, `getCurrentFormattedDateTime`, `getXmlFromBodyResponse`,
-`convertECF32ToRFCE`, `validateXMLCertificate`, plus `Environment`, `BaseUrl`, `Endpoint`,
-`SenderReceiverEndpoint`, `StatusEndpoint`, `StatusEnvironment`, `DgiiError`, `DgiiErrorCode`,
-`DgiiResult`, `HttpClient`, `IdempotencyStore`.
+`convertECF32ToRFCE`, `validateXMLCertificate`, `EcfEvent`, `EcfEventType`, `DocumentIdentity`,
+`documentIdentity`, plus `Environment`, `BaseUrl`, `Endpoint`, `SenderReceiverEndpoint`,
+`StatusEndpoint`, `StatusEnvironment`, `DgiiError`, `DgiiErrorCode`, `DgiiResult`, `HttpClient`,
+`IdempotencyStore`, `InMemoryIdempotencyStore`.
 
 ---
 
@@ -652,10 +736,18 @@ class AuthToken:
     expira: str
     expedido: str
 
-# Response models; monetary fields typed as `Decimal` (or `str` where DGII wire requires).
+@dataclass(frozen=True)
+class InquiryStatusResponse:
+    codigo: int
+    estado: str
+    rnc_emisor: str | None = None
+    ncf_electronico: str | None = None
+    monto_total: Decimal | None = None
+    total_itbis: Decimal | None = None
+    # …the remaining documented output parameters…
 ```
 
-Use dataclasses or Pydantic models; mypy-strict clean. Monetary fields are `Decimal` per §3.4.
+Use dataclasses or Pydantic models; mypy-strict clean. Monetary fields are `Decimal` per §2.3 (`InquiryStatusResponse.monto_total: Decimal | None` and `total_itbis: Decimal | None`).
 
 The response models mirror §4.2 field for field, with one difference in how a payload is read:
 Python's models are typed, so parsing is where tolerance lives. The split follows the same rule as
@@ -702,6 +794,7 @@ class DgiiError(Exception):
     data: object = None
     mensajes: list[Mensaje] | None = None
     retryable: bool | None = None
+    retry_after: float | None = None
     cause: object = None
 
 def to_dgii_error(error: object) -> DgiiError: ...
@@ -721,21 +814,26 @@ DgiiResult = Result  # used as Result[T, DgiiError]
 ### 5.5 `resilience.py`
 
 ```python
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ResilienceOptions:
-    max_retries: int = 3  # stop_after_attempt(3) -> 3 total attempts (TS: 4, §14 F-126-8)
+    max_retries: int = 3  # stop_after_attempt(3) -> 3 total attempts (matches TS maxRetries=3)
     breaker_threshold: int = 5
     reset_timeout_s: float = 30.0
     timeout_s: float = 15.0
+    bulkhead_limit: int = 20
+    bulkhead_queue: int = 40
 
-def is_retryable_error(error: BaseException) -> bool: ...   # network | 408 | 429 | 5xx
-class ResiliencePolicy:                                     # tenacity + pybreaker wrapper
-    def execute(self, fn: Callable[[], T]) -> Result[T, DgiiError]: ...
+def is_retryable_error(error: BaseException) -> bool: ...   # network | timeout | 408 | 429 | 5xx
+class ResiliencePolicy:                                     # breaker (outer) -> retry -> bulkhead (inner)
+    def execute(self, fn: Callable[[], T], *, retry: bool = True) -> T: ...
 ```
 
-Python composes **retry (tenacity) + circuit breaker (pybreaker) + timeout (httpx2 client
-`timeout=`)**, per spec §3.3/§5.1. There is **no bulkhead** in Python — the spec lists only
-tenacity + pybreaker; this is an intentional, documented parity difference (see §12.8).
+Python composes **circuit breaker (outer, lock-free during I/O) → retry (tenacity, middle) →
+bulkhead (`threading.BoundedSemaphore` + bounded wait queue, inner) → timeout (`httpx2.Client(timeout=)`
+per attempt)**. The breaker lock is held only for state transitions and never across network I/O,
+bulkhead/circuit rejections are excluded from tripping the breaker, and `HttpClient` maintains
+per-origin policies (`_policies_by_origin`) so a failing buyer host never trips the breaker or
+saturates the bulkhead for DGII origins.
 
 ### 5.6 `http.py`
 
@@ -795,7 +893,7 @@ class P12Reader:
 
 Per A.6: `cryptography.hazmat.primitives.serialization.pkcs12.load_key_and_certificates`.
 
-### 5.8 `signing.py`
+### 5.8 `signing.py` and `validation.py`
 
 ```python
 class Signature:
@@ -805,10 +903,17 @@ class Signature:
     def sign_xml(self, xml: str, root_name: str | None = None) -> DgiiResult[str]: ...
 
 def validate_xml_certificate(xml: str) -> XmlCertificateValidation: ...
+
+# validation.py
+def validate_document(xml: str) -> DgiiResult[tuple[SchemaViolation, ...]]: ...
+def is_schema_unavailable_error(error: DgiiError) -> bool: ...
+def format_violations(violations: tuple[SchemaViolation, ...]) -> str: ...
 ```
 
 No custom digest — uses `etree.tostring(node, method="c14n", exclusive=False, with_comments=False)`
-(inclusive 1.0 C14N). Full algorithm in §10.
+(inclusive 1.0 C14N). `is_schema_unavailable_error` identifies the three document types (`E31`,
+`RFCE`, `ACECF`) whose published DGII XSDs do not compile, so `validate_before_send` does not block
+them while still failing on invalid XML or an unknown document type. Full signing algorithm in §10.
 
 ### 5.9 `transformer.py`
 
@@ -823,17 +928,49 @@ class Transformer:
 Implemented with `lxml` + a small internal `dict_to_xml`/`xml_to_dict` mirroring xml-js **compact**
 semantics — **no extra dependency** (see §11 and §12.2).
 
-### 5.10 `utils.py`
+### 5.10 `utils.py` and `telemetry.py`
 
 ```python
-def get_code_six_digit_from_signature(xml: str) -> str: ...
-def generate_fc_qr_code_url(rnc: str, encf: str, monto: str, codigo: str, env: Environment) -> str: ...
-def generate_ecf_qr_code_url(rnc: str, rnc_comprador: str | None, encf: str, monto: str,
-                             fecha_emision: str, fecha_firma: str, codigo: str,
+def get_code_six_digit_from_signature(signed_xml: str) -> DgiiResult[str]: ...
+def generate_fc_qr_code_url(rncemisor: str, encf: str, montototal: Decimal | str, codigoseguridad: str, env: Environment) -> str: ...
+def generate_ecf_qr_code_url(rncemisor: str, rnc_comprador: str, encf: str, montototal: str,
+                             fecha_emision: str, fecha_firma: str, codigoseguridad: str,
                              env: Environment) -> str: ...   # omit RncComprador for E43/E47
-def get_current_formatted_datetime() -> str: ...             # DD-MM-YYYY HH:mm:ss, America/Santo_Domingo
-def get_xml_from_body_response(body: str, last_tag: str = "ACECF") -> str | None: ...
-def convert_ecf32_to_rfce(ecf32_xml: str) -> dict[str, str]: ...  # {"xml": ..., "security_code": ...}
+def get_current_formatted_datetime(now: datetime | None = None) -> str: ...  # DD-MM-YYYY HH:mm:ss, America/Santo_Domingo
+def get_xml_from_body_response(body: str, last_tag_name: str = "ACECF") -> str | None: ...
+def convert_ecf32_to_rfce(ecf32_xml: str) -> DgiiResult[dict[str, str]]: ...  # {"xml": ..., "securityCode": ...}
+
+# telemetry.py
+@dataclass(frozen=True, slots=True)
+class EcfEvent:
+    type: str
+    correlation_id: str
+    timestamp: str
+    sdk_version: str
+    document_hash: str | None = None
+    operation: str = ""
+    resource: str | None = None
+    environment: str | None = None
+    rnc: str | None = None
+    encf: str | None = None
+    attempt: int | None = None
+    max_attempts: int | None = None
+    duration_ms: float | None = None
+    http_status: int | None = None
+    error_code: str | None = None
+    retryable: bool | None = None
+    idempotency: str | None = None
+    breaker_state: str | None = None
+    breaker_since: float | None = None
+    expires_at: str | None = None
+
+@dataclass(frozen=True, slots=True)
+class DocumentIdentity:
+    document_hash: str
+    rnc: str | None = None
+    encf: str | None = None
+
+def document_identity(signed_xml: str) -> DocumentIdentity: ...
 ```
 
 ### 5.11 `client.py`
@@ -855,6 +992,7 @@ class ECF:
         status_api_key: str | None = None,
         enforce_b2b_rules: bool = True,
         validate_before_send: bool = False,
+        on_event: Callable[[EcfEvent], None] | None = None,
     ) -> None: ...
 
     def authenticate(self, buyer_host: str | None = None) -> DgiiResult[AuthToken]: ...
@@ -876,7 +1014,7 @@ class ECF:
     def get_directory_listing(self) -> DgiiResult[list[ServiceDirectoryResponse]]: ...
     def get_summary_invoice_inquiry(self, rnc: str, encf: str,
                                     cod_seguridad: str) -> DgiiResult[InquiryInvoiceSummary]: ...
-    def reconcile_submission(self, signed_xml: str) -> DgiiResult[ReconciliationResult]: ...
+    def reconcile_submission(self, signed_xml: str, buyer_host: str | None = None) -> DgiiResult[ReconciliationResult]: ...
     def get_service_status(self) -> DgiiResult[list[ServiceStatusEntry]]: ...
     def get_maintenance_windows(self) -> DgiiResult[list[MaintenanceWindow]]: ...
     def check_service_availability(self, ambiente: StatusEnvironment) -> DgiiResult[ServiceAvailabilityResponse]: ...
@@ -907,9 +1045,11 @@ the verdict only corroborates a flag that DGII already published, so an unreadab
 reuse (`can_reuse_sequence` ⇒ `False`) instead of failing a read that did happen. A payload that is
 not an object at all is still `Err`.
 
-**No `resource` on the query path.** Unlike TypeScript, this package does not populate
-`DgiiError.resource` for these failures, so the only discriminator a Python caller gets is `Ok` vs
-`Err` (§9.4, §14, F-126-12).
+**`resource` on the HTTP path.** Every `ECF` method passes `resource` to `HttpClient`, so
+transport, HTTP, timeout, and circuit-breaker errors in both packages populate `DgiiError.resource`,
+`method`, and `base_url`/`baseURL`. In Python, post-HTTP model parsing (`_parse_one`/`_parse_list`)
+raises `VALIDATION` without setting `resource`, whereas TypeScript sets `resource` on its shape
+guards as well (§9.4).
 
 ### 5.12 `cli.py` (Python-only)
 
@@ -933,8 +1073,9 @@ for it when omitted. `--environment` accepts the DGII values or the aliases
 ### 5.13 `__init__.py`
 
 Re-exports the full public surface (mirror of TS `index.ts`): the client `ECF`, `P12Reader`,
-`Signature`, `Transformer`, `validate_document`, `format_violations`, `resolve_reception_route`,
-`check_b2b_applicability`, `can_reuse_sequence`, `InMemoryIdempotencyStore`, the URL builders, the
+`Signature`, `Transformer`, `validate_document`, `is_schema_unavailable_error`, `format_violations`,
+`resolve_reception_route`, `check_b2b_applicability`, `can_reuse_sequence`, `EcfEvent`,
+`DocumentIdentity`, `document_identity`, `InMemoryIdempotencyStore`, the URL builders, the
 environment/endpoint enums, `DgiiError`, `DgiiErrorCode`, `DgiiResult`, and the response models.
 
 ---
@@ -967,24 +1108,27 @@ Rules:
 `DgiiErrorCode` (identical in both languages): `INVALID_XML`, `CERTIFICATE`, `SIGNING`, `HTTP`,
 `AUTH`, `TIMEOUT`, `CIRCUIT_OPEN`, `IDEMPOTENCY`, `VALIDATION`, `UNKNOWN`.
 
-`DgiiError` carries: `code`, `message`, and optional `status`, `resource`, `data`, `mensajes`,
-`retryable`.
+`DgiiError` carries: `code`, `message`, and optional `status`, `statusText`/`status_text`,
+`resource`, `method`, `baseURL`/`base_url`, `data`, `mensajes`, `retryable`, `retryAfter`/`retry_after`.
 
 `toDgiiError`/`to_dgii_error` normalization table (Appendix A.8):
 
-| Input shape                     | Result                                                                                                           |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| bare string body                | `message = body`                                                                                                 |
-| `{ mensajes: [...] }`           | `message = joined mensajes`; `mensajes = [...]`                                                                  |
-| ProblemDetails                  | `message` from `title`/`detail`; preserve `status`                                                               |
-| HTML body                       | `message = stripped text` (or generic fallback)                                                                  |
-| transport exception             | TypeScript `code = UNKNOWN`, Python `code = HTTP` (§14, F-126-13); the retry decision inspects the raw exception |
-| non-2xx                         | `code = AUTH` if 401/403, else `HTTP`; keep `status`, `data`                                                     |
-| payload the SDK cannot classify | `code = VALIDATION`, `message = 'Unexpected DGII response payload'` (§4.11)                                      |
+| Input shape                                         | Result                                                                                                           |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| bare string body                                    | `message = body`                                                                                                 |
+| `{ mensajes: [...] }`                               | `message = joined mensajes`; `mensajes = [...]`                                                                  |
+| ProblemDetails                                      | `message` from `title`/`detail`; preserve `status`                                                               |
+| HTML body                                           | `message = stripped text` (or generic fallback)                                                                  |
+| timeout (`TaskCancelledError` / `TimeoutException`) | `code = TIMEOUT`, `retryable = true`                                                                             |
+| open circuit breaker                                | `code = CIRCUIT_OPEN`, `retryable = false`, `retryAfter`/`retry_after` = remaining cooldown in ms                |
+| bulkhead saturation                                 | `code = HTTP`, `retryable = false`, `message = 'Bulkhead capacity reached; request rejected'`                    |
+| transport exception                                 | TypeScript `code = UNKNOWN`, Python `code = HTTP` (§14, F-126-13); the retry decision inspects the raw exception |
+| non-2xx                                             | `code = AUTH` if 401/403, else `HTTP`; keep `status`, `data`, `retryAfter`/`retry_after` (on 429/503)            |
+| payload the SDK cannot classify                     | `code = VALIDATION`, `message = 'Unexpected DGII response payload'` (§4.11)                                      |
 
-`TIMEOUT` and `CIRCUIT_OPEN` are part of the enum for callers that classify their own failures; the
-SDK does not currently emit them — a timeout arrives as `UNKNOWN` (TypeScript) or `HTTP` (Python)
-with a retryable cause.
+Both SDKs emit `TIMEOUT` (`retryable: true`) when a per-attempt timeout fires and `CIRCUIT_OPEN`
+(`retryable: false`, with `retryAfter`/`retry_after` in milliseconds and the target origin in
+`baseURL`/`base_url`) when the per-origin circuit breaker rejects a call locally.
 
 **401 special case (A.9):** keep DGII's body message verbatim — it explains the rejection reason.
 
@@ -996,37 +1140,59 @@ with a retryable cause.
 
 Retry **only**:
 
-- network/transport errors (DNS, TCP, TLS, connection reset, `ConnectError`),
+- network/transport errors (DNS, TCP, TLS, connection reset, `ConnectError`) and per-attempt timeouts (`TaskCancelledError`, `TimeoutException`),
 - HTTP **408**, **429**, **5xx**.
 
-**Never** retry: any other **4xx** (400, 401, 403, 404, 422, …). A rejected e-CF must not be
-blindly re-sent (spec §3.3).
+**Never** retry: any other **4xx** (400, 401, 403, 404, 422, …), `CIRCUIT_OPEN`, or bulkhead
+rejections. A rejected e-CF must not be blindly re-sent (spec §3.3).
+
+**And a submission carries no retry at all.** `sendElectronicDocument`, `sendSummary`,
+`sendCommercialApproval` and `voidENCF` call the HTTP layer with `retry: false` / `retry=False`,
+which selects the composed policy _without_ the retry wrapper (`policyWithoutRetry` /
+`ResiliencePolicy.execute(..., retry=False)`). Rationale: an ambiguous `POST` cannot be classified
+as "not delivered", DGII does not de-duplicate by e-NCF, and the retry therefore turned one call
+into three transmissions of the same document. A failure with a status clears the pending marker
+(the caller may retry deliberately); a failure without one keeps it and returns
+`AMBIGUOUS_SUBMISSION_MESSAGE` (§9.3). Queries and authentication keep the full retry budget
+because repeating them cannot issue a fiscal document.
 
 ### 8.2 TypeScript (cockatiel)
 
-Composed policy (innermost → outermost): `bulkhead → timeout → breaker → retry`.
+Composed policy (`wrap(breakerPolicy, retryPolicy, bulkheadPolicy, timeoutPolicy)`), innermost →
+outermost: `timeout → bulkhead → retry → breaker` (and `timeout → bulkhead → breaker` when
+`retry: false`).
 
-- **Retry** (`retry(handleWhen(isRetryable), { maxAttempts, backoff })`) — exponential backoff with
-  jitter; default `maxAttempts = 3`.
-- **ConsecutiveBreaker** (`consecutiveBreaker(threshold)`) — opens after `threshold` consecutive
-  failures; half-open after `halfOpenAfterMs`.
-- **Timeout** (`timeout(timeoutMs)`) — per-attempt and overall.
-- **Bulkhead** (`bulkhead(limit, queue)`) — caps concurrent in-flight calls.
+- **Timeout** (`timeout(timeoutMs, TimeoutStrategy.Aggressive)`) — innermost per-attempt network
+  timeout so bulkhead queue wait is never charged against the request timeout.
+- **Bulkhead** (`bulkhead(limit, queue)`) — caps concurrent in-flight calls (`20`) and queued calls
+  (`40`) per origin.
+- **Retry** (`retry(handleWhen(isRetryableError), { maxAttempts: maxRetries - 1, backoff })`) —
+  exponential backoff with jitter; default `maxRetries = 3` (at most 3 total attempts, matching
+  Python).
+- **ConsecutiveBreaker** (`circuitBreaker(handleWhen(err => !isBulkheadRejectedError(err)), { halfOpenAfter, breaker: new ConsecutiveBreaker(threshold) })`) —
+  outermost so it counts logical operations rather than individual retry attempts and ignores local
+  bulkhead capacity rejections.
 
-Policy factory returns a single composed `Policy` used by `HttpClient`.
+`HttpClient` maintains a per-origin policy map (`policiesByOrigin`), so a failing `buyerHost` never
+opens the circuit breaker or saturates the bulkhead for DGII origins.
 
-### 8.3 Python (tenacity + pybreaker)
+### 8.3 Python (tenacity + lock-free breaker + BoundedSemaphore bulkhead)
 
-- **Retry** (tenacity `@retry(stop=..., wait=..., retry=is_retryable)`) — retries when
-  `is_retryable(exception)` is true; `retry_error_clause` not used. No retry on 4xx (except 408/429).
-- **Circuit breaker** (`pybreaker.CircuitBreaker(fail_max, reset_timeout)`) — opens on `fail_max`
-  consecutive failures; `reset_timeout` (half-open) closes after quiet period.
-- **Timeout** — `httpx2.Client(timeout=timeout_seconds)`; additionally the tenacity stop condition
-  bounds total wall-clock.
-- **No bulkhead** (spec lists only tenacity + pybreaker) — documented parity difference.
+Composed policy in `ResiliencePolicy.execute(fn, retry=...)`, innermost → outermost:
+`timeout → bulkhead → retry → breaker`.
 
-`HttpCall.execute(fn)` runs `fn` inside the breaker, with tenacity retry wrapping the breaker call,
-so each retry passes through the breaker.
+- **Timeout** — `httpx2.Client(timeout=timeout_s)` per attempt.
+- **Bulkhead** — `threading.BoundedSemaphore(bulkhead_limit)` (`20`) plus a bounded wait counter
+  (`bulkhead_queue = 40`); saturation raises `BulkheadRejectedError` without tripping the breaker.
+- **Retry** (tenacity `retry(retry=retry_if_exception(is_retryable_error), stop=stop_after_attempt(max_retries), wait=wait_random_exponential(...))`) —
+  default `max_retries = 3` (at most 3 total attempts). `CircuitOpenError` and
+  `BulkheadRejectedError` are never retried.
+- **Circuit breaker** — lock-free during network I/O (`_lock` is held only for state transitions in
+  `_before_call`, `_on_success`, and `_on_failure`), opening after `breaker_threshold` (`5`)
+  consecutive failures for `reset_timeout_s` (`30.0s`) and raising `CircuitOpenError(retry_after_ms=...)`.
+
+`HttpClient` maintains a per-origin policy map (`_policies_by_origin`), isolating each `buyer_host`
+from DGII origins.
 
 ---
 
@@ -1038,13 +1204,19 @@ so each retry passes through the breaker.
 key = RNC + eNCF + SHA-256(signed XML)
 ```
 
-Concretely: `"${rnc}:${encf}:${sha256hex(signedXml)}"`, where:
+Concretely: `"${rnc}:${encf}:${sha256hex(signedXml)}${scope}"`, where:
 
 - `rnc` / `encf` are extracted from the signed XML (emisor RNC and eNCF); `fileName` `{RNC}{eNCF}.xml`
   is the fallback when the document does not expose them.
 - `sha256hex` is lowercase hex of SHA-256 over the exact signed XML string bytes.
+- `scope` is empty for a submission to DGII and `"@<host>"` for a direct buyer-host delivery
+  (`host` trimmed of trailing slashes and lowercased). The destination is part of the key because
+  delivering the same document to a buyer after DGII accepted it is a **different obligation**: with
+  an unscoped key it was answered from the DGII cache entry and never transmitted. DGII keys keep
+  the three-part shape, so markers written before this rule are still honoured.
 
-Implemented by `HttpClient.buildIdempotencyKey` / `build_idempotency_key`.
+Implemented by `ECF#buildIdempotencyKey` / `ECF._build_idempotency_key`. The TS name is
+`buildIdempotencyKey` on the client, not on `HttpClient`.
 
 ### 9.2 Store contract
 
@@ -1056,14 +1228,22 @@ Implemented by `HttpClient.buildIdempotencyKey` / `build_idempotency_key`.
 Applied in `sendElectronicDocument`/`sendSummary` (and `send_commercial_approval`/`void_encf`, which
 are also submissions) — **persist-before-transmit**:
 
-1. Compute `key`.
+1. Compute `key` (§9.1), including the destination scope.
 2. `store.get(key)` → if present, return the stored response (`Ok`), **no re-transmit**. A stored
-   `"pending"` marker surfaces as `IDEMPOTENCY`; `reconcileSubmission` clears it only when DGII has
-   no record of the document (§9.4).
-3. `store.set(key, pending)` **before** transmitting (hard rule).
-4. Transmit via `HttpClient.postMultipart` / `HttpClient.post_multipart`.
-5. On success → `store.set(key, serializedResponse)`; on failure → `store.delete(key)` so a future
-   call may retry.
+   `{"__pending__": true}` marker surfaces as `IDEMPOTENCY`; `reconcileSubmission` clears it only
+   when DGII has no record of the document (§9.4). The legacy `{"pending": true}` shape is accepted
+   on read so a marker written by an earlier version is never mistaken for a delivered response.
+3. Serialise the whole step on a per-key lock so two concurrent callers cannot both pass step 2
+   (TypeScript: the `inFlight` map; Python: `ECF._lock_for`).
+4. `store.set(key, {"__pending__": true})` **before** transmitting (hard rule).
+5. Transmit via `HttpClient.postMultipart` / `HttpClient.post_multipart`.
+6. On a 2xx whose body is a JSON object → `store.set(key, serializedResponse)`.
+7. On a 2xx whose body is **not** a JSON object → `VALIDATION` failure and the marker **stays**
+   (DGII accepted the document; a re-send would duplicate it).
+8. On a failure carrying an HTTP status → `store.delete(key)`, so a future call may retry.
+9. On a failure with **no** HTTP status (transport, timeout, reset) the outcome is ambiguous —
+   the document may have been received — so the marker **stays** and the call fails with
+   `AMBIGUOUS_SUBMISSION_MESSAGE`; the caller reconciles (§9.4) before retrying.
 
 Query methods (`statusTrackId`, `inquiryStatus`, `trackStatuses`, `getCustomerDirectory`,
 `getDirectoryListing`, `getSummaryInvoiceInquiry`, `getServiceStatus`, `getMaintenanceWindows`,
@@ -1175,10 +1355,10 @@ reports.
 - `Err` after this change means either "the existence question could not be answered" (as before)
   or "DGII holds the document, but the reuse flag could not be read". `Ok` vs `Err` is the parity-safe
   discriminator: it separates "DGII answered" from "could not ask".
-- **TypeScript only:** `error.resource` names the failing read with the real endpoint value
-  (`Endpoint.InquiryStatus`, `Endpoint.AllTrackingEcf`, `Endpoint.TrackResultStatus`), including on
-  the `VALIDATION` failures those reads raise themselves. **Python has no equivalent** — `resource`
-  is not populated on the query path (§14, F-126-12).
+- Both packages populate `error.resource` with the real endpoint value (`Endpoint.InquiryStatus`,
+  `Endpoint.AllTrackingEcf`, `Endpoint.TrackResultStatus`) on transport, HTTP, timeout, and
+  circuit-breaker failures; TypeScript also populates `error.resource` on the `VALIDATION` failures
+  those reads raise when a 200 payload fails the shape guard.
 - Recovery: on `Err`, do **not** re-send — the marker is intact, so retrying reconcile later cannot
   double-issue. If the caller needs an existence answer sooner, call `inquiryStatus(rnc, encf)`
   directly; that read decides `delivered`/`cleared` and cannot touch the marker. A permanent `Err` on
@@ -1206,10 +1386,10 @@ Logical calls, before and after:
 
 So the common paths cost what they always did and only a **rejected document** pays the chain — but
 that path can now take minutes and can fail where it used to succeed. With the default 15 s
-per-attempt timeout and no auth refresh, one reconcile is bounded by ≈61 s (TypeScript, 4 transport
-attempts per call) / ≈45 s (Python, 3) for one call, ≈121 s / ≈90 s for two, and ≈182 s / ≈135 s for
+per-attempt timeout (`maxRetries = 3`, i.e. 3 transport attempts per logical call in both packages)
+and no auth refresh, one reconcile is bounded by ≈45 s for one call, ≈90 s for two, and ≈135 s for
 the full chain. One token refresh (Seed + ValidarSemilla) adds the same again, so size a queue
-lease against ≈**303 s** (TypeScript) / ≈**225 s** (Python).
+lease against ≈**225 s** in both packages.
 
 Therefore, at the caller:
 
@@ -1218,11 +1398,10 @@ Therefore, at the caller:
   concurrently is not made safe by the marker: once one of them deletes it, the other can re-send.
 - **Do not nest a retry loop around reconcile.** The SDK's retry policy is the retry policy; schedule
   the next attempt through the queue's own backoff.
-- **Give reconcile its own worker/limit.** The breaker and the bulkhead are shared with
-  `sendElectronicDocument` (one `HttpClient` per client), so a `consultatrackids` outage can consume
-  the failure budget and the permits submissions need. A separate `HttpClient`/policy for the query
-  path is the structural fix and is not in this release (§14, F-126-2).
-- Instrument reconcile outcomes (delivered/cleared/reusable, `Err` by `resource` in TypeScript), not
+- **Give reconcile its own worker/limit.** Within the same origin, the breaker and the bulkhead are
+  shared with `sendElectronicDocument` (per-origin policy on `HttpClient`), so a `consultatrackids`
+  outage on `ecf.dgii.gov.do` can consume the failure budget and the permits submissions need.
+- Instrument reconcile outcomes (delivered/cleared/reusable, `Err` by `resource`), not
   raw request counts, or the extra reads look like a traffic regression.
 
 ---
@@ -1342,8 +1521,10 @@ Money round-trips as `string` (TS) / `Decimal`→`str` (Python); no numeric coer
    `environment != Environment.PROD` (A.9).
 7. **`getCustomerDirectory` normalization** — DGII may return an object or array; always normalize
    to a `list` (or `[]`/empty when absent) (A.8).
-8. **Bulkhead parity** — TS includes bulkhead (cockatiel); Python does not (spec §5.1 lists only
-   tenacity + pybreaker). Documented as an intentional asymmetry, not a gap.
+8. **Bulkhead & per-origin isolation parity** — Both packages enforce per-origin circuit breakers
+   and bulkheads (`bulkheadLimit: 20, bulkheadQueue: 40` in cockatiel; `bulkhead_limit: 20,
+bulkhead_queue: 40` via `threading.BoundedSemaphore` + bounded wait queue in Python), with
+   innermost→outermost composition `timeout → bulkhead → retry → breaker`.
 
 ---
 
@@ -1387,19 +1568,18 @@ skipped when credentials absent. Never run in CI without secrets.
 
 The two packages are behaviourally identical on the reconcile path for every response DGII answers:
 same payload classification, same `delivered`/`cleared`/`canReuseSequence`, same marker outcome, same
-requests. These divergences are known, permanent until their follow-up lands, and a reader of the
-parity promise must know them:
+requests. Previously registered resilience and observability divergences (`F-126-8` attempt-budget
+off-by-one, `F-126-12` Python `DgiiError.resource` on HTTP calls, `F-126-1` open-breaker retry probes,
+and `F-126-2` cross-origin breaker/bulkhead sharing) have been closed in both packages. The remaining
+divergences are known, permanent until their follow-up lands, and a reader of the parity promise must
+know them:
 
-| #                      | Divergence                                                                                                                                                                                                                                                                                                                                                                              | Where              |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| **F-126-8**            | TypeScript performs **4** transport attempts per logical call where Python performs **3**, under the same nominal setting (cockatiel's `maxAttempts` counts retries, tenacity's `stop_after_attempt` counts attempts). Every 5xx or transport failure is therefore retried one extra time — a difference in attempt count only, never in the outcome. Resource configuration is frozen. | §4.5, §5.5, §9.5   |
-| **F-126-13**           | A **transport** failure normalises to different codes: TypeScript `UNKNOWN`, Python `HTTP`. `code` and `message` match for failures **DGII answered**; the parity claim is scoped to those.                                                                                                                                                                                             | §7                 |
-| **F-126-12**           | `DgiiError.resource` is populated in TypeScript and **not** on the Python query path, so only a TypeScript caller can name the failing read. Python's discriminator is `Ok` vs `Err`, plus a direct `inquiry_status` call.                                                                                                                                                              | §4.11, §5.11, §9.4 |
-| **F-126-7**            | For a body whose `estado` is missing or not a string, both packages answer `VALIDATION` but with their own message text (TypeScript's `Unexpected DGII response payload`, Python's field-level `field 'estado' must be a string, …`). The identical-message requirement covers only the non-object and absent-body cases.                                                               | §4.11, §5.11       |
-| **F-126-1**            | An open breaker costs Python three immediate probes per call (`is_retryable_error` matches pybreaker's message text) and no wall clock; TypeScript treats it as `UNKNOWN`, non-retryable. Not a #126 regression.                                                                                                                                                                        | §5.5, §8.3         |
-| **F-126-2**            | The query path shares the submission's breaker and bulkhead, so a track-service outage can borrow the budget `sendElectronicDocument` needs. Mitigation is operational (a dedicated reconcile worker) until a separate policy lands.                                                                                                                                                    | §9.5               |
-| **Model echo** (RES-1) | TypeScript performs no field-level validation beyond the shape guard, so a malformed **non-classifying** value (`codigo: "abc"`, `montoTotal: "abc"`) reaches the caller verbatim while Python drops it (`0`/`null`). No decision reads these fields; the difference is each type system's, not a decision's.                                                                           | §4.11, §5.11, §5.2 |
-| **Off-path** (RES-2)   | `InquiryInvoiceSummary` (`consultarfce`) still parses its non-classifying fields strictly in Python and passes them through in TypeScript. Pre-existing, and **not** on the reconcile path: `secuenciaUtilizada` on that model is read without coercion in both packages, so the reuse answer agrees.                                                                                   | §5.2               |
+| #                      | Divergence                                                                                                                                                                                                                                                                                                                | Where              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| **F-126-13**           | A **transport** failure normalises to different codes: TypeScript `UNKNOWN`, Python `HTTP` (except timeouts, which both emit as `TIMEOUT`, and open breakers, which both emit as `CIRCUIT_OPEN`). `code` and `message` match for failures **DGII answered**; the parity claim is scoped to those.                         | §7                 |
+| **F-126-7**            | For a body whose `estado` is missing or not a string, both packages answer `VALIDATION` but with their own message text (TypeScript's `Unexpected DGII response payload`, Python's field-level `field 'estado' must be a string, …`). The identical-message requirement covers only the non-object and absent-body cases. | §4.11, §5.11       |
+| **Model echo** (RES-1) | TypeScript performs no field-level validation beyond the shape guard (except `InquiryStatusResponse.montoTotal`/`totalITBIS`, which are normalized to decimal strings), so a malformed **non-classifying** value (`codigo: "abc"`) reaches the caller verbatim while Python drops it (`0`/`null`).                        | §4.11, §5.11, §5.2 |
+| **Off-path** (RES-2)   | `InquiryInvoiceSummary` (`consultarfce`) still parses its non-classifying fields strictly in Python and passes them through in TypeScript. Pre-existing, and **not** on the reconcile path: `secuenciaUtilizada` on that model is read without coercion in both packages, so the reuse answer agrees.                     | §5.2               |
 
 One ambiguity inside `canReuseSequence: false` is documented rather than fixed: the boolean cannot
 distinguish "several tracks" from "no followable `trackId`" (§9.4). F-126-6 records the additive

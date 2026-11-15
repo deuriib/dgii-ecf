@@ -19,12 +19,28 @@ Solo se reintentan las fallas **transitorias**:
 
 Un e-CF rechazado (por ejemplo `400`, `401`) **nunca** se reenvía a ciegas.
 
+**El SDK nunca reintenta el envío de un documento.** Reintentar un `POST` cuyo
+resultado se desconoce no distingue "rechazado" de "aceptado y respuesta
+perdida", y la DGII no deduplica por e-NCF: una sola llamada podría entregar el
+mismo documento más de una vez. Por eso `sendElectronicDocument`, `sendSummary`,
+`sendCommercialApproval` y `voidENCF` hacen **un** intento:
+
+- una respuesta definitiva (`408`, `429`, `5xx`, `4xx`) limpia el marcador
+  pendiente y el error conserva su estado — reintentar es decisión tuya, y es
+  seguro;
+- una respuesta que nunca llega (timeout, reset, DNS) mantiene el marcador y
+  devuelve `AMBIGUOUS_SUBMISSION_MESSAGE` — llama a `reconcileSubmission` antes
+  de reenviar, porque la DGII puede tener ya el documento.
+
+Las consultas (`statusTrackId`, `inquiryStatus`, …) y la autenticación sí se
+reintentan con normalidad, porque repetirlas no emite ningún comprobante fiscal.
+
 Cuando una transmisión falla y recurres a contingencia, esto es lo que la rige:
 **Fuente oficial:** [Informe Técnico Comprobante Fiscal Electrónico](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Informe%20y%20Descripci%C3%B3n%20T%C3%A9cnica/Informe%20T%C3%A9cnico%20e-CF%20v1.0.pdf) — §19: operación en contingencia, los plazos que fija para transmitir lo generado sin conexión y los identificadores que marcan un comprobante de reemplazo (v1.0; actualizado en el sitio 2026-10-16) · [Instructivo de Contingencia de Facturación Electrónica](https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Documentacin%20sobre%20eCF/Instructivos%20sobre%20Facturaci%C3%B3n%20Electr%C3%B3nica/Instructivo%20de%20Contingencia%20de%20FE.pdf) — el manual operativo para trabajar en contingencia (actualizado en el sitio 2026-10-15).
 
 | Opción                 | Valor por defecto     |
 | ---------------------- | --------------------- |
-| Intentos máximos       | 3 (4 en TypeScript)   |
+| Intentos máximos       | 3 (envíos: 1)         |
 | Umbral del breaker     | 5 fallas consecutivas |
 | Semiabierto después de | 30 s                  |
 | Timeout por intento    | 15 s                  |

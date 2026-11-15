@@ -43,6 +43,7 @@ from .reception import (
     resolve_reception_route,
 )
 from .reconciliation import (
+    AMBIGUOUS_SUBMISSION_MESSAGE,
     PENDING_SUBMISSION_MESSAGE,
     ReconciliationResult,
     can_reuse_sequence,
@@ -50,6 +51,7 @@ from .reconciliation import (
 from .resilience import ResilienceOptions, ResiliencePolicy, is_retryable_error
 from .result import DgiiResult, Err, Ok, Result
 from .signing import Signature, XmlCertificateValidation, validate_xml_certificate
+from .telemetry import DocumentIdentity, EcfEvent, document_identity
 from .transformer import Transformer
 from .types import (
     COMMERCIAL_APPROVAL_ACCEPTED_CODE,
@@ -93,6 +95,7 @@ from .validation import (
 __version__ = "0.7.2"
 
 __all__ = [
+    "AMBIGUOUS_SUBMISSION_MESSAGE",
     "COMMERCIAL_APPROVAL_ACCEPTED_CODE",
     "COMMERCIAL_APPROVAL_ACCEPTED_STATE",
     "COMMERCIAL_APPROVAL_REJECTED_CODE",
@@ -110,6 +113,8 @@ __all__ = [
     "DgiiErrorCode",
     "DgiiErrorContext",
     "DgiiResult",
+    "DocumentIdentity",
+    "EcfEvent",
     "Endpoint",
     "Environment",
     "Err",
@@ -156,6 +161,7 @@ __all__ = [
     "can_reuse_sequence",
     "compare_decimal",
     "convert_ecf32_to_rfce",
+    "document_identity",
     "extract_dgii_error_message",
     "format_violations",
     "generate_ecf_qr_code_url",

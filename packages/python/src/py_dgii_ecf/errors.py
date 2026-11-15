@@ -141,6 +141,24 @@ def extract_dgii_error_message(data: object) -> str | None:
     return None
 
 
+def extract_mensajes(data: object) -> list[Mensaje] | None:
+    """Extract structured ``Mensaje`` items from a DGII error payload."""
+    if not isinstance(data, dict):
+        return None
+    raw = data.get("mensajes") or data.get("Mensajes")
+    if not isinstance(raw, list):
+        return None
+    out: list[Mensaje] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        valor = item.get("valor")
+        codigo = item.get("codigo")
+        if isinstance(valor, str) and isinstance(codigo, int | str):
+            out.append(Mensaje(valor=valor, codigo=codigo))
+    return out or None
+
+
 @dataclass(frozen=True, slots=True)
 class DgiiErrorContext:
     """Context used when normalizing a failure into a :class:`DgiiError`."""
@@ -152,6 +170,7 @@ class DgiiErrorContext:
     method: str | None = None
     base_url: str | None = None
     fallback_message: str | None = None
+    retry_after: float | None = None
 
 
 class DgiiError(Exception):
@@ -174,6 +193,7 @@ class DgiiError(Exception):
         data: object = None,
         mensajes: list[Mensaje] | None = None,
         retryable: bool | None = None,
+        retry_after: float | None = None,
         cause: object = None,
     ) -> None:
         super().__init__(message)
@@ -189,6 +209,7 @@ class DgiiError(Exception):
         self.retryable = (
             retryable if retryable is not None else is_retryable_status(status)
         )
+        self.retry_after = retry_after
         self.cause = cause
 
     def __str__(self) -> str:
@@ -228,5 +249,7 @@ def to_dgii_error(err: object, context: DgiiErrorContext | None = None) -> DgiiE
         method=ctx.method,
         base_url=ctx.base_url,
         data=err,
+        mensajes=extract_mensajes(err),
+        retry_after=ctx.retry_after,
         cause=err,
     )

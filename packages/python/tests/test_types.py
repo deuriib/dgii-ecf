@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from py_dgii_ecf.types import (
@@ -128,9 +130,49 @@ def test_inquiry_status_optional_fields() -> None:
             "montoTotal": "1180.00",
         }
     )
-    assert response.monto_total == 1180.0
+    assert response.monto_total == Decimal("1180.00")
+    assert isinstance(response.monto_total, Decimal)
     assert response.total_itbis is None
     assert response.id_extranjero is None
+
+
+def test_inquiry_status_parses_decimal_and_numeric_amounts() -> None:
+    response = InquiryStatusResponse.from_dict(
+        {
+            "codigo": 1,
+            "estado": "Aceptado",
+            "montoTotal": 1180.5,
+            "totalITBIS": Decimal("180.00"),
+        }
+    )
+    assert response.monto_total == Decimal("1180.5")
+    assert response.total_itbis == Decimal("180.00")
+
+
+@pytest.mark.parametrize(
+    "bad_amount",
+    [
+        True,
+        False,
+        "NaN",
+        "Infinity",
+        "-Infinity",
+        float("nan"),
+        float("inf"),
+        Decimal("NaN"),
+    ],
+)
+def test_inquiry_status_drops_bool_and_non_finite_amounts(bad_amount: object) -> None:
+    response = InquiryStatusResponse.from_dict(
+        {
+            "codigo": 1,
+            "estado": "Aceptado",
+            "montoTotal": bad_amount,
+            "totalITBIS": bad_amount,
+        }
+    )
+    assert response.monto_total is None
+    assert response.total_itbis is None
 
 
 def test_service_directory_allows_missing_optional_urls() -> None:

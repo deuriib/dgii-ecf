@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 
 import httpx2
 import pytest
@@ -135,7 +136,16 @@ def no_body(status: int = 200) -> httpx2.Response:
 
 def inquiry(estado: str) -> httpx2.Response:
     """A ``consultaestado`` answer — never carrying a reuse flag."""
-    return ok({"codigo": 2, "estado": estado, "rncEmisor": RNC, "ncfElectronico": ENCF})
+    return ok(
+        {
+            "codigo": 2,
+            "estado": estado,
+            "rncEmisor": RNC,
+            "ncfElectronico": ENCF,
+            "montoTotal": "1180.00",
+            "totalITBIS": "180.00",
+        }
+    )
 
 
 def tracks(*entries: object) -> httpx2.Response:
@@ -625,6 +635,8 @@ def test_accepted_document_costs_a_single_request() -> None:
     assert outcome.delivered is True
     assert outcome.cleared is False
     assert outcome.can_reuse_sequence is False
+    assert outcome.inquiry.monto_total == Decimal("1180.00")
+    assert outcome.inquiry.total_itbis == Decimal("180.00")
     assert run.store.get(KEY) == dict(_PENDING_MARKER)
     assert run.markers == [INQUIRY]
 
