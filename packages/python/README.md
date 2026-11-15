@@ -77,7 +77,7 @@ Each command prompts for the `.p12` password (`--password`, hidden input).
 
 ## Modules
 
-`environment`, `types`, `errors`, `result`, `resilience`, `http`, `certificate`,
+`environment`, `types`, `ecf`, `errors`, `result`, `resilience`, `http`, `certificate`,
 `signing`, `transformer`, `reception`, `reconciliation`, `validation`, `utils`,
 `client`, `cli`.
 

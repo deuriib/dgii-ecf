@@ -212,19 +212,69 @@ JSON en bruto. Los alias de paridad `json_to_xml`, `jsonToXml`, `xml_to_json` y
 Los servicios web de la DGII solo aceptan XML firmado digitalmente (`signedXml:
 string`). Para enviar una factura elaborada en JSON (como objeto o cadena JSON
 directa), transfórmala primero con `Transformer`, firma el XML resultante con
-`Signature` y pásalo a `sendDocument`:
+`Signature` y pásalo a `sendDocument`.
+
+Puedes tipar tus objetos de factura con la interfaz `EcfInvoice` (y sub-interfaces
+como `EcfDocument`, `EcfEncabezado`, `EcfTotales`, `EcfItem`) para autocompletado y
+verificación de tipos en el editor:
 
 ```ts
 import {
   ECF,
+  EcfInvoice,
   Environment,
   P12Reader,
   Signature,
   Transformer,
 } from '@deuriib/dgii-ecf';
 
+const invoice: EcfInvoice = {
+  ECF: {
+    Encabezado: {
+      Version: '1.0',
+      IdDoc: {
+        TipoeCF: '31',
+        eNCF: 'E310000000001',
+        TipoIngresos: '01',
+        TipoPago: '1',
+        TablaFormasPago: {
+          FormaDePago: { FormaPago: '1', MontoPago: '1180.00' },
+        },
+      },
+      Emisor: {
+        RNCEmisor: '130862346',
+        RazonSocialEmisor: 'Example SRL',
+        DireccionEmisor: 'Av. Example 123',
+        FechaEmision: '01-01-2026',
+      },
+      Comprador: {
+        RNCComprador: '40102368',
+        RazonSocialComprador: 'Buyer SA',
+      },
+      Totales: {
+        MontoGravadoTotal: '1000.00',
+        TotalITBIS: '180.00',
+        MontoTotal: '1180.00',
+      },
+    },
+    DetallesItems: {
+      Item: [
+        {
+          NumeroLinea: 1,
+          IndicadorFacturacion: 1,
+          NombreItem: 'Consulting services',
+          IndicadorBienoServicio: 2,
+          CantidadItem: '1.00',
+          PrecioUnitarioItem: '1000.00',
+          MontoItem: '1000.00',
+        },
+      ],
+    },
+  },
+};
+
 // 1. Convertir JSON a XML de la DGII (con redondeo monetario half-up)
-const xmlResult = Transformer.json2xml(invoiceJson, true);
+const xmlResult = Transformer.json2xml(invoice, true);
 if (xmlResult.isErr()) throw xmlResult.error;
 
 // 2. Firmar el XML generado

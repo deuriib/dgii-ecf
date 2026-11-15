@@ -203,13 +203,68 @@ disponibles.
 Los servicios web de la DGII solo aceptan XML firmado digitalmente (`signed_xml:
 str`). Para enviar una factura elaborada en JSON (como diccionario o cadena JSON
 directa), transfórmala primero con `Transformer`, firma el XML resultante con
-`Signature` y pásalo a `send_document`:
+`Signature` y pásalo a `send_document`.
+
+Puedes tipar los diccionarios de tus facturas usando `EcfInvoice` (y submódulos como
+`EcfDocument`, `EcfEncabezado`, `EcfTotales`, `EcfItem`) para seguridad de tipos con `mypy`:
 
 ```python
-from py_dgii_ecf import ECF, Environment, P12Reader, Signature, Transformer
+from py_dgii_ecf import (
+    ECF,
+    EcfInvoice,
+    Environment,
+    P12Reader,
+    Signature,
+    Transformer,
+)
+
+invoice: EcfInvoice = {
+    "ECF": {
+        "Encabezado": {
+            "Version": "1.0",
+            "IdDoc": {
+                "TipoeCF": "31",
+                "eNCF": "E310000000001",
+                "TipoIngresos": "01",
+                "TipoPago": "1",
+                "TablaFormasPago": {
+                    "FormaDePago": {"FormaPago": "1", "MontoPago": "1180.00"}
+                },
+            },
+            "Emisor": {
+                "RNCEmisor": "130862346",
+                "RazonSocialEmisor": "Example SRL",
+                "DireccionEmisor": "Av. Example 123",
+                "FechaEmision": "01-01-2026",
+            },
+            "Comprador": {
+                "RNCComprador": "40102368",
+                "RazonSocialComprador": "Buyer SA",
+            },
+            "Totales": {
+                "MontoGravadoTotal": "1000.00",
+                "TotalITBIS": "180.00",
+                "MontoTotal": "1180.00",
+            },
+        },
+        "DetallesItems": {
+            "Item": [
+                {
+                    "NumeroLinea": 1,
+                    "IndicadorFacturacion": 1,
+                    "NombreItem": "Consulting services",
+                    "IndicadorBienoServicio": 2,
+                    "CantidadItem": "1.00",
+                    "PrecioUnitarioItem": "1000.00",
+                    "MontoItem": "1000.00",
+                }
+            ]
+        },
+    }
+}
 
 # 1. Convertir JSON a XML de la DGII (con redondeo monetario half-up)
-xml_result = Transformer.json_to_xml(invoice_json, round_monetary=True)
+xml_result = Transformer.json_to_xml(invoice, round_monetary=True)
 if xml_result.is_err():
     raise RuntimeError(xml_result.unwrap_err())
 

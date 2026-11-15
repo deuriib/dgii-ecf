@@ -209,19 +209,69 @@ available.
 DGII endpoints accept only digitally signed XML (`signedXml: string`). To submit
 an invoice authored as JSON (or raw JSON string), transform it first with
 `Transformer`, sign the resulting XML with `Signature`, and pass the signed XML
-to `sendDocument`:
+to `sendDocument`.
+
+You can type invoice objects with the `EcfInvoice` interface (and sub-interfaces
+like `EcfDocument`, `EcfEncabezado`, `EcfTotales`, `EcfItem`) for full IDE
+autocomplete and type checking:
 
 ```ts
 import {
   ECF,
+  EcfInvoice,
   Environment,
   P12Reader,
   Signature,
   Transformer,
 } from '@deuriib/dgii-ecf';
 
+const invoice: EcfInvoice = {
+  ECF: {
+    Encabezado: {
+      Version: '1.0',
+      IdDoc: {
+        TipoeCF: '31',
+        eNCF: 'E310000000001',
+        TipoIngresos: '01',
+        TipoPago: '1',
+        TablaFormasPago: {
+          FormaDePago: { FormaPago: '1', MontoPago: '1180.00' },
+        },
+      },
+      Emisor: {
+        RNCEmisor: '130862346',
+        RazonSocialEmisor: 'Example SRL',
+        DireccionEmisor: 'Av. Example 123',
+        FechaEmision: '01-01-2026',
+      },
+      Comprador: {
+        RNCComprador: '40102368',
+        RazonSocialComprador: 'Buyer SA',
+      },
+      Totales: {
+        MontoGravadoTotal: '1000.00',
+        TotalITBIS: '180.00',
+        MontoTotal: '1180.00',
+      },
+    },
+    DetallesItems: {
+      Item: [
+        {
+          NumeroLinea: 1,
+          IndicadorFacturacion: 1,
+          NombreItem: 'Consulting services',
+          IndicadorBienoServicio: 2,
+          CantidadItem: '1.00',
+          PrecioUnitarioItem: '1000.00',
+          MontoItem: '1000.00',
+        },
+      ],
+    },
+  },
+};
+
 // 1. Convert JSON to DGII XML (with half-up monetary rounding)
-const xmlResult = Transformer.json2xml(invoiceJson, true);
+const xmlResult = Transformer.json2xml(invoice, true);
 if (xmlResult.isErr()) throw xmlResult.error;
 
 // 2. Sign the generated XML
