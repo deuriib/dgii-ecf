@@ -1,6 +1,7 @@
 import convert from 'xml-js';
 import { err, ok, type Result } from './result.js';
 import { DgiiError } from './errors.js';
+import type { EcfInvoice } from './ecf.js';
 
 const MONETARY_RE = /^(-?)(\d+)\.(\d+)$/;
 
@@ -145,7 +146,7 @@ const buildXmlPayload = (pruned: unknown): Record<string, unknown> => ({
  */
 export class Transformer {
   static json2xml(
-    data: object | string,
+    data: EcfInvoice | object | string,
     round = false,
   ): Result<string, DgiiError> {
     const parsed = parseJsonObject(data);
@@ -182,7 +183,7 @@ export class Transformer {
     }
   }
 
-  static xml2json<T>(xml: string): Result<T, DgiiError> {
+  static xml2json<T = EcfInvoice>(xml: string): Result<T, DgiiError> {
     try {
       const json = convert.xml2js(xml, {
         compact: true,
@@ -205,27 +206,36 @@ export class Transformer {
   static xml_to_json = Transformer.xml2json;
   static xmlToJson = Transformer.xml2json;
 
-  json2xml(data: object | string, round = false): Result<string, DgiiError> {
+  json2xml(
+    data: EcfInvoice | object | string,
+    round = false,
+  ): Result<string, DgiiError> {
     return Transformer.json2xml(data, round);
   }
 
-  json_to_xml(data: object | string, round = false): Result<string, DgiiError> {
+  json_to_xml(
+    data: EcfInvoice | object | string,
+    round = false,
+  ): Result<string, DgiiError> {
     return Transformer.json2xml(data, round);
   }
 
-  jsonToXml(data: object | string, round = false): Result<string, DgiiError> {
+  jsonToXml(
+    data: EcfInvoice | object | string,
+    round = false,
+  ): Result<string, DgiiError> {
     return Transformer.json2xml(data, round);
   }
 
-  xml2json<T>(xml: string): Result<T, DgiiError> {
+  xml2json<T = EcfInvoice>(xml: string): Result<T, DgiiError> {
     return Transformer.xml2json<T>(xml);
   }
 
-  xml_to_json<T>(xml: string): Result<T, DgiiError> {
+  xml_to_json<T = EcfInvoice>(xml: string): Result<T, DgiiError> {
     return Transformer.xml2json<T>(xml);
   }
 
-  xmlToJson<T>(xml: string): Result<T, DgiiError> {
+  xmlToJson<T = EcfInvoice>(xml: string): Result<T, DgiiError> {
     return Transformer.xml2json<T>(xml);
   }
 }

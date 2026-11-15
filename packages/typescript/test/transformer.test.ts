@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Transformer } from '../src/transformer.js';
+import type { EcfInvoice } from '../src/ecf.js';
 
 interface RoundTrip {
   ECF: {
@@ -287,5 +288,72 @@ describe('Transformer error handling', () => {
     if (result.isOk()) return;
     expect(result.error.code).toBe('INVALID_XML');
     expect(result.error.message).toContain('Error converting XML to JSON:');
+  });
+
+  it('serializes a strongly-typed EcfInvoice object', () => {
+    const invoice: EcfInvoice = {
+      ECF: {
+        Encabezado: {
+          Version: '1.0',
+          IdDoc: {
+            TipoeCF: '31',
+            eNCF: 'E310000000001',
+            TipoIngresos: '01',
+            TipoPago: '1',
+            TablaFormasPago: {
+              FormaDePago: {
+                FormaPago: '1',
+                MontoPago: '1180.00',
+              },
+            },
+          },
+          Emisor: {
+            RNCEmisor: '130862346',
+            RazonSocialEmisor: 'Example SRL',
+            DireccionEmisor: 'Av. Example 123',
+            FechaEmision: '01-01-2026',
+          },
+          Comprador: {
+            RNCComprador: '40102368',
+            RazonSocialComprador: 'Buyer SA',
+          },
+          Totales: {
+            MontoGravadoTotal: '1000.00',
+            TotalITBIS: '180.00',
+            MontoTotal: '1180.00',
+          },
+        },
+        DetallesItems: {
+          Item: [
+            {
+              NumeroLinea: 1,
+              IndicadorFacturacion: 1,
+              NombreItem: 'Consulting services',
+              IndicadorBienoServicio: 2,
+              CantidadItem: '1.00',
+              PrecioUnitarioItem: '1000.00',
+              MontoItem: '1000.00',
+            },
+          ],
+        },
+      },
+    };
+
+    const result = Transformer.json2xml(invoice);
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+    expect(result.value).toContain('<TipoeCF>31</TipoeCF>');
+    expect(result.value).toContain('<eNCF>E310000000001</eNCF>');
+    expect(result.value).toContain('<RNCEmisor>130862346</RNCEmisor>');
+    expect(result.value).toContain(
+      '<NombreItem>Consulting services</NombreItem>',
+    );
+
+    const parsed = Transformer.xml2json(result.value);
+    expect(parsed.isOk()).toBe(true);
+    if (parsed.isErr()) return;
+    const rnc = parsed.value.ECF.Encabezado.Emisor.RNCEmisor;
+    const rncText = typeof rnc === 'object' && rnc !== null ? rnc._text : rnc;
+    expect(rncText).toBe('130862346');
   });
 });

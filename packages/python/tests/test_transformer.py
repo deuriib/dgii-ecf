@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from py_dgii_ecf.ecf import EcfInvoice
 from py_dgii_ecf.errors import DgiiErrorCode
 from py_dgii_ecf.transformer import Transformer
 
@@ -260,3 +261,67 @@ def test_json_to_xml_rejects_multiple_roots() -> None:
     err = result.unwrap_err()
     assert err.code == DgiiErrorCode.INVALID_XML
     assert "Expected exactly one root element" in err.message
+
+
+def test_json_to_xml_with_typed_ecf_invoice() -> None:
+    invoice: EcfInvoice = {
+        "ECF": {
+            "Encabezado": {
+                "Version": "1.0",
+                "IdDoc": {
+                    "TipoeCF": "31",
+                    "eNCF": "E310000000001",
+                    "TipoIngresos": "01",
+                    "TipoPago": "1",
+                    "TablaFormasPago": {
+                        "FormaDePago": {
+                            "FormaPago": "1",
+                            "MontoPago": "1180.00",
+                        }
+                    },
+                },
+                "Emisor": {
+                    "RNCEmisor": "130862346",
+                    "RazonSocialEmisor": "Example SRL",
+                    "DireccionEmisor": "Av. Example 123",
+                    "FechaEmision": "01-01-2026",
+                },
+                "Comprador": {
+                    "RNCComprador": "40102368",
+                    "RazonSocialComprador": "Buyer SA",
+                },
+                "Totales": {
+                    "MontoGravadoTotal": "1000.00",
+                    "TotalITBIS": "180.00",
+                    "MontoTotal": "1180.00",
+                },
+            },
+            "DetallesItems": {
+                "Item": [
+                    {
+                        "NumeroLinea": 1,
+                        "IndicadorFacturacion": 1,
+                        "NombreItem": "Consulting services",
+                        "IndicadorBienoServicio": 2,
+                        "CantidadItem": "1.00",
+                        "PrecioUnitarioItem": "1000.00",
+                        "MontoItem": "1000.00",
+                    }
+                ]
+            },
+        }
+    }
+    result = Transformer.json_to_xml(invoice)
+    assert result.is_ok()
+    xml = result.unwrap()
+    assert "<TipoeCF>31</TipoeCF>" in xml
+    assert "<eNCF>E310000000001</eNCF>" in xml
+    assert "<RNCEmisor>130862346</RNCEmisor>" in xml
+    assert "<NombreItem>Consulting services</NombreItem>" in xml
+
+    parsed = Transformer.xml_to_json(xml)
+    assert parsed.is_ok()
+    assert (
+        parsed.unwrap()["ECF"]["Encabezado"]["Emisor"]["RNCEmisor"]["_text"]  # type: ignore[index]
+        == "130862346"
+    )

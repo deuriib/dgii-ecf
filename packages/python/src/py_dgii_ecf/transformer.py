@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from lxml import etree
 
+from .ecf import EcfInvoice
 from .errors import DgiiError, DgiiErrorCode
 from .result import DgiiResult, Err, Ok
 
@@ -71,7 +73,9 @@ def _prune_empty(value: object) -> object | None:
     return value
 
 
-def _parse_json_dict(data: dict[str, object] | str) -> DgiiResult[dict[str, object]]:
+def _parse_json_dict(
+    data: Mapping[str, object] | EcfInvoice | str,
+) -> DgiiResult[dict[str, object]]:
     """Parse JSON string if needed and assert root is an object."""
     if isinstance(data, str):
         try:
@@ -93,14 +97,14 @@ def _parse_json_dict(data: dict[str, object] | str) -> DgiiResult[dict[str, obje
             )
         return Ok({str(k): v for k, v in parsed.items()})
 
-    if not isinstance(data, dict):
+    if not isinstance(data, (dict, Mapping)):
         return Err(
             DgiiError(
                 "Error converting JSON to XML: Expected an object as root",
                 code=DgiiErrorCode.INVALID_XML,
             )
         )
-    return Ok(data)
+    return Ok(dict(data))
 
 
 class Transformer:
@@ -108,7 +112,7 @@ class Transformer:
 
     @staticmethod
     def json_to_xml(
-        data: dict[str, object] | str,
+        data: Mapping[str, object] | EcfInvoice | str,
         *,
         round_monetary: bool = False,
     ) -> DgiiResult[str]:
