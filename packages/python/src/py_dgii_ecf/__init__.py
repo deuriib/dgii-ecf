@@ -134,7 +134,7 @@ from .validation import (
     validate_document,
 )
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 __all__ = [
     "AMBIGUOUS_SUBMISSION_MESSAGE",
