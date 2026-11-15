@@ -461,10 +461,10 @@ in §10.
 ```ts
 class Transformer {
   static json2xml(
-    data: object | string,
+    data: EcfInvoice | object | string,
     round?: boolean,
   ): Result<string, DgiiError>;
-  static xml2json<T = unknown>(xml: string): Result<T, DgiiError>;
+  static xml2json<T = EcfInvoice>(xml: string): Result<T, DgiiError>;
 
   // Parity aliases (static)
   static json_to_xml: typeof Transformer.json2xml;
@@ -473,15 +473,21 @@ class Transformer {
   static xmlToJson: typeof Transformer.xml2json;
 
   // Instance methods
-  json2xml(data: object | string, round?: boolean): Result<string, DgiiError>;
-  json_to_xml(
-    data: object | string,
+  json2xml(
+    data: EcfInvoice | object | string,
     round?: boolean,
   ): Result<string, DgiiError>;
-  jsonToXml(data: object | string, round?: boolean): Result<string, DgiiError>;
-  xml2json<T = unknown>(xml: string): Result<T, DgiiError>;
-  xml_to_json<T = unknown>(xml: string): Result<T, DgiiError>;
-  xmlToJson<T = unknown>(xml: string): Result<T, DgiiError>;
+  json_to_xml(
+    data: EcfInvoice | object | string,
+    round?: boolean,
+  ): Result<string, DgiiError>;
+  jsonToXml(
+    data: EcfInvoice | object | string,
+    round?: boolean,
+  ): Result<string, DgiiError>;
+  xml2json<T = EcfInvoice>(xml: string): Result<T, DgiiError>;
+  xml_to_json<T = EcfInvoice>(xml: string): Result<T, DgiiError>;
+  xmlToJson<T = EcfInvoice>(xml: string): Result<T, DgiiError>;
 }
 ```
 
@@ -946,7 +952,7 @@ them while still failing on invalid XML or an unknown document type. Full signin
 class Transformer:
     @staticmethod
     def json_to_xml(
-        data: dict[str, object] | str,
+        data: Mapping[str, object] | EcfInvoice | str,
         *,
         round_monetary: bool = False,
     ) -> DgiiResult[str]: ...
