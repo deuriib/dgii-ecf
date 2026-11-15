@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/deuriib/dgii-ecf/compare/python-v0.7.2...python-v0.8.0) (2026-11-15)
+
+
+### Features
+
+* **client:** harden fiscal submission safety, resilience, and telemetry ([#133](https://github.com/deuriib/dgii-ecf/issues/133)) ([a59156b](https://github.com/deuriib/dgii-ecf/commit/a59156bdf68fce0808e8aaeda855e44fbf5508b5))
+
 ## [0.7.2](https://github.com/deuriib/dgii-ecf/compare/python-v0.7.1...python-v0.7.2) (2026-11-10)
 
 
