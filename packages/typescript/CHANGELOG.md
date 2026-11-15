@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.7.0...typescript-v0.8.0) (2026-11-15)
+
+
+### Features
+
+* **transformer:** support static invocation, raw json strings, aliases, and cli command ([#135](https://github.com/deuriib/dgii-ecf/issues/135)) ([fd6992a](https://github.com/deuriib/dgii-ecf/commit/fd6992af411ee930ef0b822af0af9e796d8b1c39))
+
 ## [0.7.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.6.1...typescript-v0.7.0) (2026-11-15)
 
 
