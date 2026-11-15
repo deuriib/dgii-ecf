@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from typer.testing import CliRunner
 
@@ -85,3 +87,71 @@ def test_status_queries_after_successful_auth(
     assert result.exit_code == 0
     assert requested["track_id"] == "TRACK-1"
     assert "Aceptado" in result.output
+
+
+def test_json_to_xml_stdout(tmp_path: Path) -> None:
+    json_file = tmp_path / "document.json"
+    json_file.write_text(
+        '{"ECF": {"Encabezado": {"Version": "1.0"}}}', encoding="utf-8"
+    )
+    runner = CliRunner()
+    result = runner.invoke(cli.app, ["json-to-xml", str(json_file)])
+
+    assert result.exit_code == 0
+    assert '<?xml version="1.0" encoding="utf-8"?>' in result.output
+    assert "<Version>1.0</Version>" in result.output
+
+
+def test_json_to_xml_output_file(tmp_path: Path) -> None:
+    json_file = tmp_path / "document.json"
+    json_file.write_text(
+        '{"ECF": {"Encabezado": {"Version": "1.0"}}}', encoding="utf-8"
+    )
+    output_xml = tmp_path / "output.xml"
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.app,
+        ["json-to-xml", str(json_file), "--output", str(output_xml)],
+    )
+
+    assert result.exit_code == 0
+    assert f"xml document written to {output_xml}" in result.output
+    assert output_xml.is_file()
+    content = output_xml.read_text(encoding="utf-8")
+    assert "<Version>1.0</Version>" in content
+
+
+def test_json_to_xml_round_monetary(tmp_path: Path) -> None:
+    json_file = tmp_path / "document.json"
+    json_file.write_text(
+        '{"ECF": {"Encabezado": {"Version": "1.0", "MontoTotal": "2.675"}}}',
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.app,
+        ["json-to-xml", str(json_file), "--round-monetary"],
+    )
+
+    assert result.exit_code == 0
+    assert "<Version>1.0</Version>" in result.output
+    assert "<MontoTotal>2.68</MontoTotal>" in result.output
+
+
+def test_json_to_xml_file_not_found(tmp_path: Path) -> None:
+    nonexistent = tmp_path / "nonexistent.json"
+    runner = CliRunner()
+    result = runner.invoke(cli.app, ["json-to-xml", str(nonexistent)])
+
+    assert result.exit_code == 1
+    assert "error: file not found:" in result.output
+
+
+def test_json_to_xml_invalid_json_content(tmp_path: Path) -> None:
+    invalid_file = tmp_path / "bad.json"
+    invalid_file.write_text("{bad json", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(cli.app, ["json-to-xml", str(invalid_file)])
+
+    assert result.exit_code == 1
+    assert "error:" in result.output

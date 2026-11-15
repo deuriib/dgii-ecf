@@ -17,6 +17,7 @@ becomes ``<ECF><Encabezado><Version>1.0</Version></Encabezado></ECF>``.
 
 from __future__ import annotations
 
+import json
 import re
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
@@ -70,22 +71,58 @@ def _prune_empty(value: object) -> object | None:
     return value
 
 
+def _parse_json_dict(data: dict[str, object] | str) -> DgiiResult[dict[str, object]]:
+    """Parse JSON string if needed and assert root is an object."""
+    if isinstance(data, str):
+        try:
+            parsed: object = json.loads(data)
+        except (json.JSONDecodeError, ValueError) as exc:
+            return Err(
+                DgiiError(
+                    f"Error converting JSON to XML: {exc}",
+                    code=DgiiErrorCode.INVALID_XML,
+                    cause=exc,
+                )
+            )
+        if not isinstance(parsed, dict):
+            return Err(
+                DgiiError(
+                    "Error converting JSON to XML: Expected an object as root",
+                    code=DgiiErrorCode.INVALID_XML,
+                )
+            )
+        return Ok({str(k): v for k, v in parsed.items()})
+
+    if not isinstance(data, dict):
+        return Err(
+            DgiiError(
+                "Error converting JSON to XML: Expected an object as root",
+                code=DgiiErrorCode.INVALID_XML,
+            )
+        )
+    return Ok(data)
+
+
 class Transformer:
     """Convert between DGII XML documents and the compact JSON shape."""
 
+    @staticmethod
     def json_to_xml(
-        self,
-        data: dict[str, object],
+        data: dict[str, object] | str,
         *,
         round_monetary: bool = False,
     ) -> DgiiResult[str]:
         """Serialize a single-root compact JSON object to an XML string."""
+        parse_result = _parse_json_dict(data)
+        if parse_result.is_err():
+            return Err(parse_result.unwrap_err())
+
         try:
-            pruned = _prune_empty(data)
+            pruned = _prune_empty(parse_result.unwrap())
             if not isinstance(pruned, dict) or len(pruned) != 1:
                 raise ValueError("Expected exactly one root element")
             root_tag, root_value = next(iter(pruned.items()))
-            root = self._build(root_tag, root_value, round_monetary)
+            root = Transformer._build(root_tag, root_value, round_monetary)
             body: str = etree.tostring(root, encoding="unicode")
             return Ok(f'<?xml version="1.0" encoding="utf-8"?>{body}')
         except (ValueError, TypeError) as exc:
@@ -97,7 +134,8 @@ class Transformer:
                 )
             )
 
-    def xml_to_json(self, xml: str) -> DgiiResult[dict[str, object]]:
+    @staticmethod
+    def xml_to_json(xml: str) -> DgiiResult[dict[str, object]]:
         """Parse an XML string into a compact JSON object."""
         try:
             root = etree.fromstring(xml.encode("utf-8"))
@@ -110,7 +148,10 @@ class Transformer:
                 )
             )
         root_tag = etree.QName(root).localname
-        return Ok({root_tag: self._convert(root)})
+        return Ok({root_tag: Transformer._convert(root)})
+
+    json2xml = json_to_xml
+    xml2json = xml_to_json
 
     @staticmethod
     def _format_text(tag: str, value: str, round_monetary: bool) -> str:
@@ -119,8 +160,8 @@ class Transformer:
             return _round_monetary(value)
         return value
 
+    @staticmethod
     def _build(
-        self,
         tag: str,
         value: object,
         round_monetary: bool,
@@ -133,17 +174,17 @@ class Transformer:
                     element.set(str(key), str(attr_value))
             text = value.get("_text")
             if text is not None:
-                element.text = self._format_text(tag, str(text), round_monetary)
+                element.text = Transformer._format_text(tag, str(text), round_monetary)
             for key, child in value.items():
                 if key in ("_attributes", "_text"):
                     continue
-                self._append(element, str(key), child, round_monetary)
+                Transformer._append(element, str(key), child, round_monetary)
         elif value is not None:
-            element.text = self._format_text(tag, str(value), round_monetary)
+            element.text = Transformer._format_text(tag, str(value), round_monetary)
         return element
 
+    @staticmethod
     def _append(
-        self,
         parent: etree._Element,
         tag: str,
         value: object,
@@ -151,11 +192,12 @@ class Transformer:
     ) -> None:
         if isinstance(value, (list, tuple)):
             for item in value:
-                self._append(parent, tag, item, round_monetary)
+                Transformer._append(parent, tag, item, round_monetary)
         else:
-            parent.append(self._build(tag, value, round_monetary))
+            parent.append(Transformer._build(tag, value, round_monetary))
 
-    def _convert(self, element: etree._Element) -> object:
+    @staticmethod
+    def _convert(element: etree._Element) -> object:
         node: dict[str, object] = {}
         if element.attrib:
             node["_attributes"] = dict(element.attrib)
@@ -170,7 +212,7 @@ class Transformer:
         grouped: dict[str, list[object]] = {}
         for child in children:
             child_tag = etree.QName(child).localname
-            grouped.setdefault(child_tag, []).append(self._convert(child))
+            grouped.setdefault(child_tag, []).append(Transformer._convert(child))
         for child_tag, items in grouped.items():
             node[child_tag] = items[0] if len(items) == 1 else items
         return node
