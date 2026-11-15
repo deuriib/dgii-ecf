@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.6.1...typescript-v0.7.0) (2026-11-15)
+
+
+### Features
+
+* **client:** harden fiscal submission safety, resilience, and telemetry ([#133](https://github.com/deuriib/dgii-ecf/issues/133)) ([a59156b](https://github.com/deuriib/dgii-ecf/commit/a59156bdf68fce0808e8aaeda855e44fbf5508b5))
+
 ## [0.6.1](https://github.com/deuriib/dgii-ecf/compare/typescript-v0.6.0...typescript-v0.6.1) (2026-11-10)
 
 
