@@ -236,9 +236,12 @@ export interface EcfTablaSubRecargo {
   SubRecargo: EcfSubRecargo | EcfSubRecargo[];
 }
 
+export interface EcfImpuestoAdicionalItem {
+  TipoImpuesto: XmlText;
+}
+
 export interface EcfTablaImpuestoAdicionalItem {
-  ImpuestoAdicional:
-    { TipoImpuesto: XmlText } | Array<{ TipoImpuesto: XmlText }>;
+  ImpuestoAdicional: EcfImpuestoAdicionalItem | EcfImpuestoAdicionalItem[];
 }
 
 export interface EcfOtraMonedaDetalle {
